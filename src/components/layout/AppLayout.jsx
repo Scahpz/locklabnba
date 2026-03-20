@@ -1,0 +1,31 @@
+import React, { useState } from 'react';
+import { Outlet } from 'react-router-dom';
+import Sidebar from './Sidebar';
+import MobileNav from './MobileNav';
+import { cn } from '@/lib/utils';
+
+export default function AppLayout() {
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block">
+        <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
+      </div>
+
+      {/* Main Content */}
+      <main className={cn(
+        "transition-all duration-300 pb-20 md:pb-6",
+        collapsed ? "md:ml-16" : "md:ml-60"
+      )}>
+        <div className="p-4 md:p-6 max-w-7xl mx-auto">
+          <Outlet />
+        </div>
+      </main>
+
+      {/* Mobile Nav */}
+      <MobileNav />
+    </div>
+  );
+}
