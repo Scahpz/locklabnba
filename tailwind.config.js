@@ -88,5 +88,10 @@ module.exports = {
   		}
   	}
   },
+  safelist: [
+    'text-chart-3', 'text-chart-4', 'text-chart-5',
+    'bg-chart-3/10', 'bg-chart-4/10', 'bg-chart-5/10',
+    'fill-chart-4',
+  ],
   plugins: [require("tailwindcss-animate")],
 }
