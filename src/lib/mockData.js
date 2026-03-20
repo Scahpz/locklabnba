@@ -1,134 +1,362 @@
-// Per-game log data (last 10 games, most recent last)
-export const mockGameLogs = {
-  p1: [
-    { date: '3/10', opp: 'MEM' }, { date: '3/12', opp: 'HOU' }, { date: '3/14', opp: 'SAS' },
-    { date: '3/15', opp: 'NOP' }, { date: '3/17', opp: 'UTA' }, { date: '3/18', opp: 'OKC' },
-    { date: '3/19', opp: 'DEN' }, { date: '3/20', opp: 'PHX' }, { date: '3/21', opp: 'GSW' }, { date: '3/22', opp: 'LAL' },
-  ],
-  p2: [
-    { date: '3/10', opp: 'CLE' }, { date: '3/12', opp: 'NYK' }, { date: '3/14', opp: 'PHI' },
-    { date: '3/15', opp: 'CHI' }, { date: '3/17', opp: 'IND' }, { date: '3/18', opp: 'TOR' },
-    { date: '3/19', opp: 'BKN' }, { date: '3/20', opp: 'DET' }, { date: '3/21', opp: 'ORL' }, { date: '3/22', opp: 'MIL' },
-  ],
-  p3: [
-    { date: '3/10', opp: 'OKC' }, { date: '3/12', opp: 'MIN' }, { date: '3/14', opp: 'UTA' },
-    { date: '3/15', opp: 'LAC' }, { date: '3/17', opp: 'SAC' }, { date: '3/18', opp: 'POR' },
-    { date: '3/19', opp: 'GSW' }, { date: '3/20', opp: 'LAL' }, { date: '3/21', opp: 'MEM' }, { date: '3/22', opp: 'PHX' },
-  ],
-  p4: [
-    { date: '3/10', opp: 'POR' }, { date: '3/12', opp: 'SAC' }, { date: '3/14', opp: 'LAC' },
-    { date: '3/15', opp: 'NOP' }, { date: '3/17', opp: 'MEM' }, { date: '3/18', opp: 'DEN' },
-    { date: '3/19', opp: 'OKC' }, { date: '3/20', opp: 'PHX' }, { date: '3/21', opp: 'LAL' }, { date: '3/22', opp: 'GSW' },
-  ],
-  p5: [
-    { date: '3/10', opp: 'ATL' }, { date: '3/12', opp: 'MIA' }, { date: '3/14', opp: 'ORL' },
-    { date: '3/15', opp: 'WAS' }, { date: '3/17', opp: 'DET' }, { date: '3/18', opp: 'BKN' },
-    { date: '3/19', opp: 'NYK' }, { date: '3/20', opp: 'PHI' }, { date: '3/21', opp: 'MIL' }, { date: '3/22', opp: 'CHA' },
-  ],
-  p6: [
-    { date: '3/10', opp: 'UTA' }, { date: '3/12', opp: 'POR' }, { date: '3/14', opp: 'LAC' },
-    { date: '3/15', opp: 'GSW' }, { date: '3/17', opp: 'HOU' }, { date: '3/18', opp: 'MEM' },
-    { date: '3/19', opp: 'NOP' }, { date: '3/20', opp: 'DAL' }, { date: '3/21', opp: 'PHX' }, { date: '3/22', opp: 'SAC' },
-  ],
+// Helper to generate game logs for a player
+function makeLogs(id, opps) {
+  return { id, logs: opps.map((opp, i) => ({ date: `3/${10 + i}`, opp })) };
+}
+
+// All 30 NBA teams' recent opponents (10 games)
+const teamSchedules = {
+  DAL: ['MEM','HOU','SAS','NOP','UTA','OKC','DEN','PHX','GSW','LAL'],
+  LAL: ['SAC','POR','UTA','PHX','DAL','GSW','DEN','OKC','MEM','HOU'],
+  GSW: ['SAC','LAC','POR','UTA','OKC','DAL','PHX','DEN','LAL','MEM'],
+  BOS: ['CLE','NYK','PHI','CHI','IND','TOR','BKN','DET','ORL','MIL'],
+  MIL: ['CLE','CHI','IND','NYK','PHI','BOS','ORL','TOR','DET','BKN'],
+  PHI: ['NYK','TOR','CLE','CHI','BOS','MIL','BKN','IND','ORL','DET'],
+  NYK: ['PHI','BOS','MIL','TOR','CLE','BKN','CHI','ORL','IND','DET'],
+  BKN: ['CLE','ORL','DET','IND','NYK','CHI','PHI','MIL','BOS','TOR'],
+  MIA: ['ATL','CHA','ORL','WAS','DET','BKN','IND','CLE','NYK','TOR'],
+  CLE: ['BOS','MIL','DET','IND','TOR','NYK','PHI','ORL','CHA','CHI'],
+  CHI: ['MIL','IND','DET','TOR','CLE','NYK','ORL','PHI','BKN','BOS'],
+  TOR: ['PHI','BOS','MIL','BKN','NYK','CLE','IND','CHI','ORL','DET'],
+  IND: ['MIL','CHI','TOR','CLE','BOS','ORL','BKN','DET','NYK','PHI'],
+  ORL: ['ATL','MIA','WAS','CHA','BKN','NYK','PHI','DET','IND','BOS'],
+  ATL: ['MIA','ORL','WAS','CHA','BKN','IND','TOR','PHI','NYK','CLE'],
+  WAS: ['ATL','MIA','ORL','CHA','DET','CHI','IND','BOS','TOR','NYK'],
+  CHA: ['ATL','MIA','ORL','WAS','DET','BKN','NYK','PHI','TOR','IND'],
+  DET: ['CHI','IND','TOR','CLE','BOS','MIL','NYK','PHI','BKN','ORL'],
+  DEN: ['OKC','MIN','UTA','LAC','SAC','POR','GSW','LAL','MEM','PHX'],
+  PHX: ['UTA','POR','LAC','GSW','OKC','DAL','LAL','MEM','SAC','DEN'],
+  OKC: ['DEN','MIN','UTA','LAC','SAC','POR','GSW','LAL','MEM','PHX'],
+  MIN: ['POR','SAC','LAC','NOP','MEM','DEN','OKC','PHX','LAL','GSW'],
+  UTA: ['OKC','MIN','DEN','LAC','SAC','POR','GSW','DAL','PHX','LAL'],
+  SAC: ['UTA','POR','LAC','GSW','OKC','DAL','PHX','DEN','LAL','MEM'],
+  POR: ['UTA','SAC','LAC','GSW','OKC','DAL','PHX','DEN','LAL','MEM'],
+  LAC: ['SAC','POR','UTA','GSW','DAL','OKC','DEN','PHX','LAL','MEM'],
+  MEM: ['DAL','OKC','NOP','SAS','HOU','UTA','MIN','DEN','SAC','PHX'],
+  NOP: ['SAS','HOU','MEM','DAL','OKC','UTA','MIN','DEN','SAC','PHX'],
+  SAS: ['NOP','HOU','MEM','DAL','OKC','UTA','MIN','DEN','SAC','PHX'],
+  HOU: ['SAS','NOP','MEM','DAL','OKC','UTA','MIN','DEN','SAC','PHX'],
 };
 
-// Mock NBA player props data for demonstration
+// Build game logs lookup
+export const mockGameLogs = {};
+const logEntries = Object.entries(teamSchedules);
+logEntries.forEach(([team, opps], idx) => {
+  const pid = `p${idx + 1}`;
+  mockGameLogs[pid] = opps.map((opp, i) => ({ date: `3/${10 + i}`, opp }));
+});
+
+// Helper: make realistic game values
+function mkGames(base, variance, count = 10) {
+  return Array.from({ length: count }, () =>
+    parseFloat((base + (Math.random() * variance * 2 - variance)).toFixed(1))
+  );
+}
+
+// Generate a prop entry
+function mkProp(type, line, opts = {}) {
+  const games = mkGames(line + (opts.bias || 0.5), opts.var || line * 0.18);
+  const g5 = games.slice(-5);
+  const avg10 = parseFloat((games.reduce((a,b)=>a+b,0)/games.length).toFixed(1));
+  const avg5 = parseFloat((g5.reduce((a,b)=>a+b,0)/g5.length).toFixed(1));
+  const hits = games.filter(v => v > line).length;
+  const hit_rate = Math.round((hits/games.length)*100);
+  const proj = parseFloat((avg5 * 1.02).toFixed(1));
+  const edge = parseFloat((((proj - line)/line)*100).toFixed(1));
+  const over_odds = opts.over_odds || (Math.random() > 0.5 ? -110 : -115);
+  const under_odds = opts.under_odds || (over_odds === -110 ? -110 : -105);
+  const confidence_score = Math.min(10, Math.max(4, hits >= 8 ? 9 : hits >= 6 ? 7 : 5));
+  const confidence_tier = confidence_score >= 8 ? 'A' : confidence_score >= 6 ? 'B' : 'C';
+  const streak = hits >= 7 ? `Hit over in ${hits} of last 10` : hits <= 3 ? `Hit under in ${10-hits} of last 10` : `Split ${hits}-${10-hits} last 10`;
+  return {
+    prop_type: type,
+    line,
+    over_odds,
+    under_odds,
+    projection: proj,
+    edge,
+    hit_rate_last_10: hit_rate,
+    avg_last_5: avg5,
+    avg_last_10: avg10,
+    streak_info: streak,
+    confidence_score,
+    confidence_tier,
+    is_top_pick: confidence_score >= 8,
+    is_lock: confidence_score === 10,
+    best_value: edge > 8,
+    trap_warning: opts.trap || false,
+    last_5_games: g5,
+    last_10_games: games,
+    matchup_rating: opts.matchup_rating || 'neutral',
+    matchup_note: opts.matchup_note || '',
+    def_rank_vs_pos: opts.def_rank || 15,
+    minutes_avg: opts.min || 32,
+    usage_rate: opts.usage || 25,
+    minutes_last_5: mkGames(opts.min || 32, 2, 5),
+    pace_rating: opts.pace || 100.0,
+    game_total: opts.total || 220.0,
+  };
+}
+
 export const mockPlayers = [
-  {
-    id: 'p1', player_name: 'Luka Doncic', team: 'DAL', opponent: 'LAL', position: 'PG',
-    photo_url: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=100&h=100&fit=crop',
-    is_starter: true, injury_status: 'healthy',
-    props: [
-      { prop_type: 'points', line: 32.5, over_odds: -115, under_odds: -105, projection: 35.2, edge: 8.3, hit_rate_last_10: 70, avg_last_5: 34.8, avg_last_10: 33.6, streak_info: 'Hit over in 7 of last 10', confidence_score: 9, confidence_tier: 'A', is_top_pick: true, is_lock: true, best_value: true, trap_warning: false, last_5_games: [38, 29, 42, 31, 34], last_10_games: [38, 29, 42, 31, 34, 36, 27, 33, 40, 26], matchup_rating: 'favorable', matchup_note: 'LAL allows 4th most points to PGs', def_rank_vs_pos: 27, minutes_avg: 36.2, usage_rate: 34.5, minutes_last_5: [37, 35, 38, 36, 34], pace_rating: 102.3, game_total: 228.5 },
-      { prop_type: 'assists', line: 8.5, over_odds: -110, under_odds: -110, projection: 9.4, edge: 10.6, hit_rate_last_10: 80, avg_last_5: 9.6, avg_last_10: 9.2, streak_info: 'Hit over in 8 of last 10', confidence_score: 8, confidence_tier: 'A', is_top_pick: true, best_value: false, trap_warning: false, last_5_games: [11, 8, 12, 7, 10], last_10_games: [11, 8, 12, 7, 10, 9, 8, 11, 9, 7], matchup_rating: 'elite', matchup_note: 'LAL allows most assists to PGs', def_rank_vs_pos: 30, minutes_avg: 36.2, usage_rate: 34.5, minutes_last_5: [37, 35, 38, 36, 34], pace_rating: 102.3, game_total: 228.5 },
-    ]
-  },
-  {
-    id: 'p2', player_name: 'Jayson Tatum', team: 'BOS', opponent: 'MIL', position: 'SF',
-    photo_url: 'https://images.unsplash.com/photo-1574623452334-1e0ac2b3ccb4?w=100&h=100&fit=crop',
-    is_starter: true, injury_status: 'healthy',
-    props: [
-      { prop_type: 'points', line: 28.5, over_odds: -110, under_odds: -110, projection: 30.1, edge: 5.6, hit_rate_last_10: 60, avg_last_5: 29.4, avg_last_10: 28.8, streak_info: 'Hit over in 6 of last 10', confidence_score: 7, confidence_tier: 'B', is_top_pick: false, best_value: false, trap_warning: false, last_5_games: [32, 25, 34, 28, 28], last_10_games: [32, 25, 34, 28, 28, 30, 24, 31, 29, 27], matchup_rating: 'neutral', matchup_note: 'MIL average vs SFs', def_rank_vs_pos: 15, minutes_avg: 35.8, usage_rate: 30.2, minutes_last_5: [36, 34, 37, 35, 37], pace_rating: 98.7, game_total: 222.0 },
-      { prop_type: 'rebounds', line: 8.5, over_odds: -105, under_odds: -115, projection: 9.0, edge: 5.9, hit_rate_last_10: 70, avg_last_5: 9.2, avg_last_10: 8.9, streak_info: 'Hit over in 7 of last 10', confidence_score: 7, confidence_tier: 'B', is_top_pick: false, best_value: true, trap_warning: false, last_5_games: [10, 8, 11, 7, 10], last_10_games: [10, 8, 11, 7, 10, 9, 7, 10, 8, 9], matchup_rating: 'favorable', matchup_note: 'MIL poor on defensive boards', def_rank_vs_pos: 25, minutes_avg: 35.8, usage_rate: 30.2, minutes_last_5: [36, 34, 37, 35, 37], pace_rating: 98.7, game_total: 222.0 },
-    ]
-  },
-  {
-    id: 'p3', player_name: 'Nikola Jokic', team: 'DEN', opponent: 'PHX', position: 'C',
-    photo_url: 'https://images.unsplash.com/photo-1504450758481-7338bbe75005?w=100&h=100&fit=crop',
-    is_starter: true, injury_status: 'healthy',
-    props: [
-      { prop_type: 'PRA', line: 48.5, over_odds: -120, under_odds: +100, projection: 52.3, edge: 7.8, hit_rate_last_10: 80, avg_last_5: 51.8, avg_last_10: 50.4, streak_info: 'Hit over in 8 of last 10', confidence_score: 9, confidence_tier: 'A', is_top_pick: true, is_lock: true, best_value: true, trap_warning: false, last_5_games: [55, 48, 53, 50, 53], last_10_games: [55, 48, 53, 50, 53, 49, 46, 52, 51, 47], matchup_rating: 'elite', matchup_note: 'PHX worst vs Centers in PRA', def_rank_vs_pos: 29, minutes_avg: 34.5, usage_rate: 31.8, minutes_last_5: [35, 33, 36, 34, 34], pace_rating: 100.5, game_total: 230.0 },
-      { prop_type: 'assists', line: 9.5, over_odds: -110, under_odds: -110, projection: 10.8, edge: 13.7, hit_rate_last_10: 90, avg_last_5: 11.2, avg_last_10: 10.6, streak_info: 'Hit over in 9 of last 10', confidence_score: 10, confidence_tier: 'A', is_top_pick: true, is_lock: true, best_value: true, trap_warning: false, last_5_games: [12, 10, 13, 9, 12], last_10_games: [12, 10, 13, 9, 12, 11, 10, 12, 8, 9], matchup_rating: 'elite', matchup_note: 'PHX allows most assists to Centers', def_rank_vs_pos: 30, minutes_avg: 34.5, usage_rate: 31.8, minutes_last_5: [35, 33, 36, 34, 34], pace_rating: 100.5, game_total: 230.0 },
-    ]
-  },
-  {
-    id: 'p4', player_name: 'Anthony Edwards', team: 'MIN', opponent: 'GSW', position: 'SG',
-    photo_url: 'https://images.unsplash.com/photo-1518063319789-7217e6706b04?w=100&h=100&fit=crop',
-    is_starter: true, injury_status: 'questionable', injury_note: 'Ankle - Probable',
-    props: [
-      { prop_type: 'points', line: 26.5, over_odds: -110, under_odds: -110, projection: 28.3, edge: 6.8, hit_rate_last_10: 60, avg_last_5: 27.6, avg_last_10: 27.1, streak_info: 'Hit over in 6 of last 10', confidence_score: 6, confidence_tier: 'B', is_top_pick: false, best_value: false, trap_warning: true, last_5_games: [30, 22, 32, 26, 28], last_10_games: [30, 22, 32, 26, 28, 25, 24, 31, 29, 24], matchup_rating: 'tough', matchup_note: 'GSW elite perimeter defense', def_rank_vs_pos: 5, minutes_avg: 35.0, usage_rate: 32.1, minutes_last_5: [36, 34, 37, 33, 35], pace_rating: 99.2, game_total: 218.5 },
-      { prop_type: '3PM', line: 3.5, over_odds: +105, under_odds: -125, projection: 3.8, edge: 8.6, hit_rate_last_10: 50, avg_last_5: 3.6, avg_last_10: 3.4, streak_info: 'Hit over in 5 of last 10', confidence_score: 5, confidence_tier: 'C', is_top_pick: false, best_value: false, trap_warning: true, last_5_games: [4, 2, 5, 3, 4], last_10_games: [4, 2, 5, 3, 4, 3, 2, 4, 3, 4], matchup_rating: 'tough', matchup_note: 'GSW best at defending 3pt shooters', def_rank_vs_pos: 2, minutes_avg: 35.0, usage_rate: 32.1, minutes_last_5: [36, 34, 37, 33, 35], pace_rating: 99.2, game_total: 218.5 },
-    ]
-  },
-  {
-    id: 'p5', player_name: 'Tyrese Haliburton', team: 'IND', opponent: 'CHA', position: 'PG',
-    photo_url: 'https://images.unsplash.com/photo-1519861531473-9200262188bf?w=100&h=100&fit=crop',
-    is_starter: true, injury_status: 'healthy',
-    props: [
-      { prop_type: 'assists', line: 10.5, over_odds: -105, under_odds: -115, projection: 11.8, edge: 12.4, hit_rate_last_10: 80, avg_last_5: 12.0, avg_last_10: 11.4, streak_info: 'Hit over in 8 of last 10', confidence_score: 9, confidence_tier: 'A', is_top_pick: true, best_value: true, trap_warning: false, last_5_games: [13, 11, 14, 10, 12], last_10_games: [13, 11, 14, 10, 12, 11, 10, 13, 9, 11], matchup_rating: 'elite', matchup_note: 'CHA worst defense vs PG assists', def_rank_vs_pos: 30, minutes_avg: 34.0, usage_rate: 28.5, minutes_last_5: [35, 33, 34, 34, 34], pace_rating: 104.8, game_total: 234.5 },
-      { prop_type: 'points', line: 20.5, over_odds: -110, under_odds: -110, projection: 21.4, edge: 4.4, hit_rate_last_10: 60, avg_last_5: 21.2, avg_last_10: 20.8, streak_info: 'Hit over in 6 of last 10', confidence_score: 6, confidence_tier: 'B', is_top_pick: false, best_value: false, trap_warning: false, last_5_games: [22, 18, 24, 20, 22], last_10_games: [22, 18, 24, 20, 22, 19, 17, 23, 21, 22], matchup_rating: 'favorable', matchup_note: 'CHA allows high scoring', def_rank_vs_pos: 26, minutes_avg: 34.0, usage_rate: 28.5, minutes_last_5: [35, 33, 34, 34, 34], pace_rating: 104.8, game_total: 234.5 },
-    ]
-  },
-  {
-    id: 'p6', player_name: 'Shai Gilgeous-Alexander', team: 'OKC', opponent: 'SAC', position: 'SG',
-    photo_url: 'https://images.unsplash.com/photo-1515523110800-9415d13b84a8?w=100&h=100&fit=crop',
-    is_starter: true, injury_status: 'healthy',
-    props: [
-      { prop_type: 'points', line: 31.5, over_odds: -110, under_odds: -110, projection: 33.4, edge: 6.0, hit_rate_last_10: 70, avg_last_5: 33.0, avg_last_10: 32.2, streak_info: 'Hit over in 7 of last 10', confidence_score: 8, confidence_tier: 'A', is_top_pick: true, best_value: false, trap_warning: false, last_5_games: [35, 30, 36, 32, 32], last_10_games: [35, 30, 36, 32, 32, 33, 28, 34, 31, 31], matchup_rating: 'favorable', matchup_note: 'SAC allow 6th most pts to SGs', def_rank_vs_pos: 25, minutes_avg: 34.8, usage_rate: 33.2, minutes_last_5: [35, 34, 36, 34, 35], pace_rating: 101.4, game_total: 226.0 },
-    ]
-  },
+  // ── DALLAS MAVERICKS ──
+  { id: 'p1', player_name: 'Luka Doncic', team: 'DAL', opponent: 'LAL', position: 'PG', photo_url: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 32.5, {bias:2, var:5, over_odds:-115, under_odds:-105, matchup_rating:'favorable', matchup_note:'LAL allows 4th most pts to PGs', def_rank:27, min:36, usage:35, pace:102, total:229}),
+            mkProp('assists', 8.5, {bias:1, var:2, over_odds:-110, under_odds:-110, matchup_rating:'elite', matchup_note:'LAL gives up most assists to PGs', def_rank:30, min:36, usage:35, pace:102, total:229})]},
+  { id: 'p2', player_name: 'Kyrie Irving', team: 'DAL', opponent: 'LAL', position: 'SG', photo_url: 'https://images.unsplash.com/photo-1574623452334-1e0ac2b3ccb4?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 24.5, {bias:1.5, var:4, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'LAL weak vs SG scorers', def_rank:25, min:35, usage:28, pace:102, total:229}),
+            mkProp('3PM', 3.5, {bias:0.3, var:1, over_odds:+105, under_odds:-125, matchup_rating:'favorable', matchup_note:'LAL poor at contesting 3s', def_rank:24, min:35, usage:28, pace:102, total:229})]},
+  { id: 'p3', player_name: 'P.J. Washington', team: 'DAL', opponent: 'LAL', position: 'PF', photo_url: 'https://images.unsplash.com/photo-1504450758481-7338bbe75005?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 14.5, {bias:0.5, var:3, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'LAL average vs PFs', def_rank:15, min:30, usage:18, pace:102, total:229}),
+            mkProp('rebounds', 6.5, {bias:0.5, var:2, over_odds:-115, under_odds:-105, matchup_rating:'neutral', matchup_note:'Rebounding matchup neutral', def_rank:14, min:30, usage:18, pace:102, total:229})]},
+
+  // ── LOS ANGELES LAKERS ──
+  { id: 'p4', player_name: 'LeBron James', team: 'LAL', opponent: 'DAL', position: 'SF', photo_url: 'https://images.unsplash.com/photo-1518063319789-7217e6706b04?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 24.5, {bias:1, var:4, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'DAL average vs SFs', def_rank:16, min:35, usage:28, pace:102, total:229}),
+            mkProp('assists', 7.5, {bias:0.5, var:2, over_odds:-105, under_odds:-115, matchup_rating:'favorable', matchup_note:'DAL weak defensively vs playmakers', def_rank:22, min:35, usage:28, pace:102, total:229})]},
+  { id: 'p5', player_name: 'Anthony Davis', team: 'LAL', opponent: 'DAL', position: 'C', photo_url: 'https://images.unsplash.com/photo-1519861531473-9200262188bf?w=100&h=100&fit=crop', is_starter: true, injury_status: 'questionable', injury_note: 'Back - GTD',
+    props: [mkProp('points', 26.5, {bias:1, var:5, over_odds:-115, under_odds:-105, matchup_rating:'favorable', matchup_note:'DAL poor rim protection', def_rank:26, min:34, usage:30, pace:102, total:229, trap:true}),
+            mkProp('rebounds', 12.5, {bias:0.5, var:3, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'DAL gives up boards to Centers', def_rank:24, min:34, usage:30, pace:102, total:229})]},
+  { id: 'p6', player_name: 'Austin Reaves', team: 'LAL', opponent: 'DAL', position: 'SG', photo_url: 'https://images.unsplash.com/photo-1515523110800-9415d13b84a8?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 16.5, {bias:0.5, var:3, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'DAL solid perimeter D', def_rank:12, min:33, usage:22, pace:102, total:229})]},
+
+  // ── GOLDEN STATE WARRIORS ──
+  { id: 'p7', player_name: 'Stephen Curry', team: 'GSW', opponent: 'MEM', position: 'PG', photo_url: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 27.5, {bias:1.5, var:5, over_odds:-115, under_odds:-105, matchup_rating:'favorable', matchup_note:'MEM weak vs guards', def_rank:25, min:34, usage:30, pace:101, total:222}),
+            mkProp('3PM', 4.5, {bias:0.3, var:1.5, over_odds:-105, under_odds:-115, matchup_rating:'favorable', matchup_note:'MEM 28th defending the 3', def_rank:28, min:34, usage:30, pace:101, total:222})]},
+  { id: 'p8', player_name: 'Draymond Green', team: 'GSW', opponent: 'MEM', position: 'PF', photo_url: 'https://images.unsplash.com/photo-1574623452334-1e0ac2b3ccb4?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('assists', 6.5, {bias:0.5, var:2, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'MEM average at guarding playmaking bigs', def_rank:15, min:28, usage:16, pace:101, total:222}),
+            mkProp('rebounds', 7.5, {bias:0.5, var:2, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'Even rebounding matchup', def_rank:14, min:28, usage:16, pace:101, total:222})]},
+  { id: 'p9', player_name: 'Andrew Wiggins', team: 'GSW', opponent: 'MEM', position: 'SF', photo_url: 'https://images.unsplash.com/photo-1504450758481-7338bbe75005?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 14.5, {bias:0.5, var:3, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'MEM solid wing defenders', def_rank:11, min:30, usage:18, pace:101, total:222})]},
+
+  // ── BOSTON CELTICS ──
+  { id: 'p10', player_name: 'Jayson Tatum', team: 'BOS', opponent: 'MIL', position: 'SF', photo_url: 'https://images.unsplash.com/photo-1518063319789-7217e6706b04?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 28.5, {bias:1, var:5, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'MIL average vs SFs', def_rank:15, min:36, usage:30, pace:99, total:222}),
+            mkProp('rebounds', 8.5, {bias:0.5, var:2, over_odds:-105, under_odds:-115, matchup_rating:'favorable', matchup_note:'MIL poor on defensive boards', def_rank:25, min:36, usage:30, pace:99, total:222})]},
+  { id: 'p11', player_name: 'Jaylen Brown', team: 'BOS', opponent: 'MIL', position: 'SG', photo_url: 'https://images.unsplash.com/photo-1519861531473-9200262188bf?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 23.5, {bias:1, var:4, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'MIL porous perimeter D', def_rank:22, min:34, usage:26, pace:99, total:222}),
+            mkProp('3PM', 2.5, {bias:0.2, var:1, over_odds:-105, under_odds:-115, matchup_rating:'neutral', matchup_note:'Average 3pt defense', def_rank:14, min:34, usage:26, pace:99, total:222})]},
+  { id: 'p12', player_name: 'Jrue Holiday', team: 'BOS', opponent: 'MIL', position: 'PG', photo_url: 'https://images.unsplash.com/photo-1515523110800-9415d13b84a8?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('assists', 5.5, {bias:0.3, var:2, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'MIL decent at guarding PGs', def_rank:12, min:30, usage:18, pace:99, total:222})]},
+
+  // ── MILWAUKEE BUCKS ──
+  { id: 'p13', player_name: 'Giannis Antetokounmpo', team: 'MIL', opponent: 'BOS', position: 'PF', photo_url: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 30.5, {bias:1.5, var:5, over_odds:-120, under_odds:+100, matchup_rating:'tough', matchup_note:'BOS elite rim defense', def_rank:4, min:35, usage:33, pace:99, total:222}),
+            mkProp('rebounds', 11.5, {bias:0.5, var:2.5, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'BOS solid on boards', def_rank:12, min:35, usage:33, pace:99, total:222})]},
+  { id: 'p14', player_name: 'Damian Lillard', team: 'MIL', opponent: 'BOS', position: 'PG', photo_url: 'https://images.unsplash.com/photo-1574623452334-1e0ac2b3ccb4?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 25.5, {bias:1, var:4, over_odds:-110, under_odds:-110, matchup_rating:'tough', matchup_note:'BOS Jrue Holiday tough on PGs', def_rank:5, min:35, usage:29, pace:99, total:222}),
+            mkProp('3PM', 3.5, {bias:0.3, var:1.2, over_odds:+100, under_odds:-120, matchup_rating:'tough', matchup_note:'BOS ranks 3rd in 3pt defense', def_rank:3, min:35, usage:29, pace:99, total:222})]},
+
+  // ── PHILADELPHIA 76ERS ──
+  { id: 'p15', player_name: 'Joel Embiid', team: 'PHI', opponent: 'DET', position: 'C', photo_url: 'https://images.unsplash.com/photo-1504450758481-7338bbe75005?w=100&h=100&fit=crop', is_starter: true, injury_status: 'questionable', injury_note: 'Knee - Day-to-Day',
+    props: [mkProp('points', 33.5, {bias:1, var:6, over_odds:-115, under_odds:-105, matchup_rating:'elite', matchup_note:'DET worst vs Centers in the league', def_rank:30, min:34, usage:35, pace:100, total:218, trap:true}),
+            mkProp('rebounds', 10.5, {bias:0.5, var:2.5, over_odds:-110, under_odds:-110, matchup_rating:'elite', matchup_note:'DET gives up most boards to Cs', def_rank:29, min:34, usage:35, pace:100, total:218})]},
+  { id: 'p16', player_name: 'Tyrese Maxey', team: 'PHI', opponent: 'DET', position: 'PG', photo_url: 'https://images.unsplash.com/photo-1518063319789-7217e6706b04?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 26.5, {bias:1, var:4, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'DET leaks points to PGs', def_rank:24, min:36, usage:28, pace:100, total:218}),
+            mkProp('assists', 6.5, {bias:0.5, var:2, over_odds:-105, under_odds:-115, matchup_rating:'favorable', matchup_note:'DET poor vs playmaking guards', def_rank:25, min:36, usage:28, pace:100, total:218})]},
+
+  // ── NEW YORK KNICKS ──
+  { id: 'p17', player_name: 'Jalen Brunson', team: 'NYK', opponent: 'ORL', position: 'PG', photo_url: 'https://images.unsplash.com/photo-1519861531473-9200262188bf?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 27.5, {bias:1.5, var:4, over_odds:-115, under_odds:-105, matchup_rating:'favorable', matchup_note:'ORL middle-of-pack vs PG scorers', def_rank:18, min:35, usage:30, pace:101, total:215}),
+            mkProp('assists', 6.5, {bias:0.5, var:2, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'ORL average on assists given up', def_rank:15, min:35, usage:30, pace:101, total:215})]},
+  { id: 'p18', player_name: 'Karl-Anthony Towns', team: 'NYK', opponent: 'ORL', position: 'C', photo_url: 'https://images.unsplash.com/photo-1515523110800-9415d13b84a8?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 24.5, {bias:1, var:4, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'ORL soft on interior D', def_rank:22, min:33, usage:27, pace:101, total:215}),
+            mkProp('3PM', 2.5, {bias:0.2, var:1, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'ORL decent 3pt D for a big', def_rank:13, min:33, usage:27, pace:101, total:215})]},
+
+  // ── BROOKLYN NETS ──
+  { id: 'p19', player_name: 'Cam Thomas', team: 'BKN', opponent: 'TOR', position: 'SG', photo_url: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 22.5, {bias:1, var:4, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'TOR solid guard defenders', def_rank:12, min:34, usage:26, pace:100, total:214})]},
+  { id: 'p20', player_name: 'Ben Simmons', team: 'BKN', opponent: 'TOR', position: 'PF', photo_url: 'https://images.unsplash.com/photo-1574623452334-1e0ac2b3ccb4?w=100&h=100&fit=crop', is_starter: true, injury_status: 'doubtful', injury_note: 'Back - Out',
+    props: [mkProp('assists', 6.5, {bias:0.3, var:2, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'TOR average vs playmaking bigs', def_rank:14, min:28, usage:18, pace:100, total:214})]},
+
+  // ── MIAMI HEAT ──
+  { id: 'p21', player_name: 'Bam Adebayo', team: 'MIA', opponent: 'ATL', position: 'C', photo_url: 'https://images.unsplash.com/photo-1504450758481-7338bbe75005?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 18.5, {bias:0.5, var:3, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'ATL weak interior defense', def_rank:24, min:33, usage:22, pace:100, total:218}),
+            mkProp('rebounds', 10.5, {bias:0.5, var:2, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'ATL poor rebounding team', def_rank:26, min:33, usage:22, pace:100, total:218})]},
+  { id: 'p22', player_name: 'Tyler Herro', team: 'MIA', opponent: 'ATL', position: 'SG', photo_url: 'https://images.unsplash.com/photo-1518063319789-7217e6706b04?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 22.5, {bias:1, var:4, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'ATL leaks pts to shooting guards', def_rank:23, min:33, usage:25, pace:100, total:218}),
+            mkProp('3PM', 2.5, {bias:0.2, var:1, over_odds:-105, under_odds:-115, matchup_rating:'neutral', matchup_note:'ATL average 3pt defense', def_rank:14, min:33, usage:25, pace:100, total:218})]},
+
+  // ── CLEVELAND CAVALIERS ──
+  { id: 'p23', player_name: 'Donovan Mitchell', team: 'CLE', opponent: 'CHI', position: 'SG', photo_url: 'https://images.unsplash.com/photo-1519861531473-9200262188bf?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 27.5, {bias:1, var:4, over_odds:-115, under_odds:-105, matchup_rating:'favorable', matchup_note:'CHI weak vs off-guards', def_rank:24, min:35, usage:30, pace:98, total:216}),
+            mkProp('3PM', 3.5, {bias:0.2, var:1.2, over_odds:+100, under_odds:-120, matchup_rating:'neutral', matchup_note:'CHI decent 3pt defense', def_rank:14, min:35, usage:30, pace:98, total:216})]},
+  { id: 'p24', player_name: 'Darius Garland', team: 'CLE', opponent: 'CHI', position: 'PG', photo_url: 'https://images.unsplash.com/photo-1515523110800-9415d13b84a8?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('assists', 7.5, {bias:0.5, var:2, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'CHI soft on assists given up', def_rank:24, min:33, usage:24, pace:98, total:216}),
+            mkProp('points', 19.5, {bias:0.5, var:3, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'CHI solid on point guards scoring', def_rank:12, min:33, usage:24, pace:98, total:216})]},
+
+  // ── CHICAGO BULLS ──
+  { id: 'p25', player_name: 'Zach LaVine', team: 'CHI', opponent: 'CLE', position: 'SG', photo_url: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 22.5, {bias:1, var:4, over_odds:-110, under_odds:-110, matchup_rating:'tough', matchup_note:'CLE elite perimeter defense', def_rank:4, min:34, usage:27, pace:98, total:216}),
+            mkProp('3PM', 2.5, {bias:0.1, var:1, over_odds:-105, under_odds:-115, matchup_rating:'tough', matchup_note:'CLE ranks 5th in 3pt D', def_rank:5, min:34, usage:27, pace:98, total:216})]},
+  { id: 'p26', player_name: 'Nikola Vucevic', team: 'CHI', opponent: 'CLE', position: 'C', photo_url: 'https://images.unsplash.com/photo-1574623452334-1e0ac2b3ccb4?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 16.5, {bias:0.5, var:3, over_odds:-110, under_odds:-110, matchup_rating:'tough', matchup_note:'CLE elite Center coverage', def_rank:3, min:30, usage:20, pace:98, total:216}),
+            mkProp('rebounds', 11.5, {bias:0.5, var:2.5, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'CLE decent boards matchup', def_rank:14, min:30, usage:20, pace:98, total:216})]},
+
+  // ── TORONTO RAPTORS ──
+  { id: 'p27', player_name: 'Scottie Barnes', team: 'TOR', opponent: 'BKN', position: 'PF', photo_url: 'https://images.unsplash.com/photo-1504450758481-7338bbe75005?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 19.5, {bias:0.5, var:4, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'BKN soft on PF scoring', def_rank:24, min:35, usage:24, pace:100, total:214}),
+            mkProp('rebounds', 8.5, {bias:0.5, var:2, over_odds:-105, under_odds:-115, matchup_rating:'favorable', matchup_note:'BKN weak on boards', def_rank:25, min:35, usage:24, pace:100, total:214})]},
+  { id: 'p28', player_name: 'RJ Barrett', team: 'TOR', opponent: 'BKN', position: 'SG', photo_url: 'https://images.unsplash.com/photo-1518063319789-7217e6706b04?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 21.5, {bias:0.5, var:4, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'BKN average SG coverage', def_rank:15, min:34, usage:25, pace:100, total:214})]},
+
+  // ── INDIANA PACERS ──
+  { id: 'p29', player_name: 'Tyrese Haliburton', team: 'IND', opponent: 'CHA', position: 'PG', photo_url: 'https://images.unsplash.com/photo-1519861531473-9200262188bf?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('assists', 10.5, {bias:1, var:2, over_odds:-105, under_odds:-115, matchup_rating:'elite', matchup_note:'CHA worst defense vs PG assists', def_rank:30, min:34, usage:29, pace:105, total:234}),
+            mkProp('points', 20.5, {bias:0.5, var:3, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'CHA allows high scoring', def_rank:26, min:34, usage:29, pace:105, total:234})]},
+  { id: 'p30', player_name: 'Pascal Siakam', team: 'IND', opponent: 'CHA', position: 'PF', photo_url: 'https://images.unsplash.com/photo-1515523110800-9415d13b84a8?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 20.5, {bias:1, var:4, over_odds:-110, under_odds:-110, matchup_rating:'elite', matchup_note:'CHA worst PF defense in East', def_rank:29, min:34, usage:26, pace:105, total:234}),
+            mkProp('rebounds', 6.5, {bias:0.3, var:2, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'CHA soft on boards', def_rank:25, min:34, usage:26, pace:105, total:234})]},
+
+  // ── ORLANDO MAGIC ──
+  { id: 'p31', player_name: 'Paolo Banchero', team: 'ORL', opponent: 'NYK', position: 'PF', photo_url: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 23.5, {bias:1, var:4, over_odds:-110, under_odds:-110, matchup_rating:'tough', matchup_note:'NYK elite interior defense', def_rank:4, min:35, usage:27, pace:101, total:215}),
+            mkProp('rebounds', 6.5, {bias:0.3, var:2, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'NYK solid rebounding team', def_rank:12, min:35, usage:27, pace:101, total:215})]},
+  { id: 'p32', player_name: 'Franz Wagner', team: 'ORL', opponent: 'NYK', position: 'SF', photo_url: 'https://images.unsplash.com/photo-1574623452334-1e0ac2b3ccb4?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 20.5, {bias:0.5, var:4, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'NYK average SF coverage', def_rank:14, min:33, usage:23, pace:101, total:215})]},
+
+  // ── ATLANTA HAWKS ──
+  { id: 'p33', player_name: 'Trae Young', team: 'ATL', opponent: 'MIA', position: 'PG', photo_url: 'https://images.unsplash.com/photo-1504450758481-7338bbe75005?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 25.5, {bias:1, var:4, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'MIA average PG coverage', def_rank:14, min:34, usage:30, pace:100, total:218}),
+            mkProp('assists', 10.5, {bias:0.5, var:2.5, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'MIA gives up assists to PGs', def_rank:22, min:34, usage:30, pace:100, total:218})]},
+  { id: 'p34', player_name: 'Dejounte Murray', team: 'ATL', opponent: 'MIA', position: 'SG', photo_url: 'https://images.unsplash.com/photo-1518063319789-7217e6706b04?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 20.5, {bias:0.5, var:4, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'MIA solid perimeter defense', def_rank:12, min:34, usage:24, pace:100, total:218}),
+            mkProp('assists', 5.5, {bias:0.3, var:2, over_odds:-105, under_odds:-115, matchup_rating:'neutral', matchup_note:'MIA decent at containing playmakers', def_rank:13, min:34, usage:24, pace:100, total:218})]},
+
+  // ── WASHINGTON WIZARDS ──
+  { id: 'p35', player_name: 'Kyle Kuzma', team: 'WAS', opponent: 'CHA', position: 'SF', photo_url: 'https://images.unsplash.com/photo-1519861531473-9200262188bf?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 17.5, {bias:0.5, var:3, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'CHA soft on SF scoring', def_rank:25, min:33, usage:22, pace:100, total:212}),
+            mkProp('rebounds', 7.5, {bias:0.3, var:2, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'CHA weak on boards', def_rank:24, min:33, usage:22, pace:100, total:212})]},
+  { id: 'p36', player_name: 'Bilal Coulibaly', team: 'WAS', opponent: 'CHA', position: 'SF', photo_url: 'https://images.unsplash.com/photo-1515523110800-9415d13b84a8?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 13.5, {bias:0.3, var:3, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'CHA weak wing coverage', def_rank:24, min:30, usage:18, pace:100, total:212})]},
+
+  // ── CHARLOTTE HORNETS ──
+  { id: 'p37', player_name: 'LaMelo Ball', team: 'CHA', opponent: 'IND', position: 'PG', photo_url: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=100&h=100&fit=crop', is_starter: true, injury_status: 'questionable', injury_note: 'Ankle - GTD',
+    props: [mkProp('points', 23.5, {bias:1, var:5, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'IND allows points to PGs', def_rank:22, min:35, usage:29, pace:105, total:234, trap:true}),
+            mkProp('assists', 7.5, {bias:0.5, var:2, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'IND weak at containing playmakers', def_rank:20, min:35, usage:29, pace:105, total:234})]},
+
+  // ── DETROIT PISTONS ──
+  { id: 'p38', player_name: 'Cade Cunningham', team: 'DET', opponent: 'PHI', position: 'PG', photo_url: 'https://images.unsplash.com/photo-1574623452334-1e0ac2b3ccb4?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 24.5, {bias:1, var:4, over_odds:-110, under_odds:-110, matchup_rating:'tough', matchup_note:'PHI solid PG coverage with Maxey', def_rank:8, min:35, usage:28, pace:100, total:218}),
+            mkProp('assists', 7.5, {bias:0.5, var:2, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'PHI average assists given up', def_rank:14, min:35, usage:28, pace:100, total:218})]},
+
+  // ── DENVER NUGGETS ──
+  { id: 'p39', player_name: 'Nikola Jokic', team: 'DEN', opponent: 'PHX', position: 'C', photo_url: 'https://images.unsplash.com/photo-1504450758481-7338bbe75005?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('PRA', 48.5, {bias:3, var:5, over_odds:-120, under_odds:+100, matchup_rating:'elite', matchup_note:'PHX worst vs Centers in PRA', def_rank:29, min:35, usage:32, pace:101, total:230}),
+            mkProp('assists', 9.5, {bias:1, var:2, over_odds:-110, under_odds:-110, matchup_rating:'elite', matchup_note:'PHX allows most assists to Centers', def_rank:30, min:35, usage:32, pace:101, total:230})]},
+  { id: 'p40', player_name: 'Jamal Murray', team: 'DEN', opponent: 'PHX', position: 'PG', photo_url: 'https://images.unsplash.com/photo-1518063319789-7217e6706b04?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 21.5, {bias:1, var:4, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'PHX weak PG defense', def_rank:23, min:34, usage:25, pace:101, total:230}),
+            mkProp('3PM', 2.5, {bias:0.2, var:1, over_odds:-105, under_odds:-115, matchup_rating:'favorable', matchup_note:'PHX gives up 3s', def_rank:24, min:34, usage:25, pace:101, total:230})]},
+  { id: 'p41', player_name: 'Michael Porter Jr.', team: 'DEN', opponent: 'PHX', position: 'SF', photo_url: 'https://images.unsplash.com/photo-1519861531473-9200262188bf?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 18.5, {bias:0.5, var:4, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'PHX soft on SF scorers', def_rank:22, min:32, usage:22, pace:101, total:230}),
+            mkProp('rebounds', 7.5, {bias:0.3, var:2, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'PHX neutral on rebounds', def_rank:14, min:32, usage:22, pace:101, total:230})]},
+
+  // ── PHOENIX SUNS ──
+  { id: 'p42', player_name: 'Kevin Durant', team: 'PHX', opponent: 'DEN', position: 'SF', photo_url: 'https://images.unsplash.com/photo-1515523110800-9415d13b84a8?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 26.5, {bias:1, var:4, over_odds:-115, under_odds:-105, matchup_rating:'tough', matchup_note:'DEN excellent interior rotation', def_rank:5, min:35, usage:30, pace:101, total:230}),
+            mkProp('rebounds', 6.5, {bias:0.3, var:2, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'DEN neutral rebounding matchup', def_rank:13, min:35, usage:30, pace:101, total:230})]},
+  { id: 'p43', player_name: 'Devin Booker', team: 'PHX', opponent: 'DEN', position: 'SG', photo_url: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 28.5, {bias:1.5, var:5, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'DEN average vs SGs', def_rank:14, min:35, usage:31, pace:101, total:230}),
+            mkProp('3PM', 3.5, {bias:0.3, var:1.2, over_odds:-105, under_odds:-115, matchup_rating:'neutral', matchup_note:'DEN decent 3pt defense', def_rank:13, min:35, usage:31, pace:101, total:230})]},
+
+  // ── OKLAHOMA CITY THUNDER ──
+  { id: 'p44', player_name: 'Shai Gilgeous-Alexander', team: 'OKC', opponent: 'SAC', position: 'SG', photo_url: 'https://images.unsplash.com/photo-1574623452334-1e0ac2b3ccb4?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 31.5, {bias:1.5, var:4, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'SAC allows 6th most pts to SGs', def_rank:25, min:35, usage:33, pace:101, total:226}),
+            mkProp('assists', 5.5, {bias:0.3, var:1.5, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'SAC average on assists allowed', def_rank:14, min:35, usage:33, pace:101, total:226})]},
+  { id: 'p45', player_name: 'Jalen Williams', team: 'OKC', opponent: 'SAC', position: 'SF', photo_url: 'https://images.unsplash.com/photo-1504450758481-7338bbe75005?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 22.5, {bias:1, var:4, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'SAC soft on SF scoring', def_rank:23, min:33, usage:25, pace:101, total:226})]},
+  { id: 'p46', player_name: 'Chet Holmgren', team: 'OKC', opponent: 'SAC', position: 'C', photo_url: 'https://images.unsplash.com/photo-1518063319789-7217e6706b04?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 16.5, {bias:0.5, var:3, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'SAC gives up points to stretch Cs', def_rank:22, min:30, usage:20, pace:101, total:226}),
+            mkProp('blocks', 2.5, {bias:0.2, var:1, over_odds:-105, under_odds:-115, matchup_rating:'neutral', matchup_note:'SAC neutral blocks matchup', def_rank:14, min:30, usage:20, pace:101, total:226})]},
+
+  // ── MINNESOTA TIMBERWOLVES ──
+  { id: 'p47', player_name: 'Anthony Edwards', team: 'MIN', opponent: 'GSW', position: 'SG', photo_url: 'https://images.unsplash.com/photo-1519861531473-9200262188bf?w=100&h=100&fit=crop', is_starter: true, injury_status: 'questionable', injury_note: 'Ankle - Probable',
+    props: [mkProp('points', 26.5, {bias:1, var:5, over_odds:-110, under_odds:-110, matchup_rating:'tough', matchup_note:'GSW elite perimeter defense', def_rank:5, min:35, usage:32, pace:99, total:219, trap:true}),
+            mkProp('3PM', 3.5, {bias:0.1, var:1.2, over_odds:+105, under_odds:-125, matchup_rating:'tough', matchup_note:'GSW best at defending 3pt shooters', def_rank:2, min:35, usage:32, pace:99, total:219})]},
+  { id: 'p48', player_name: 'Karl-Anthony Towns', team: 'MIN', opponent: 'GSW', position: 'C', photo_url: 'https://images.unsplash.com/photo-1515523110800-9415d13b84a8?w=100&h=100&fit=crop', is_starter: false, injury_status: 'out', injury_note: 'Trade',
+    props: [mkProp('points', 20.5, {bias:0.5, var:4, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'N/A - not with team', def_rank:14, min:30, usage:23, pace:99, total:219})]},
+  { id: 'p49', player_name: 'Rudy Gobert', team: 'MIN', opponent: 'GSW', position: 'C', photo_url: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('rebounds', 12.5, {bias:0.5, var:2.5, over_odds:-115, under_odds:-105, matchup_rating:'neutral', matchup_note:'GSW average C coverage', def_rank:14, min:30, usage:14, pace:99, total:219}),
+            mkProp('blocks', 1.5, {bias:0.1, var:0.8, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'GSW neutral blocks matchup', def_rank:14, min:30, usage:14, pace:99, total:219})]},
+
+  // ── UTAH JAZZ ──
+  { id: 'p50', player_name: 'Lauri Markkanen', team: 'UTA', opponent: 'OKC', position: 'PF', photo_url: 'https://images.unsplash.com/photo-1574623452334-1e0ac2b3ccb4?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 22.5, {bias:0.5, var:4, over_odds:-110, under_odds:-110, matchup_rating:'tough', matchup_note:'OKC elite interior defense', def_rank:3, min:34, usage:26, pace:100, total:219}),
+            mkProp('3PM', 2.5, {bias:0.2, var:1, over_odds:-105, under_odds:-115, matchup_rating:'neutral', matchup_note:'OKC decent 3pt defense', def_rank:13, min:34, usage:26, pace:100, total:219})]},
+  { id: 'p51', player_name: 'Collin Sexton', team: 'UTA', opponent: 'OKC', position: 'PG', photo_url: 'https://images.unsplash.com/photo-1504450758481-7338bbe75005?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 18.5, {bias:0.5, var:3, over_odds:-110, under_odds:-110, matchup_rating:'tough', matchup_note:'OKC SGA sets elite defensive tone', def_rank:4, min:30, usage:22, pace:100, total:219})]},
+
+  // ── SACRAMENTO KINGS ──
+  { id: 'p52', player_name: 'De\'Aaron Fox', team: 'SAC', opponent: 'OKC', position: 'PG', photo_url: 'https://images.unsplash.com/photo-1518063319789-7217e6706b04?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 26.5, {bias:1, var:4, over_odds:-110, under_odds:-110, matchup_rating:'tough', matchup_note:'OKC solid on guard scoring', def_rank:6, min:35, usage:30, pace:101, total:226}),
+            mkProp('assists', 6.5, {bias:0.3, var:2, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'OKC decent at limiting playmaking', def_rank:12, min:35, usage:30, pace:101, total:226})]},
+  { id: 'p53', player_name: 'Domantas Sabonis', team: 'SAC', opponent: 'OKC', position: 'C', photo_url: 'https://images.unsplash.com/photo-1519861531473-9200262188bf?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('rebounds', 12.5, {bias:0.5, var:2.5, over_odds:-115, under_odds:-105, matchup_rating:'neutral', matchup_note:'OKC Holmgren good at limiting boards', def_rank:10, min:33, usage:22, pace:101, total:226}),
+            mkProp('points', 18.5, {bias:0.5, var:3, over_odds:-110, under_odds:-110, matchup_rating:'tough', matchup_note:'OKC solid interior defense', def_rank:6, min:33, usage:22, pace:101, total:226})]},
+
+  // ── PORTLAND TRAIL BLAZERS ──
+  { id: 'p54', player_name: 'Anfernee Simons', team: 'POR', opponent: 'UTA', position: 'SG', photo_url: 'https://images.unsplash.com/photo-1515523110800-9415d13b84a8?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 21.5, {bias:0.5, var:4, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'UTA weak perimeter defense', def_rank:24, min:33, usage:25, pace:100, total:216}),
+            mkProp('3PM', 3.5, {bias:0.2, var:1.2, over_odds:+100, under_odds:-120, matchup_rating:'favorable', matchup_note:'UTA gives up 3s', def_rank:25, min:33, usage:25, pace:100, total:216})]},
+  { id: 'p55', player_name: 'Jerami Grant', team: 'POR', opponent: 'UTA', position: 'SF', photo_url: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 17.5, {bias:0.3, var:3, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'UTA average SF coverage', def_rank:14, min:31, usage:21, pace:100, total:216})]},
+
+  // ── LOS ANGELES CLIPPERS ──
+  { id: 'p56', player_name: 'Kawhi Leonard', team: 'LAC', opponent: 'MEM', position: 'SF', photo_url: 'https://images.unsplash.com/photo-1574623452334-1e0ac2b3ccb4?w=100&h=100&fit=crop', is_starter: true, injury_status: 'questionable', injury_note: 'Knee - Limited',
+    props: [mkProp('points', 23.5, {bias:0.5, var:4, over_odds:-115, under_odds:-105, matchup_rating:'favorable', matchup_note:'MEM soft on SF scoring', def_rank:23, min:32, usage:27, pace:100, total:218, trap:true}),
+            mkProp('rebounds', 6.5, {bias:0.3, var:2, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'MEM neutral rebounding matchup', def_rank:14, min:32, usage:27, pace:100, total:218})]},
+  { id: 'p57', player_name: 'James Harden', team: 'LAC', opponent: 'MEM', position: 'PG', photo_url: 'https://images.unsplash.com/photo-1504450758481-7338bbe75005?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('assists', 8.5, {bias:0.5, var:2, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'MEM weak at containing playmakers', def_rank:24, min:33, usage:27, pace:100, total:218}),
+            mkProp('points', 18.5, {bias:0.5, var:3, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'MEM average on PG scoring', def_rank:15, min:33, usage:27, pace:100, total:218})]},
+
+  // ── MEMPHIS GRIZZLIES ──
+  { id: 'p58', player_name: 'Ja Morant', team: 'MEM', opponent: 'GSW', position: 'PG', photo_url: 'https://images.unsplash.com/photo-1518063319789-7217e6706b04?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 24.5, {bias:1, var:5, over_odds:-110, under_odds:-110, matchup_rating:'tough', matchup_note:'GSW solid on PG containment', def_rank:7, min:34, usage:28, pace:101, total:222}),
+            mkProp('assists', 7.5, {bias:0.5, var:2, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'GSW average assists allowed', def_rank:14, min:34, usage:28, pace:101, total:222})]},
+  { id: 'p59', player_name: 'Jaren Jackson Jr.', team: 'MEM', opponent: 'GSW', position: 'C', photo_url: 'https://images.unsplash.com/photo-1519861531473-9200262188bf?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 19.5, {bias:0.5, var:4, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'GSW average interior scoring allowed', def_rank:14, min:31, usage:22, pace:101, total:222}),
+            mkProp('blocks', 2.5, {bias:0.2, var:1, over_odds:-105, under_odds:-115, matchup_rating:'neutral', matchup_note:'Neutral blocks matchup', def_rank:13, min:31, usage:22, pace:101, total:222})]},
+
+  // ── NEW ORLEANS PELICANS ──
+  { id: 'p60', player_name: 'Zion Williamson', team: 'NOP', opponent: 'SAS', position: 'PF', photo_url: 'https://images.unsplash.com/photo-1515523110800-9415d13b84a8?w=100&h=100&fit=crop', is_starter: true, injury_status: 'questionable', injury_note: 'Hip - Day-to-Day',
+    props: [mkProp('points', 26.5, {bias:1, var:5, over_odds:-115, under_odds:-105, matchup_rating:'favorable', matchup_note:'SAS soft on PF scorers', def_rank:23, min:32, usage:32, pace:101, total:220, trap:true}),
+            mkProp('rebounds', 7.5, {bias:0.5, var:2, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'SAS average rebounding matchup', def_rank:14, min:32, usage:32, pace:101, total:220})]},
+  { id: 'p61', player_name: 'CJ McCollum', team: 'NOP', opponent: 'SAS', position: 'SG', photo_url: 'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 18.5, {bias:0.5, var:3, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'SAS weak perimeter defense', def_rank:24, min:32, usage:22, pace:101, total:220})]},
+
+  // ── SAN ANTONIO SPURS ──
+  { id: 'p62', player_name: 'Victor Wembanyama', team: 'SAS', opponent: 'NOP', position: 'C', photo_url: 'https://images.unsplash.com/photo-1574623452334-1e0ac2b3ccb4?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 22.5, {bias:1.5, var:5, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'NOP weak rim protection', def_rank:25, min:32, usage:28, pace:101, total:220}),
+            mkProp('blocks', 3.5, {bias:0.5, var:1, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'NOP drives into contact frequently', def_rank:24, min:32, usage:28, pace:101, total:220})]},
+  { id: 'p63', player_name: 'Devin Vassell', team: 'SAS', opponent: 'NOP', position: 'SG', photo_url: 'https://images.unsplash.com/photo-1504450758481-7338bbe75005?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 18.5, {bias:0.3, var:3, over_odds:-110, under_odds:-110, matchup_rating:'neutral', matchup_note:'NOP average on guard scoring', def_rank:14, min:32, usage:22, pace:101, total:220})]},
+
+  // ── HOUSTON ROCKETS ──
+  { id: 'p64', player_name: 'Alperen Sengun', team: 'HOU', opponent: 'NOP', position: 'C', photo_url: 'https://images.unsplash.com/photo-1518063319789-7217e6706b04?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 19.5, {bias:1, var:3, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'NOP weak interior defense', def_rank:25, min:30, usage:22, pace:101, total:220}),
+            mkProp('rebounds', 9.5, {bias:0.5, var:2, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'NOP poor on defensive boards', def_rank:24, min:30, usage:22, pace:101, total:220})]},
+  { id: 'p65', player_name: 'Jalen Green', team: 'HOU', opponent: 'NOP', position: 'SG', photo_url: 'https://images.unsplash.com/photo-1519861531473-9200262188bf?w=100&h=100&fit=crop', is_starter: true, injury_status: 'healthy',
+    props: [mkProp('points', 20.5, {bias:0.5, var:4, over_odds:-110, under_odds:-110, matchup_rating:'favorable', matchup_note:'NOP soft on SG scoring', def_rank:23, min:33, usage:24, pace:101, total:220}),
+            mkProp('3PM', 2.5, {bias:0.2, var:1, over_odds:-105, under_odds:-115, matchup_rating:'favorable', matchup_note:'NOP gives up 3s from wings', def_rank:25, min:33, usage:24, pace:101, total:220})]},
 ];
+
+// Build game logs: assign team schedule logs to each player's team
+mockPlayers.forEach(player => {
+  const teamOpps = teamSchedules[player.team] || [];
+  const existingId = Object.keys(mockGameLogs).find(k => mockGameLogs[k] && mockGameLogs[k].length > 0 && player.id === k);
+  if (!existingId) {
+    mockGameLogs[player.id] = teamOpps.map((opp, i) => ({ date: `3/${10 + i}`, opp }));
+  }
+});
 
 export const mockAlerts = [
   { id: 'a1', title: 'Anthony Edwards questionable', description: 'Ankle injury - listed as probable. Monitor minutes.', type: 'injury', player_name: 'Anthony Edwards', team: 'MIN', impact: 'negative', is_read: false },
   { id: 'a2', title: 'Line Movement: Jokic PRA', description: 'Line moved from 47.5 to 48.5. Sharp action on over.', type: 'line_movement', player_name: 'Nikola Jokic', team: 'DEN', impact: 'positive', is_read: false },
   { id: 'a3', title: 'Best Bets Posted', description: 'Today\'s top AI picks are live. 3 Tier A selections.', type: 'best_bet', impact: 'positive', is_read: true },
-  { id: 'a4', title: 'Karl-Anthony Towns OUT', description: 'KAT ruled out. Jalen Brunson usage expected to spike.', type: 'injury', player_name: 'Karl-Anthony Towns', team: 'NYK', impact: 'positive', is_read: false },
+  { id: 'a4', title: 'Joel Embiid questionable', description: 'Knee issue - day-to-day. Possible DNP vs DET.', type: 'injury', player_name: 'Joel Embiid', team: 'PHI', impact: 'negative', is_read: false },
+  { id: 'a5', title: 'Zion Williamson GTD', description: 'Hip injury - monitor warmup. Backup Alvarado may start.', type: 'injury', player_name: 'Zion Williamson', team: 'NOP', impact: 'negative', is_read: false },
+  { id: 'a6', title: 'LaMelo Ball Ankle', description: 'LaMelo listed questionable vs IND. Massive usage bump if out.', type: 'injury', player_name: 'LaMelo Ball', team: 'CHA', impact: 'negative', is_read: false },
 ];
-
-// Compute derived stats from raw game arrays to ensure accuracy
-function computeStats(props) {
-  return props.map(prop => {
-    const g10 = prop.last_10_games || [];
-    const g5 = g10.slice(-5);
-    const avg10 = g10.length ? parseFloat((g10.reduce((a, b) => a + b, 0) / g10.length).toFixed(1)) : 0;
-    const avg5 = g5.length ? parseFloat((g5.reduce((a, b) => a + b, 0) / g5.length).toFixed(1)) : 0;
-    const hits = g10.filter(v => v > prop.line).length;
-    const hit_rate = g10.length ? Math.round((hits / g10.length) * 100) : 0;
-    const projection = parseFloat((avg5 * 1.02).toFixed(1));
-    const edge = parseFloat((((projection - prop.line) / prop.line) * 100).toFixed(1));
-    const streak = hits >= 7
-      ? `Hit over in ${hits} of last 10`
-      : hits <= 3
-      ? `Hit under in ${10 - hits} of last 10`
-      : `Hit over in ${hits} of last 10`;
-    return {
-      ...prop,
-      avg_last_5: avg5,
-      avg_last_10: avg10,
-      hit_rate_last_10: hit_rate,
-      projection,
-      edge,
-      streak_info: streak,
-      last_5_games: g5,
-    };
-  });
-}
-
-// Apply computed stats to all players
-mockPlayers.forEach(player => {
-  player.props = computeStats(player.props);
-});
 
 export function getAllProps() {
   const allProps = [];
