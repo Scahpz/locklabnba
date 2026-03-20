@@ -108,7 +108,8 @@ export default function Trends() {
             <PlayerTrendChart 
               games={prop.last_10_games || []} 
               line={prop.line} 
-              propType={prop.prop_type} 
+              propType={prop.prop_type}
+              gameLogs={gameLogs}
             />
 
             <div className="grid grid-cols-4 gap-3 mt-4">
