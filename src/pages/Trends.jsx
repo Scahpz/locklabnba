@@ -20,6 +20,11 @@ export default function Trends() {
     [selectedPlayer]
   );
 
+  const gameLogs = useMemo(() => {
+    const found = mockPlayers.find(p => p.player_name === (player?.player_name));
+    return found ? (mockGameLogs[found.id] || []) : [];
+  }, [player]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
