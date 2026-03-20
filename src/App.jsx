@@ -40,7 +40,15 @@ const AuthenticatedApp = () => {
   // Render the main app
   return (
     <Routes>
-      {/* Add your page Route elements here */}
+      <Route element={<AppLayout />}>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/trends" element={<Trends />} />
+        <Route path="/picks" element={<AIPicks />} />
+        <Route path="/matchups" element={<Matchups />} />
+        <Route path="/parlay" element={<ParlayBuilder />} />
+        <Route path="/alerts" element={<Alerts />} />
+        <Route path="/profile" element={<Profile />} />
+      </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
