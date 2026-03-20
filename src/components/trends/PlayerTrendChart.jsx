@@ -17,7 +17,20 @@ export default function PlayerTrendChart({ games, line, propType, gameLogs }) {
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="hsl(217 33% 20%)" />
-          <XAxis dataKey="game" tick={{ fill: 'hsl(215 20% 55%)', fontSize: 11 }} />
+          <XAxis
+            dataKey="game"
+            tick={({ x, y, payload }) => {
+              const parts = payload.value.split('\n');
+              return (
+                <g transform={`translate(${x},${y})`}>
+                  <text x={0} y={0} dy={10} textAnchor="middle" fill="hsl(215 20% 55%)" fontSize={10}>{parts[0]}</text>
+                  <text x={0} y={0} dy={22} textAnchor="middle" fill="hsl(142 71% 45%)" fontSize={10} fontWeight="600">{parts[1]}</text>
+                </g>
+              );
+            }}
+            height={40}
+            interval={0}
+          />
           <YAxis tick={{ fill: 'hsl(215 20% 55%)', fontSize: 11 }} />
           <Tooltip
             contentStyle={{
