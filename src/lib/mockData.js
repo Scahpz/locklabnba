@@ -1,3 +1,37 @@
+// Per-game log data (last 10 games, most recent last)
+export const mockGameLogs = {
+  p1: [
+    { date: '3/10', opp: 'MEM' }, { date: '3/12', opp: 'HOU' }, { date: '3/14', opp: 'SAS' },
+    { date: '3/15', opp: 'NOP' }, { date: '3/17', opp: 'UTA' }, { date: '3/18', opp: 'OKC' },
+    { date: '3/19', opp: 'DEN' }, { date: '3/20', opp: 'PHX' }, { date: '3/21', opp: 'GSW' }, { date: '3/22', opp: 'LAL' },
+  ],
+  p2: [
+    { date: '3/10', opp: 'CLE' }, { date: '3/12', opp: 'NYK' }, { date: '3/14', opp: 'PHI' },
+    { date: '3/15', opp: 'CHI' }, { date: '3/17', opp: 'IND' }, { date: '3/18', opp: 'TOR' },
+    { date: '3/19', opp: 'BKN' }, { date: '3/20', opp: 'DET' }, { date: '3/21', opp: 'ORL' }, { date: '3/22', opp: 'MIL' },
+  ],
+  p3: [
+    { date: '3/10', opp: 'OKC' }, { date: '3/12', opp: 'MIN' }, { date: '3/14', opp: 'UTA' },
+    { date: '3/15', opp: 'LAC' }, { date: '3/17', opp: 'SAC' }, { date: '3/18', opp: 'POR' },
+    { date: '3/19', opp: 'GSW' }, { date: '3/20', opp: 'LAL' }, { date: '3/21', opp: 'MEM' }, { date: '3/22', opp: 'PHX' },
+  ],
+  p4: [
+    { date: '3/10', opp: 'POR' }, { date: '3/12', opp: 'SAC' }, { date: '3/14', opp: 'LAC' },
+    { date: '3/15', opp: 'NOP' }, { date: '3/17', opp: 'MEM' }, { date: '3/18', opp: 'DEN' },
+    { date: '3/19', opp: 'OKC' }, { date: '3/20', opp: 'PHX' }, { date: '3/21', opp: 'LAL' }, { date: '3/22', opp: 'GSW' },
+  ],
+  p5: [
+    { date: '3/10', opp: 'ATL' }, { date: '3/12', opp: 'MIA' }, { date: '3/14', opp: 'ORL' },
+    { date: '3/15', opp: 'WAS' }, { date: '3/17', opp: 'DET' }, { date: '3/18', opp: 'BKN' },
+    { date: '3/19', opp: 'NYK' }, { date: '3/20', opp: 'PHI' }, { date: '3/21', opp: 'MIL' }, { date: '3/22', opp: 'CHA' },
+  ],
+  p6: [
+    { date: '3/10', opp: 'UTA' }, { date: '3/12', opp: 'POR' }, { date: '3/14', opp: 'LAC' },
+    { date: '3/15', opp: 'GSW' }, { date: '3/17', opp: 'HOU' }, { date: '3/18', opp: 'MEM' },
+    { date: '3/19', opp: 'NOP' }, { date: '3/20', opp: 'DAL' }, { date: '3/21', opp: 'PHX' }, { date: '3/22', opp: 'SAC' },
+  ],
+};
+
 // Mock NBA player props data for demonstration
 export const mockPlayers = [
   {
