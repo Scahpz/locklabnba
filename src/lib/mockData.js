@@ -96,6 +96,40 @@ export const mockAlerts = [
   { id: 'a4', title: 'Karl-Anthony Towns OUT', description: 'KAT ruled out. Jalen Brunson usage expected to spike.', type: 'injury', player_name: 'Karl-Anthony Towns', team: 'NYK', impact: 'positive', is_read: false },
 ];
 
+// Compute derived stats from raw game arrays to ensure accuracy
+function computeStats(props) {
+  return props.map(prop => {
+    const g10 = prop.last_10_games || [];
+    const g5 = g10.slice(-5);
+    const avg10 = g10.length ? parseFloat((g10.reduce((a, b) => a + b, 0) / g10.length).toFixed(1)) : 0;
+    const avg5 = g5.length ? parseFloat((g5.reduce((a, b) => a + b, 0) / g5.length).toFixed(1)) : 0;
+    const hits = g10.filter(v => v > prop.line).length;
+    const hit_rate = g10.length ? Math.round((hits / g10.length) * 100) : 0;
+    const projection = parseFloat((avg5 * 1.02).toFixed(1));
+    const edge = parseFloat((((projection - prop.line) / prop.line) * 100).toFixed(1));
+    const streak = hits >= 7
+      ? `Hit over in ${hits} of last 10`
+      : hits <= 3
+      ? `Hit under in ${10 - hits} of last 10`
+      : `Hit over in ${hits} of last 10`;
+    return {
+      ...prop,
+      avg_last_5: avg5,
+      avg_last_10: avg10,
+      hit_rate_last_10: hit_rate,
+      projection,
+      edge,
+      streak_info: streak,
+      last_5_games: g5,
+    };
+  });
+}
+
+// Apply computed stats to all players
+mockPlayers.forEach(player => {
+  player.props = computeStats(player.props);
+});
+
 export function getAllProps() {
   const allProps = [];
   mockPlayers.forEach(player => {
