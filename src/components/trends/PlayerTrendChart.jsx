@@ -1,12 +1,16 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
-export default function PlayerTrendChart({ games, line, propType }) {
-  const data = games.map((val, i) => ({
-    game: `G${i + 1}`,
-    value: val,
-    hit: val > line,
-  }));
+export default function PlayerTrendChart({ games, line, propType, gameLogs }) {
+  const data = games.map((val, i) => {
+    const log = gameLogs?.[i];
+    return {
+      game: log ? `${log.date}\n${log.opp}` : `G${i + 1}`,
+      label: log ? `${log.date} vs ${log.opp}` : `Game ${i + 1}`,
+      value: val,
+      hit: val > line,
+    };
+  });
 
   return (
     <div className="h-48 w-full">

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { mockPlayers } from '@/lib/mockData';
+import { mockPlayers, mockGameLogs } from '@/lib/mockData';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, Clock, Target, Activity, Zap } from 'lucide-react';
