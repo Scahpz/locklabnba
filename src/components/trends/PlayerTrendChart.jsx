@@ -40,6 +40,7 @@ export default function PlayerTrendChart({ games, line, propType, gameLogs }) {
               color: 'hsl(210 40% 98%)',
               fontSize: 12,
             }}
+            labelFormatter={(_, payload) => payload?.[0]?.payload?.label || ''}
           />
           <ReferenceLine y={line} stroke="hsl(263 70% 58%)" strokeDasharray="5 5" label={{ value: `Line: ${line}`, fill: 'hsl(263 70% 58%)', fontSize: 10, position: 'right' }} />
           <Line
