@@ -31,7 +31,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
-            <h1 className="text-lg font-bold text-foreground tracking-tight">PropEdge</h1>
+            <h1 className="text-lg font-bold text-foreground tracking-tight">LockLab</h1>
             <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">Analytics</p>
           </div>
         )}

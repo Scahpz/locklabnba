@@ -6,7 +6,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AppLayout from '@/components/layout/AppLayout';
-import Dashboard from '@/pages/Dashboard';
+import Dashboard from '@/pages/Dashboard.jsx';
 import Trends from '@/pages/Trends';
 import AIPicks from '@/pages/AIPicks';
 import Matchups from '@/pages/Matchups';
