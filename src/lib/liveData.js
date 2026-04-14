@@ -18,31 +18,35 @@ export async function fetchLiveProps() {
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   const result = await base44.integrations.Core.InvokeLLM({
-    prompt: `Today is ${today}. You are an NBA betting analyst. Search the web for today's NBA games and return real player prop data.
+    prompt: `Today is ${today}. You are an expert NBA prop betting analyst with access to real-time data. Search the web RIGHT NOW for:
 
-For each game today, find:
-1. The two teams playing
-2. Player props from DraftKings, FanDuel, or BetMGM (points, rebounds, assists, 3PM, PRA lines)
-3. Current injury/availability status for key players (from official NBA injury reports or ESPN)
-4. Over/under odds for each prop
+1. TODAYS NBA SCHEDULE: Find every game being played today (${today}). Get the exact team matchups.
+2. OFFICIAL NBA INJURY REPORT: Check nba.com/injuries or ESPN for today's official injury report. Get each player's status (Out, Doubtful, Questionable, GTD, Available) and the reason.
+3. CURRENT 2025-26 ROSTERS: Use the correct current team for each player. Key recent trades to know: Luka Doncic is on LAL, Anthony Davis is on DAL, Jimmy Butler is on GSW, Kevin Durant is on HOU, Damian Lillard is on MIL, Jrue Holiday is on BOS, Michael Porter Jr is on BKN, DeMar DeRozan is on SAC, Jordan Poole is on NOP, Julius Randle is on MIN.
+4. PROP LINES: Search DraftKings, FanDuel, PrizePicks, or ESPN BET for today's player prop lines (points, rebounds, assists, 3PM, PRA).
+5. DEFENSIVE MATCHUP DATA: For each player, note the opponent's defensive rank vs that position (1=best defense, 30=worst).
 
-Return 15-25 of the most interesting props from today's slate. Focus on star players and high-confidence situations.
+Return 20-30 of the best props from today's slate only. Prioritize star players and high-value matchups. Only include players who are CONFIRMED ACTIVE (not out).
 
-For each prop include:
-- player_name (full name)
-- team (3-letter abbreviation)
-- opponent (3-letter abbreviation)  
-- prop_type (one of: points, rebounds, assists, PRA, 3PM, steals, blocks)
-- line (the number e.g. 27.5)
-- over_odds (e.g. -110)
-- under_odds (e.g. -110)
-- injury_status (healthy, questionable, doubtful, out, GTD)
-- injury_note (string, empty if healthy)
-- matchup_note (brief note about the matchup quality)
-- game_total (over/under for the game)
-- position (PG, SG, SF, PF, C)
+For each prop return:
+- player_name: full name (use correct current team)
+- team: 3-letter abbreviation (MUST be player's CURRENT 2025-26 team)
+- opponent: 3-letter abbreviation (today's actual opponent)
+- prop_type: one of: points, rebounds, assists, PRA, 3PM, steals, blocks
+- line: the actual sportsbook line (e.g. 27.5)
+- over_odds: e.g. -110
+- under_odds: e.g. -110
+- injury_status: healthy, questionable, doubtful, out, or GTD
+- injury_note: reason if not healthy, empty string if healthy
+- matchup_note: specific note about why this matchup is good or bad (e.g. "OKC ranks 28th vs PG scoring")
+- def_rank_vs_pos: opponent's defensive rank vs this player's position (1-30)
+- matchup_rating: one of: elite, favorable, neutral, tough, elite_defense
+- game_total: the game's over/under total
+- pace_rating: estimated game pace (95-108)
+- position: PG, SG, SF, PF, or C
+- is_starter: true/false
 
-Use real lines from DraftKings or FanDuel if available. If no games today, return props for the next scheduled NBA game day.`,
+If no NBA games today, return props for the NEXT scheduled game day and set game_date accordingly.`,
     add_context_from_internet: true,
     response_json_schema: {
       type: 'object',
@@ -63,8 +67,12 @@ Use real lines from DraftKings or FanDuel if available. If no games today, retur
               injury_status: { type: 'string' },
               injury_note: { type: 'string' },
               matchup_note: { type: 'string' },
+              def_rank_vs_pos: { type: 'number' },
+              matchup_rating: { type: 'string' },
               game_total: { type: 'number' },
+              pace_rating: { type: 'number' },
               position: { type: 'string' },
+              is_starter: { type: 'boolean' },
             }
           }
         }
@@ -112,9 +120,9 @@ Use real lines from DraftKings or FanDuel if available. If no games today, retur
       minutes_avg: 33,
       usage_rate: 25,
       minutes_last_5: [33, 34, 32, 35, 33],
-      def_rank_vs_pos: 15,
-      matchup_rating: 'neutral',
-      pace_rating: 100,
+      def_rank_vs_pos: prop.def_rank_vs_pos || 15,
+      matchup_rating: prop.matchup_rating || 'neutral',
+      pace_rating: prop.pace_rating || 100,
     };
   });
 
