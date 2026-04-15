@@ -131,7 +131,7 @@ export default function ParlayBuilder() {
 
             <Button
               className="w-full mt-3 bg-accent hover:bg-accent/80 text-accent-foreground"
-              onClick={() => setShowPropPicker(!showPropPicker)}
+              onClick={() => {}}
             >
               <Plus className="w-4 h-4 mr-2" /> Add Prop
             </Button>
