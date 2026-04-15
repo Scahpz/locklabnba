@@ -13,14 +13,15 @@ export async function fetchLiveProps() {
   }
 
   try {
-    // Fetch today's NBA games and props
+    // Fetch today's NBA games and props with specific context
     const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `Today's date is ${today}. Get TODAY's NBA games and player props. Return ONLY a JSON object with:
+      prompt: `Today is ${today}. Get the ACTUAL current NBA player props for TODAY's games. Search for real betting lines and odds.
+Return a JSON object with:
 {
-  "games": [{"away": "GSW", "home": "LAC", "tipoff": "10:30 PM ET", "total": 225.5}],
-  "props": [{"player_name": "Stephen Curry", "team": "GSW", "opponent": "LAC", "prop_type": "points", "line": 28.5, "over_odds": -110, "under_odds": -110, "projection": 29, "edge": 2}]
+  "games": [{"away": "TEAM", "home": "TEAM", "tipoff": "TIME ET", "total": NUMBER}],
+  "props": [{"player_name": "NAME", "team": "TEAM", "opponent": "OPP", "prop_type": "points|rebounds|assists|PRA|3PM", "line": NUMBER, "over_odds": NUMBER, "under_odds": NUMBER, "projection": NUMBER, "edge": NUMBER, "confidence_score": NUMBER, "confidence_tier": "A|B|C", "hit_rate_last_10": NUMBER, "avg_last_5": NUMBER, "avg_last_10": NUMBER}]
 }
-Include key NBA players from today's games with realistic lines and edges. Make sure prop lines are realistic for 2026.`,
+Include 5-10 top props per game with CURRENT REAL LINES and REAL ODDS from today's games. Use actual sportsbooks data.`,
       response_json_schema: {
         type: "object",
         properties: {
