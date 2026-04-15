@@ -119,8 +119,8 @@ export default function AIPicks() {
       </div>
 
       {Object.entries(tiers).map(([tier, props]) => {
-        if (props.length === 0) return null;
         const config = tierConfig[tier];
+        if (!config || props.length === 0) return null;
         return (
           <div key={tier}>
             <div className="flex items-center gap-2 mb-3">
