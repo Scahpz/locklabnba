@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import TeamLogo from '@/components/common/TeamLogo';
+import { useParlay } from '@/lib/ParlayContext';
 
 function calculateCombinedOdds(legs) {
   if (legs.length === 0) return 0;
@@ -34,33 +35,17 @@ const riskColors = {
 };
 
 export default function ParlayBuilder() {
-  const [legs, setLegs] = useState([]);
+  const { legs, addLeg: contextAddLeg, removeLeg: contextRemoveLeg, clearLegs } = useParlay();
   const [wager, setWager] = useState(10);
-  const [showPropPicker, setShowPropPicker] = useState(false);
   const allProps = getAllProps();
 
   const addLeg = (prop, pick) => {
-    const exists = legs.find(l => l.player_name === prop.player_name && l.prop_type === prop.prop_type);
-    if (exists) {
-      toast.error('This prop is already in your parlay');
-      return;
-    }
-    setLegs([...legs, {
-      player_name: prop.player_name,
-      team: prop.team,
-      opponent: prop.opponent,
-      prop_type: prop.prop_type,
-      line: prop.line,
-      pick,
-      odds: pick === 'over' ? prop.over_odds : prop.under_odds,
-      photo_url: prop.photo_url,
-      confidence_score: prop.confidence_score,
-    }]);
-    setShowPropPicker(false);
+    contextAddLeg(prop, pick);
   };
 
   const removeLeg = (index) => {
-    setLegs(legs.filter((_, i) => i !== index));
+    const leg = legs[index];
+    if (leg) contextRemoveLeg(leg.player_name, leg.prop_type);
   };
 
   const combinedOdds = calculateCombinedOdds(legs);
