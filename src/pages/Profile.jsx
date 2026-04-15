@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { User, Star, TrendingUp, Target, Trophy, BarChart3 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { User, Star, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { mockPlayers } from '@/lib/mockData';
+import { useLivePlayers } from '@/lib/useLivePlayers';
 import TeamLogo from '@/components/common/TeamLogo';
 
 export default function Profile() {
+  const { players } = useLivePlayers();
   const [favorites, setFavorites] = useState(['Luka Doncic', 'Nikola Jokic']);
 
   const toggleFavorite = (name) => {
@@ -77,7 +77,7 @@ export default function Profile() {
           <Star className="w-4 h-4 text-chart-4" /> Favorite Players
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {mockPlayers.map(player => {
+          {players.map(player => {
             const isFav = favorites.includes(player.player_name);
             return (
               <div

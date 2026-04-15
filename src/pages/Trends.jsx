@@ -1,56 +1,67 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { mockPlayers, mockGameLogs } from '@/lib/mockData';
+import { mockGameLogs } from '@/lib/mockData';
+import { useLivePlayers } from '@/lib/useLivePlayers';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, Clock, Target, Activity, Zap, Search, Flame, X } from 'lucide-react';
+import { TrendingUp, Clock, Target, Activity, Zap, Search, Flame, X, Wifi, WifiOff } from 'lucide-react';
 import PlayerTrendChart from '@/components/trends/PlayerTrendChart';
 import MinutesTrendChart from '@/components/trends/MinutesTrendChart';
 import HotStreakCard from '@/components/trends/HotStreakCard';
 import { cn } from '@/lib/utils';
 import TeamLogo from '@/components/common/TeamLogo';
 
-function getHotStreakPlayers() {
+function getHotStreakPlayers(players) {
   const hot = [];
-  mockPlayers.forEach(player => {
+  players.forEach(player => {
     player.props.forEach(prop => {
       const hits = prop.last_10_games?.filter(v => v > prop.line).length || 0;
-      if (hits >= 7) {
-        hot.push({ player, prop, hits });
-      }
+      if (hits >= 7) hot.push({ player, prop, hits });
     });
   });
   return hot.sort((a, b) => b.hits - a.hits).slice(0, 12);
 }
 
+const labelMap = { points: 'PPG', rebounds: 'RPG', assists: 'APG', '3PM': '3PM', steals: 'SPG', blocks: 'BPG', PRA: 'PRA' };
+const iconMap = { points: TrendingUp, rebounds: Activity, assists: Target, '3PM': Zap, steals: Clock, blocks: Clock, PRA: TrendingUp };
+const colorMap = { points: 'text-primary', rebounds: 'text-accent', assists: 'text-chart-3', '3PM': 'text-chart-4', steals: 'text-chart-3', blocks: 'text-destructive', PRA: 'text-primary' };
+
 export default function Trends() {
   const urlParams = new URLSearchParams(window.location.search);
   const playerParam = urlParams.get('player');
 
-  const [selectedPlayer, setSelectedPlayer] = useState(
-    playerParam || mockPlayers[0].player_name
-  );
+  const { players, isLive, loading } = useLivePlayers();
+
+  const [selectedPlayer, setSelectedPlayer] = useState(playerParam || null);
   const [search, setSearch] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const searchRef = useRef(null);
 
-  const hotPlayers = useMemo(() => getHotStreakPlayers(), []);
+  // Once players load, set default selection
+  const defaultPlayerName = players[0]?.player_name;
+  const resolvedSelected = selectedPlayer || defaultPlayerName;
+
+  const hotPlayers = useMemo(() => getHotStreakPlayers(players), [players]);
 
   const player = useMemo(() =>
-    mockPlayers.find(p => p.player_name === selectedPlayer) || mockPlayers[0],
-    [selectedPlayer]
+    players.find(p => p.player_name === resolvedSelected) || players[0],
+    [players, resolvedSelected]
   );
 
+  // Game logs: use mock if available, otherwise generate simple labels
   const gameLogs = useMemo(() => {
-    const found = mockPlayers.find(p => p.player_name === player?.player_name);
-    return found ? (mockGameLogs[found.id] || []) : [];
+    if (!player) return [];
+    return mockGameLogs[player.id] || player.props[0]?.last_10_games?.map((_, i) => ({
+      date: `G${i + 1}`,
+      opp: player.opponent || 'OPP',
+    })) || [];
   }, [player]);
 
   const searchResults = useMemo(() => {
     if (!search.trim()) return [];
     const q = search.toLowerCase();
-    return mockPlayers.filter(p =>
+    return players.filter(p =>
       p.player_name.toLowerCase().includes(q) || p.team.toLowerCase().includes(q)
     ).slice(0, 8);
-  }, [search]);
+  }, [search, players]);
 
   useEffect(() => {
     function handleClick(e) {
@@ -68,9 +79,15 @@ export default function Trends() {
     setShowDropdown(false);
   }
 
-  const labelMap = { points: 'PPG', rebounds: 'RPG', assists: 'APG', '3PM': '3PM', steals: 'SPG', blocks: 'BPG', PRA: 'PRA' };
-  const iconMap = { points: TrendingUp, rebounds: Activity, assists: Target, '3PM': Zap, steals: Clock, blocks: Clock, PRA: TrendingUp };
-  const colorMap = { points: 'text-primary', rebounds: 'text-accent', assists: 'text-chart-3', '3PM': 'text-chart-4', steals: 'text-chart-3', blocks: 'text-destructive', PRA: 'text-primary' };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-8 h-8 border-4 border-border border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!player) return null;
 
   return (
     <div className="space-y-6">
@@ -82,7 +99,12 @@ export default function Trends() {
             <Flame className="w-7 h-7 text-orange-400" />
             Streaks & Trends
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">Hot streaks, recent form & performance analysis</p>
+          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+            {isLive
+              ? <><Wifi className="w-3.5 h-3.5 text-primary" /><span className="text-primary font-medium">Live — today's players</span></>
+              : <><WifiOff className="w-3.5 h-3.5" />Hot streaks, recent form & performance analysis</>
+            }
+          </p>
         </div>
 
         {/* Search Bar */}
@@ -114,7 +136,7 @@ export default function Trends() {
                     <p className="text-sm font-medium text-foreground">{p.player_name}</p>
                     <p className="text-[10px] text-muted-foreground">{p.team} · {p.position}</p>
                   </div>
-                  {p.injury_status !== 'healthy' && (
+                  {p.injury_status && p.injury_status !== 'healthy' && (
                     <Badge variant="outline" className="ml-auto text-[10px] border-destructive/30 text-destructive">
                       {p.injury_status?.toUpperCase()}
                     </Badge>
@@ -127,24 +149,26 @@ export default function Trends() {
       </div>
 
       {/* Hot Streak Players */}
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <Flame className="w-4 h-4 text-orange-400" />
-          <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">On Fire — Hot Streaks</h2>
-          <span className="text-xs text-muted-foreground">(7+ hits in last 10)</span>
+      {hotPlayers.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Flame className="w-4 h-4 text-orange-400" />
+            <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">On Fire — Hot Streaks</h2>
+            <span className="text-xs text-muted-foreground">(7+ hits in last 10)</span>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {hotPlayers.map(({ player: hp, prop }) => (
+              <HotStreakCard
+                key={`${hp.id}-${prop.prop_type}`}
+                player={hp}
+                prop={prop}
+                isSelected={resolvedSelected === hp.player_name}
+                onClick={() => selectPlayer(hp.player_name)}
+              />
+            ))}
+          </div>
         </div>
-        <div className="flex gap-3 overflow-x-auto pb-2">
-          {hotPlayers.map(({ player: hp, prop }) => (
-            <HotStreakCard
-              key={`${hp.id}-${prop.prop_type}`}
-              player={hp}
-              prop={prop}
-              isSelected={selectedPlayer === hp.player_name}
-              onClick={() => selectPlayer(hp.player_name)}
-            />
-          ))}
-        </div>
-      </div>
+      )}
 
       {/* Player Header */}
       <div className="rounded-xl border border-border bg-card p-5">
@@ -152,7 +176,9 @@ export default function Trends() {
           <TeamLogo team={player.team} className="w-16 h-16" bgClass="bg-secondary border-2 border-border" />
           <div className="flex-1 min-w-0">
             <h2 className="text-xl font-bold text-foreground">{player.player_name}</h2>
-            <p className="text-sm text-muted-foreground">{player.team} · {player.position} · {player.is_starter ? 'Starter' : 'Bench'}</p>
+            <p className="text-sm text-muted-foreground">
+              {player.team} · {player.position} · {player.is_starter ? 'Starter' : 'Bench'}
+            </p>
             {player.injury_status && player.injury_status !== 'healthy' && (
               <Badge variant="outline" className="mt-1 border-destructive/30 text-destructive text-xs">
                 {player.injury_status.toUpperCase()} {player.injury_note && `— ${player.injury_note}`}

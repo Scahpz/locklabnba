@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { mockPlayers } from '@/lib/mockData';
+import React, { useState, useEffect } from 'react';
+import { useLivePlayers } from '@/lib/useLivePlayers';
 import { GitCompare } from 'lucide-react';
 import PlayerSelector from '@/components/compare/PlayerSelector';
 import CompareColumn from '@/components/compare/CompareColumn';
@@ -8,9 +8,17 @@ import ComparePropRow from '@/components/compare/ComparePropRow';
 const MAX_PLAYERS = 3;
 
 export default function Compare() {
-  const [selectedIds, setSelectedIds] = useState([mockPlayers[0].id, mockPlayers[5].id]);
+  const { players } = useLivePlayers();
+  const [selectedIds, setSelectedIds] = useState([]);
 
-  const selected = selectedIds.map(id => mockPlayers.find(p => p.id === id)).filter(Boolean);
+  // Set defaults once players load
+  useEffect(() => {
+    if (players.length >= 2 && selectedIds.length === 0) {
+      setSelectedIds([players[0].id, players[1].id]);
+    }
+  }, [players]);
+
+  const selected = selectedIds.map(id => players.find(p => p.id === id)).filter(Boolean);
 
   const handleSelect = (slot, id) => {
     const next = [...selectedIds];
@@ -24,7 +32,7 @@ export default function Compare() {
 
   const handleAdd = () => {
     if (selectedIds.length < MAX_PLAYERS) {
-      const unused = mockPlayers.find(p => !selectedIds.includes(p.id));
+      const unused = players.find(p => !selectedIds.includes(p.id));
       if (unused) setSelectedIds([...selectedIds, unused.id]);
     }
   };
@@ -49,7 +57,7 @@ export default function Compare() {
             key={slot}
             slot={slot}
             selectedId={id}
-            allPlayers={mockPlayers}
+            allPlayers={players}
             disabledIds={selectedIds.filter((_, i) => i !== slot)}
             onSelect={(newId) => handleSelect(slot, newId)}
             onRemove={selectedIds.length > 1 ? () => handleSelect(slot, null) : null}
