@@ -184,18 +184,28 @@ export default function Dashboard() {
           sortBy={sortBy}
           setSortBy={setSortBy}
         />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-          {[...filtered].sort((a, b) => {
-            const tierOrder = { A: 0, B: 1, C: 2 };
-            return (tierOrder[a.confidence_tier] || 2) - (tierOrder[b.confidence_tier] || 2);
-          }).map((prop, i) => (
-            <PropCard key={`${prop.player_name}-${prop.prop_type}-${i}`} prop={prop} />
-          ))}
-        </div>
-        {filtered.length === 0 && (
+        {filtered.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <Calendar className="w-10 h-10 mx-auto mb-2 opacity-30" />
             <p>No props found for this filter.</p>
+          </div>
+        ) : (
+          <div className="space-y-6 mt-4">
+            {['A', 'B', 'C'].map(tier => {
+              const tierProps = filtered.filter(p => p.confidence_tier === tier);
+              if (tierProps.length === 0) return null;
+              const tierLabels = { A: 'Tier A — High Confidence', B: 'Tier B — Solid Value', C: 'Tier C — Speculative' };
+              return (
+                <div key={tier}>
+                  <h3 className="text-sm font-bold text-foreground mb-3 uppercase tracking-wider">{tierLabels[tier]} ({tierProps.length})</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {tierProps.map((prop, i) => (
+                      <PropCard key={`${prop.player_name}-${prop.prop_type}-${i}`} prop={prop} />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
