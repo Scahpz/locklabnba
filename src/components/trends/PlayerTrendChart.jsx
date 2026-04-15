@@ -41,6 +41,7 @@ export default function PlayerTrendChart({ games, line, propType, gameLogs }) {
               fontSize: 12,
             }}
             labelFormatter={(_, payload) => payload?.[0]?.payload?.label || ''}
+            formatter={(value) => [value, propType?.toUpperCase() || 'Value']}
           />
           <ReferenceLine y={line} stroke="hsl(263 70% 58%)" strokeDasharray="5 5" label={{ value: `Line: ${line}`, fill: 'hsl(263 70% 58%)', fontSize: 10, position: 'right' }} />
           <Line
