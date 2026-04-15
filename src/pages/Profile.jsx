@@ -17,6 +17,7 @@ const statusConfig = {
 };
 
 function ParlayCard({ parlay, onStatusChange, onDelete }) {
+  const [expanded, setExpanded] = React.useState(false);
   const cfg = statusConfig[parlay.status] || statusConfig.pending;
   const Icon = cfg.icon;
 
@@ -42,7 +43,7 @@ function ParlayCard({ parlay, onStatusChange, onDelete }) {
       </div>
 
       <div className="space-y-1 mb-3">
-        {parlay.legs?.slice(0, 3).map((leg, i) => (
+        {parlay.legs?.slice(0, expanded ? undefined : 3).map((leg, i) => (
           <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
             <TeamLogo team={leg.team} className="w-5 h-5" />
             <span className="font-medium text-foreground">{leg.player_name}</span>
@@ -52,8 +53,15 @@ function ParlayCard({ parlay, onStatusChange, onDelete }) {
             <span>{leg.line} {leg.prop_type?.toUpperCase()}</span>
           </div>
         ))}
-        {parlay.legs?.length > 3 && (
-          <p className="text-[10px] text-muted-foreground pl-7">+{parlay.legs.length - 3} more legs</p>
+        {parlay.legs?.length > 3 && !expanded && (
+          <button onClick={() => setExpanded(true)} className="text-[10px] text-primary hover:text-primary/80 transition-colors pl-7 font-medium">
+            +{parlay.legs.length - 3} more legs
+          </button>
+        )}
+        {expanded && parlay.legs?.length > 3 && (
+          <button onClick={() => setExpanded(false)} className="text-[10px] text-primary hover:text-primary/80 transition-colors pl-7 font-medium">
+            Show less
+          </button>
         )}
       </div>
 
