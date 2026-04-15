@@ -28,31 +28,15 @@ export async function fetchLiveProps() {
     const validTeams = ['ATL', 'BOS', 'BKN', 'CHA', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'GSW', 'HOU', 'IND', 'LAC', 'LAL', 'MEM', 'MIA', 'MIL', 'MIN', 'NOP', 'NYK', 'OKC', 'ORL', 'PHI', 'PHX', 'POR', 'SAC', 'SAS', 'TOR', 'UTA', 'WAS'];
 
     const result = await base44.integrations.Core.InvokeLLM({
-      model: 'gemini_3_flash',
-      prompt: `Today is ${today}. Search the web RIGHT NOW for TODAY's real NBA player prop lines from DraftKings, FanDuel, or BetMGM.
+      model: 'gpt_5_mini',
+      prompt: `You are a sports data specialist. Today is ${today}. Return ONLY real NBA games and props scheduled for today from major sportsbooks.
 
-Search for: "NBA player props today ${today} DraftKings" and "NBA prop lines today".
+If there are NO real NBA games today, return empty arrays.
 
-RULES:
-1. ONLY include games scheduled for TODAY. Do NOT make up or guess any data.
-2. Use ONLY real player names from the actual NBA rosters (valid teams: ${validTeams.join(', ')})
-3. Lines and odds MUST come from real sportsbooks found in your search. Do NOT invent lines.
-4. If you cannot find actual real props for today, return an empty props array — do NOT hallucinate data.
-5. Odds are typically -110 to -115 for both sides on standard props.
+Valid NBA teams: ${validTeams.join(', ')}
 
-Return a JSON object:
-- game_date: today's date string
-- games_summary: [{home, away, tipoff, total}] — only real games today
-- props: up to 30 real prop lines. Each:
-  - player_name, team (3-letter abbrev), opponent (3-letter abbrev)
-  - prop_type: "points", "rebounds", "assists", "PRA", "3PM", "steals", "blocks", or "turnovers"
-  - line (the actual O/U number), over_odds, under_odds (e.g. -110)
-  - injury_status: "healthy", "questionable", "GTD", or "out"
-  - position (PG/SG/SF/PF/C), is_starter (true/false)
-  - minutes_avg, usage_rate
-  - matchup_note, matchup_rating ("elite"/"favorable"/"neutral"/"tough"/"elite_defense")
-  - def_rank_vs_pos (1-30), game_total, pace_rating`,
-      add_context_from_internet: true,
+For each player prop, use real lines from DraftKings/FanDuel or major sportsbooks. Odds are typically -110 to -120. If unsure, omit it.`,
+      add_context_from_internet: false,
       response_json_schema: {
         type: 'object',
         properties: {
@@ -65,8 +49,9 @@ Return a JSON object:
                 home: { type: 'string' },
                 away: { type: 'string' },
                 tipoff: { type: 'string' },
-                total: { type: 'number' },
-              }
+                total: { type: 'number' }
+              },
+              required: ['home', 'away']
             }
           },
           props: {
@@ -82,20 +67,16 @@ Return a JSON object:
                 over_odds: { type: 'number' },
                 under_odds: { type: 'number' },
                 injury_status: { type: 'string' },
-                injury_note: { type: 'string' },
-                matchup_note: { type: 'string' },
-                def_rank_vs_pos: { type: 'number' },
-                matchup_rating: { type: 'string' },
-                game_total: { type: 'number' },
-                pace_rating: { type: 'number' },
                 position: { type: 'string' },
                 is_starter: { type: 'boolean' },
                 minutes_avg: { type: 'number' },
-                usage_rate: { type: 'number' },
-              }
+                usage_rate: { type: 'number' }
+              },
+              required: ['player_name', 'team', 'opponent', 'prop_type', 'line', 'over_odds', 'under_odds']
             }
           }
-        }
+        },
+        required: ['game_date', 'games_summary', 'props']
       }
     });
     
@@ -189,8 +170,8 @@ Return a JSON object:
     localStorage.setItem(CACHE_DATE_KEY, todayStr());
     return payload;
   } catch (error) {
-    console.warn('Failed to fetch live props, falling back to cache or mock data:', error);
-    // Return empty payload so app shows mock data instead
+    console.error('Live props error:', error.message);
+    // Return empty to trigger mock data fallback in Dashboard
     return { game_date: new Date().toLocaleDateString(), games_summary: [], props: [] };
   }
 }
