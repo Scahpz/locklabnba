@@ -49,7 +49,7 @@ export default function Dashboard() {
   const allProps = useLive && liveProps ? liveProps : staticProps;
 
   const toggleGame = (g) => {
-    const key = `${g.away}@${g.home}`;
+    const key = `${(g.away || '').toUpperCase().trim()}@${(g.home || '').toUpperCase().trim()}`;
     setSelectedGames(prev =>
       prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
     );
@@ -59,10 +59,11 @@ export default function Dashboard() {
     let result = selectedType === 'all' ? allProps : allProps.filter(p => p.prop_type === selectedType);
     if (selectedGames.length > 0) {
       result = result.filter(p => {
-        const teams = [p.team, p.opponent];
+        const pTeam = (p.team || '').toUpperCase().trim();
+        const pOpp = (p.opponent || '').toUpperCase().trim();
         return selectedGames.some(key => {
-          const [away, home] = key.split('@');
-          return teams.includes(away) && teams.includes(home);
+          const [away, home] = key.split('@').map(t => t.toUpperCase().trim());
+          return (pTeam === away || pTeam === home) && (pOpp === away || pOpp === home);
         });
       });
     }
@@ -136,7 +137,7 @@ export default function Dashboard() {
       {gamesSummary.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {gamesSummary.map((g, i) => {
-            const key = `${g.away}@${g.home}`;
+            const key = `${(g.away || '').toUpperCase().trim()}@${(g.home || '').toUpperCase().trim()}`;
             const active = selectedGames.includes(key);
             return (
               <button
