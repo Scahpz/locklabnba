@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { getAllProps } from '@/lib/mockData';
+import { fetchLiveProps, isCacheValid } from '@/lib/liveData';
 import { Badge } from '@/components/ui/badge';
-import { Lock, TrendingUp, Target, Zap, Shield, AlertTriangle, Award } from 'lucide-react';
+import { Lock, Zap, Shield, AlertTriangle, Award, Wifi, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import TeamLogo from '@/components/common/TeamLogo';
@@ -45,13 +46,7 @@ function PickCard({ prop }) {
           <div className="flex items-center gap-1 mt-1">
             <div className="flex gap-0.5">
               {Array.from({ length: 10 }, (_, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    "w-1.5 h-4 rounded-sm",
-                    i < prop.confidence_score ? "bg-primary" : "bg-secondary"
-                  )}
-                />
+                <div key={i} className={cn("w-1.5 h-4 rounded-sm", i < prop.confidence_score ? "bg-primary" : "bg-secondary")} />
               ))}
             </div>
             <span className="text-[10px] text-muted-foreground ml-1">{prop.confidence_score}/10</span>
@@ -85,11 +80,25 @@ function PickCard({ prop }) {
 }
 
 export default function AIPicks() {
-  const allProps = getAllProps();
+  const [allProps, setAllProps] = useState(getAllProps());
+  const [isLive, setIsLive] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const data = await fetchLiveProps();
+        if (data?.props?.length > 0) {
+          setAllProps(data.props);
+          setIsLive(true);
+        }
+      } catch {}
+    }
+    load();
+  }, []);
+
   const tiers = { A: [], B: [], C: [] };
-  
   allProps
-    .filter(p => p.is_top_pick || p.confidence_score >= 6)
+    .filter(p => p.injury_status !== 'out' && (p.is_top_pick || p.confidence_score >= 6))
     .sort((a, b) => b.confidence_score - a.confidence_score)
     .forEach(p => {
       if (tiers[p.confidence_tier]) tiers[p.confidence_tier].push(p);
@@ -97,12 +106,16 @@ export default function AIPicks() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
-          <Zap className="w-7 h-7 text-primary" />
-          AI Pick Recommendations
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">Top props of the day ranked by confidence</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
+            <Zap className="w-7 h-7 text-primary" />
+            AI Pick Recommendations
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+            {isLive ? <><Wifi className="w-3.5 h-3.5 text-primary" /><span className="text-primary font-medium">Live — today's players only</span></> : <><WifiOff className="w-3.5 h-3.5" />Sample data</>}
+          </p>
+        </div>
       </div>
 
       {Object.entries(tiers).map(([tier, props]) => {

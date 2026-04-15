@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { mockPlayers } from '@/lib/mockData';
-import { Shield, TrendingUp, TrendingDown, Gauge, Target } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { mockPlayers, getAllProps } from '@/lib/mockData';
+import { fetchLiveProps } from '@/lib/liveData';
+import { Shield, TrendingUp, TrendingDown, Gauge, Target, Wifi, WifiOff } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -19,39 +20,50 @@ function DefRankBar({ rank }) {
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${(rank / 30) * 100}%`, backgroundColor: color }}
-        />
+        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(rank / 30) * 100}%`, backgroundColor: color }} />
       </div>
       <span className="text-xs font-mono font-bold text-foreground w-8 text-right">#{rank}</span>
     </div>
   );
 }
 
-export default function Matchups() {
-  const allMatchups = [];
-  mockPlayers.forEach(player => {
-    player.props.forEach(prop => {
-      allMatchups.push({
-        player_name: player.player_name,
-        team: player.team,
-        opponent: player.opponent,
-        position: player.position,
-        photo_url: player.photo_url,
-        prop_type: prop.prop_type,
-        line: prop.line,
-        matchup_rating: prop.matchup_rating,
-        matchup_note: prop.matchup_note,
-        def_rank_vs_pos: prop.def_rank_vs_pos,
-        pace_rating: prop.pace_rating,
-        game_total: prop.game_total,
-        edge: prop.edge,
-      });
-    });
-  });
+function buildMatchups(props) {
+  return props
+    .filter(p => p.injury_status !== 'out')
+    .map(prop => ({
+      player_name: prop.player_name,
+      team: prop.team,
+      opponent: prop.opponent,
+      position: prop.position,
+      prop_type: prop.prop_type,
+      line: prop.line,
+      matchup_rating: prop.matchup_rating,
+      matchup_note: prop.matchup_note,
+      def_rank_vs_pos: prop.def_rank_vs_pos,
+      pace_rating: prop.pace_rating,
+      game_total: prop.game_total,
+      edge: prop.edge,
+    }));
+}
 
-  const chartData = allMatchups
+export default function Matchups() {
+  const [allMatchups, setAllMatchups] = useState(() => buildMatchups(getAllProps()));
+  const [isLive, setIsLive] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const data = await fetchLiveProps();
+        if (data?.props?.length > 0) {
+          setAllMatchups(buildMatchups(data.props));
+          setIsLive(true);
+        }
+      } catch {}
+    }
+    load();
+  }, []);
+
+  const chartData = [...allMatchups]
     .sort((a, b) => b.def_rank_vs_pos - a.def_rank_vs_pos)
     .slice(0, 8)
     .map(m => ({
@@ -67,7 +79,9 @@ export default function Matchups() {
           <Shield className="w-7 h-7 text-chart-3" />
           Matchup Insights
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">Defensive rankings vs position & game pace</p>
+        <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+          {isLive ? <><Wifi className="w-3.5 h-3.5 text-primary" /><span className="text-primary font-medium">Live — today's players only</span></> : <><WifiOff className="w-3.5 h-3.5" />Defensive rankings vs position & game pace</>}
+        </p>
       </div>
 
       {/* Defensive Rank Chart */}
@@ -84,9 +98,7 @@ export default function Matchups() {
                 formatter={(value) => [`#${value}`, 'Def Rank']}
               />
               <Bar dataKey="rank" radius={[0, 4, 4, 0]}>
-                {chartData.map((entry, i) => (
-                  <Cell key={i} fill={entry.fill} />
-                ))}
+                {chartData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
