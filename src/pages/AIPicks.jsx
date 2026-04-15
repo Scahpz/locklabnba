@@ -102,8 +102,8 @@ export default function AIPicks() {
 
   const tiers = { A: [], B: [], C: [] };
   allProps
-    .filter(p => p.injury_status !== 'out' && (p.is_top_pick || p.confidence_score >= 6))
-    .sort((a, b) => b.confidence_score - a.confidence_score)
+    .filter(p => p && p.player_name && p.confidence_tier && p.injury_status !== 'out' && (p.is_top_pick || p.confidence_score >= 6))
+    .sort((a, b) => (b.confidence_score || 0) - (a.confidence_score || 0))
     .forEach(p => {
       if (tiers[p.confidence_tier]) tiers[p.confidence_tier].push(p);
     });
