@@ -109,10 +109,9 @@ If you cannot find real data for today, return empty props array.`,
       return true;
     });
     
-    // If validation fails significantly, return empty to fallback to mock data
+    // If validation fails significantly, throw error instead of fallback
     if (validProps.length === 0 && result.props && result.props.length > 0) {
-      console.warn('Live data validation failed - too many invalid props, falling back to mock data');
-      return { game_date: new Date().toLocaleDateString(), games_summary: [], props: [] };
+      throw new Error('Live data validation failed - received invalid prop data');
     }
     
     result.props = validProps;
