@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import MobileNav from './MobileNav';
+import MiniParlayBar from './MiniParlayBar';
 import { cn } from '@/lib/utils';
 
 export default function AppLayout() {
@@ -26,6 +27,9 @@ export default function AppLayout() {
 
       {/* Mobile Nav */}
       <MobileNav />
+
+      {/* Mini Parlay Bar */}
+      <MiniParlayBar />
     </div>
   );
 }

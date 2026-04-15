@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Lock, AlertTriangle, Award, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import TeamLogo from '@/components/common/TeamLogo';
+import { useParlay } from '@/lib/ParlayContext';
 
 const propTypeLabels = {
   points: 'PTS', rebounds: 'REB', assists: 'AST', PRA: 'PRA', '3PM': '3PM',
@@ -22,6 +23,7 @@ const matchupColors = {
 };
 
 export default function PropCard({ prop, onAddToParlay }) {
+  const { addLeg, isSelected } = useParlay();
   const tier = tierConfig[prop.confidence_tier] || tierConfig.C;
   const isPositiveEdge = prop.edge > 0;
   const oddsDisplay = (odds) => odds > 0 ? `+${odds}` : odds;
@@ -58,18 +60,28 @@ export default function PropCard({ prop, onAddToParlay }) {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={(e) => { e.preventDefault(); onAddToParlay?.(prop, 'over'); }}
-              className="flex flex-col items-center bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-lg px-3 py-1.5 transition-all"
+              onClick={(e) => { e.preventDefault(); addLeg(prop, 'over'); }}
+              className={cn(
+                "flex flex-col items-center border rounded-lg px-3 py-1.5 transition-all",
+                isSelected(prop.player_name, prop.prop_type, 'over')
+                  ? "bg-primary border-primary text-primary-foreground"
+                  : "bg-primary/10 hover:bg-primary/20 border-primary/20"
+              )}
             >
-              <span className="text-[10px] text-primary font-medium">OVER</span>
-              <span className="text-sm font-bold text-primary">{oddsDisplay(prop.over_odds)}</span>
+              <span className={cn("text-[10px] font-medium", isSelected(prop.player_name, prop.prop_type, 'over') ? 'text-primary-foreground' : 'text-primary')}>OVER</span>
+              <span className={cn("text-sm font-bold", isSelected(prop.player_name, prop.prop_type, 'over') ? 'text-primary-foreground' : 'text-primary')}>{oddsDisplay(prop.over_odds)}</span>
             </button>
             <button
-              onClick={(e) => { e.preventDefault(); onAddToParlay?.(prop, 'under'); }}
-              className="flex flex-col items-center bg-secondary hover:bg-secondary/80 border border-border rounded-lg px-3 py-1.5 transition-all"
+              onClick={(e) => { e.preventDefault(); addLeg(prop, 'under'); }}
+              className={cn(
+                "flex flex-col items-center border rounded-lg px-3 py-1.5 transition-all",
+                isSelected(prop.player_name, prop.prop_type, 'under')
+                  ? "bg-foreground border-foreground"
+                  : "bg-secondary hover:bg-secondary/80 border-border"
+              )}
             >
-              <span className="text-[10px] text-muted-foreground font-medium">UNDER</span>
-              <span className="text-sm font-bold text-foreground">{oddsDisplay(prop.under_odds)}</span>
+              <span className={cn("text-[10px] font-medium", isSelected(prop.player_name, prop.prop_type, 'under') ? 'text-background' : 'text-muted-foreground')}>UNDER</span>
+              <span className={cn("text-sm font-bold", isSelected(prop.player_name, prop.prop_type, 'under') ? 'text-background' : 'text-foreground')}>{oddsDisplay(prop.under_odds)}</span>
             </button>
           </div>
         </div>
