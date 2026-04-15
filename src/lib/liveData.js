@@ -63,14 +63,62 @@ export async function fetchLiveProps() {
       return { game_date: gamesResult.game_date || today, games_summary: [], props: [] };
     }
 
-    // Step 2: Get props for each game separately (small batches = no JSON truncation)
+    // Step 2: Fetch current rosters for all teams in today's games
+    const teamsInGames = new Set();
+    games.forEach(g => {
+      teamsInGames.add(g.home);
+      teamsInGames.add(g.away);
+    });
+
+    let rosters = {};
+    try {
+      const rosterResult = await base44.integrations.Core.InvokeLLM({
+        model: 'gemini_3_flash',
+        add_context_from_internet: true,
+        prompt: `Today is ${today}. For each of these NBA teams: ${Array.from(teamsInGames).join(', ')}, list ALL current active roster players (2025-26 season). For each player, provide: player name, team abbreviation, position (G/F/C), whether starter or bench, injury status (healthy/out/questionable/doubtful/GTD or "healthy" if none). Only include players currently on the roster.`,
+        response_json_schema: {
+          type: 'object',
+          properties: {
+            rosters: {
+              type: 'object',
+              additionalProperties: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    player_name: { type: 'string' },
+                    position: { type: 'string' },
+                    is_starter: { type: 'boolean' },
+                    injury_status: { type: 'string' }
+                  },
+                  required: ['player_name']
+                }
+              }
+            }
+          },
+          required: ['rosters']
+        }
+      });
+      rosters = rosterResult.rosters || {};
+    } catch (e) {
+      console.warn('Failed to fetch rosters:', e.message);
+    }
+
+    // Step 3: Get props for each game separately (small batches = no JSON truncation)
     const allRawProps = [];
     for (const game of games.slice(0, 6)) {
       try {
+        const homeRoster = rosters[game.home] || [];
+        const awayRoster = rosters[game.away] || [];
+        const validPlayerNames = new Set([
+          ...homeRoster.map(p => p.player_name?.toLowerCase()),
+          ...awayRoster.map(p => p.player_name?.toLowerCase())
+        ]);
+
         const propsResult = await base44.integrations.Core.InvokeLLM({
           model: 'gemini_3_flash',
           add_context_from_internet: true,
-          prompt: `Today is ${today}. NBA game: ${game.away} @ ${game.home}. List the top 6-8 player prop bets available on DraftKings or FanDuel for this game. Include points, rebounds, assists, 3PM props. For each: player name, team (use abbreviation), opponent (use abbreviation), prop type (points/rebounds/assists/3PM/PRA/steals/blocks), line, over odds (e.g. -110), under odds, player position (G/F/C), whether they are a starter, and their approximate minutes per game. Only include active/healthy players expected to play.`,
+          prompt: `Today is ${today}. NBA game: ${game.away} @ ${game.home}. List the top 6-8 player prop bets available on DraftKings or FanDuel for this game. Include points, rebounds, assists, 3PM props. For each: player name, team (use abbreviation), opponent (use abbreviation), prop type (points/rebounds/assists/3PM/PRA/steals/blocks), line, over odds (e.g. -110), under odds, player position (G/F/C), whether they are a starter, and their approximate minutes per game. ONLY include players who are actually on these rosters: ${game.away}: ${homeRoster.map(p => p.player_name).join(', ') || 'unknown'}. ${game.home}: ${awayRoster.map(p => p.player_name).join(', ') || 'unknown'}. Verify player names are correct.`,
           response_json_schema: {
             type: 'object',
             properties: {
