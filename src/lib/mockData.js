@@ -271,9 +271,9 @@ export const mockPlayers = [
     mkProp('points',13.5,{min:24,usage:17,pace:101,total:225}),
     mkProp('3PM',3.5,{min:24,usage:17,pace:101,total:225}),
   ]),
-  mkPlayer('gsw5','Jonathan Kuminga','GSW','LAC','PF',true,'healthy','',[
-    mkProp('points',16.5,{min:28,usage:20,pace:101,total:225}),
-    mkProp('rebounds',5.5,{min:28,usage:20,pace:101,total:225}),
+  mkPlayer('gsw5','Moses Moody','GSW','LAC','SG',true,'healthy','',[
+    mkProp('points',13.5,{min:26,usage:15,pace:101,total:225}),
+    mkProp('3PM',2.5,{min:26,usage:15,pace:101,total:225}),
   ]),
 
   // ══ HOUSTON ROCKETS ══
