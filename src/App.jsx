@@ -11,9 +11,9 @@ import Dashboard from '@/pages/Dashboard.jsx';
 import Trends from '@/pages/Trends.jsx';
 import AIPicks from '@/pages/AIPicks';
 import Matchups from '@/pages/Matchups';
-import ParlayBuilder from '@/pages/ParlayBuilder';
+import ParlayBuilder from '@/pages/ParlayBuilder.jsx';
 import Alerts from '@/pages/Alerts';
-import Profile from '@/pages/Profile';
+import Profile from '@/pages/Profile.jsx';
 import Compare from '@/pages/Compare';
 
 const AuthenticatedApp = () => {

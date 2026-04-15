@@ -1,0 +1,63 @@
+{
+  "name": "SavedParlay",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "User-given name for the parlay"
+    },
+    "legs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "player_name": {
+            "type": "string"
+          },
+          "team": {
+            "type": "string"
+          },
+          "opponent": {
+            "type": "string"
+          },
+          "prop_type": {
+            "type": "string"
+          },
+          "line": {
+            "type": "number"
+          },
+          "pick": {
+            "type": "string"
+          },
+          "odds": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "wager": {
+      "type": "number"
+    },
+    "combined_odds": {
+      "type": "string"
+    },
+    "potential_payout": {
+      "type": "number"
+    },
+    "game_date": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "won",
+        "lost"
+      ],
+      "default": "pending"
+    }
+  },
+  "required": [
+    "legs"
+  ]
+}

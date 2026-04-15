@@ -1,0 +1,21 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "user"
+      ],
+      "default": "user"
+    },
+    "favorite_players": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of favorited player names"
+    }
+  }
+}
