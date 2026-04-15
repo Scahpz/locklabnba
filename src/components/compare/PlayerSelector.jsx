@@ -2,6 +2,7 @@ import React from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { X, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import TeamLogo from '@/components/common/TeamLogo';
 
 const injuryColors = {
   healthy: 'text-primary',
@@ -38,9 +39,7 @@ export default function PlayerSelector({ slot, selectedId, allPlayers, disabledI
 
       {player && (
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-secondary overflow-hidden border-2 border-border flex-shrink-0">
-            <img src={player.photo_url} alt="" className="w-full h-full object-cover" />
-          </div>
+          <TeamLogo team={player.team} className="w-12 h-12" bgClass="bg-secondary border-2 border-border" />
           <div>
             <p className="font-bold text-foreground text-sm">{player.player_name}</p>
             <p className="text-xs text-muted-foreground">{player.team} vs {player.opponent} · {player.position}</p>

@@ -13,14 +13,18 @@ const teamSchedules = {
 
 export const mockGameLogs = {};
 
-function mkGames(base, variance, count = 10) {
-  return Array.from({ length: count }, () =>
-    parseFloat((base + (Math.random() * variance * 2 - variance)).toFixed(1))
-  );
+function mkGames(base, variance, count = 10, integer = true) {
+  return Array.from({ length: count }, () => {
+    const raw = base + (Math.random() * variance * 2 - variance);
+    return integer ? Math.round(raw) : parseFloat(raw.toFixed(1));
+  });
 }
 
+const integerPropTypes = ['points', 'rebounds', 'assists', 'steals', 'blocks', 'turnovers', '3PM', 'PRA'];
+
 function mkProp(type, line, opts = {}) {
-  const games = mkGames(line + (opts.bias || 0.5), opts.var || line * 0.18);
+  const isInt = integerPropTypes.includes(type);
+  const games = mkGames(line + (opts.bias || 0.5), opts.var || line * 0.18, 10, isInt);
   const g5 = games.slice(-5);
   const avg10 = parseFloat((games.reduce((a,b)=>a+b,0)/games.length).toFixed(1));
   const avg5 = parseFloat((g5.reduce((a,b)=>a+b,0)/g5.length).toFixed(1));

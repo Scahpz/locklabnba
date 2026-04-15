@@ -6,6 +6,7 @@ import { TrendingUp, Clock, Target, Activity, Zap } from 'lucide-react';
 import PlayerTrendChart from '@/components/trends/PlayerTrendChart';
 import MinutesTrendChart from '@/components/trends/MinutesTrendChart';
 import { cn } from '@/lib/utils';
+import TeamLogo from '@/components/common/TeamLogo';
 
 export default function Trends() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -47,9 +48,7 @@ export default function Trends() {
       {/* Player Header */}
       <div className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-center gap-4 mb-4">
-          <div className="w-16 h-16 rounded-full bg-secondary overflow-hidden border-2 border-border">
-            <img src={player.photo_url} alt="" className="w-full h-full object-cover" />
-          </div>
+          <TeamLogo team={player.team} className="w-16 h-16" bgClass="bg-secondary border-2 border-border" />
           <div>
             <h2 className="text-xl font-bold text-foreground">{player.player_name}</h2>
             <p className="text-sm text-muted-foreground">{player.team} · {player.position} · {player.is_starter ? 'Starter' : 'Bench'}</p>

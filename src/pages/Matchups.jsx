@@ -4,6 +4,7 @@ import { Shield, TrendingUp, TrendingDown, Gauge, Target } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import TeamLogo from '@/components/common/TeamLogo';
 
 const ratingColors = {
   elite: { text: 'text-primary', bg: 'bg-primary/10', label: 'ELITE' },
@@ -100,9 +101,7 @@ export default function Matchups() {
             <div key={i} className="rounded-xl border border-border bg-card p-4 hover:border-primary/20 transition-all">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-secondary overflow-hidden">
-                    <img src={m.photo_url} alt="" className="w-full h-full object-cover" />
-                  </div>
+                  <TeamLogo team={m.team} className="w-10 h-10" />
                   <div>
                     <p className="font-semibold text-sm text-foreground">{m.player_name}</p>
                     <p className="text-xs text-muted-foreground">{m.team} vs {m.opponent} · {m.prop_type.toUpperCase()}</p>

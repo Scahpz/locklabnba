@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Lock, TrendingUp, Target, Zap, Shield, AlertTriangle, Award } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
+import TeamLogo from '@/components/common/TeamLogo';
 
 const tierConfig = {
   A: { label: 'Tier A — High Confidence', emoji: '🔒', color: 'border-primary/40 bg-primary/5', badge: 'bg-primary/20 text-primary border-primary/30', glow: 'shadow-[0_0_15px_hsl(142,71%,45%,0.1)]' },
@@ -19,9 +20,7 @@ function PickCard({ prop }) {
     <div className={cn("rounded-xl border p-4 transition-all duration-300 hover:scale-[1.01]", tier.color, tier.glow)}>
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-secondary overflow-hidden">
-            <img src={prop.photo_url} alt="" className="w-full h-full object-cover" />
-          </div>
+          <TeamLogo team={prop.team} className="w-10 h-10" />
           <div>
             <Link to={`/trends?player=${encodeURIComponent(prop.player_name)}`} className="font-semibold text-sm text-foreground hover:text-primary transition-colors">
               {prop.player_name}

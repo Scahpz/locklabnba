@@ -1,6 +1,7 @@
 import React from 'react';
 import { Lock, Zap, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import TeamLogo from '@/components/common/TeamLogo';
 
 export default function LockOfTheDay({ props }) {
   const locks = props.filter(p => p.is_lock);
@@ -20,9 +21,7 @@ export default function LockOfTheDay({ props }) {
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-secondary overflow-hidden border-2 border-primary/30">
-            <img src={lock.photo_url} alt="" className="w-full h-full object-cover" />
-          </div>
+          <TeamLogo team={lock.team} className="w-14 h-14" />
           <div className="flex-1">
             <h4 className="text-lg font-bold text-foreground">{lock.player_name}</h4>
             <p className="text-sm text-muted-foreground">{lock.team} vs {lock.opponent}</p>

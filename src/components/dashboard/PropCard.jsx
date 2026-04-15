@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Lock, AlertTriangle, Award, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import TeamLogo from '@/components/common/TeamLogo';
 
 const propTypeLabels = {
   points: 'PTS', rebounds: 'REB', assists: 'AST', PRA: 'PRA', '3PM': '3PM',
@@ -31,9 +32,7 @@ export default function PropCard({ prop, onAddToParlay }) {
       <div className="p-4 pb-3">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-secondary overflow-hidden flex-shrink-0">
-              <img src={prop.photo_url} alt="" className="w-full h-full object-cover" />
-            </div>
+            <TeamLogo team={prop.team} className="w-10 h-10" />
             <div>
               <Link to={`/trends?player=${encodeURIComponent(prop.player_name)}`} className="font-semibold text-sm text-foreground hover:text-primary transition-colors">
                 {prop.player_name}

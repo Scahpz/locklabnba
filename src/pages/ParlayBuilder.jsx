@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import TeamLogo from '@/components/common/TeamLogo';
 
 function calculateCombinedOdds(legs) {
   if (legs.length === 0) return 0;
@@ -97,9 +98,7 @@ export default function ParlayBuilder() {
                 {legs.map((leg, i) => (
                   <div key={i} className="flex items-center justify-between bg-secondary/50 rounded-lg p-2.5">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div className="w-7 h-7 rounded-full bg-secondary overflow-hidden flex-shrink-0">
-                        <img src={leg.photo_url} alt="" className="w-full h-full object-cover" />
-                      </div>
+                      <TeamLogo team={leg.team} className="w-7 h-7" />
                       <div className="min-w-0">
                         <p className="text-xs font-medium text-foreground truncate">{leg.player_name}</p>
                         <p className="text-[10px] text-muted-foreground">
@@ -166,9 +165,7 @@ export default function ParlayBuilder() {
                   isInParlay ? "border-primary/40 bg-primary/5" : "border-border hover:border-primary/20"
                 )}>
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-full bg-secondary overflow-hidden">
-                      <img src={prop.photo_url} alt="" className="w-full h-full object-cover" />
-                    </div>
+                    <TeamLogo team={prop.team} className="w-8 h-8" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{prop.player_name}</p>
                       <p className="text-[10px] text-muted-foreground">{prop.team} vs {prop.opponent} · {prop.prop_type.toUpperCase()}</p>

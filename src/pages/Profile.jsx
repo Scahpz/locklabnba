@@ -3,6 +3,7 @@ import { User, Star, TrendingUp, Target, Trophy, BarChart3 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { mockPlayers } from '@/lib/mockData';
+import TeamLogo from '@/components/common/TeamLogo';
 
 export default function Profile() {
   const [favorites, setFavorites] = useState(['Luka Doncic', 'Nikola Jokic']);
@@ -88,9 +89,7 @@ export default function Profile() {
                 onClick={() => toggleFavorite(player.player_name)}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-secondary overflow-hidden">
-                    <img src={player.photo_url} alt="" className="w-full h-full object-cover" />
-                  </div>
+                  <TeamLogo team={player.team} className="w-10 h-10" />
                   <div>
                     <p className="text-sm font-medium text-foreground">{player.player_name}</p>
                     <p className="text-xs text-muted-foreground">{player.team} · {player.position}</p>

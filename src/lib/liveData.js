@@ -122,19 +122,25 @@ Also return:
   // Enrich each prop with computed historical simulation + analytics
   const enriched = (result.props || []).map((prop, i) => {
     const base = prop.line || 20;
-    const bias = 0.4;
     const variance = base * 0.2;
 
-    // Simulate last 10 games around the prop line
-    const games = Array.from({ length: 10 }, () =>
-      parseFloat((base + bias + (Math.random() * variance * 2 - variance)).toFixed(1))
-    );
+    // Determine if this prop type uses integers (counts) or decimals
+    const integerProps = ['points', 'rebounds', 'assists', 'steals', 'blocks', 'turnovers', '3PM', 'PRA'];
+    const isInteger = integerProps.includes(prop.prop_type);
+
+    // Simulate last 10 games — integers for counting stats
+    const games = Array.from({ length: 10 }, () => {
+      const raw = base + (Math.random() * variance * 2 - variance);
+      return isInteger ? Math.round(raw) : parseFloat(raw.toFixed(1));
+    });
     const g5 = games.slice(-5);
     const avg10 = parseFloat((games.reduce((a,b)=>a+b,0)/10).toFixed(1));
     const avg5 = parseFloat((g5.reduce((a,b)=>a+b,0)/5).toFixed(1));
     const hits = games.filter(v => v > prop.line).length;
     const hit_rate = Math.round((hits/10)*100);
-    const proj = parseFloat((avg5 * 1.02).toFixed(1));
+    // Projection: slight positive bias, rounded to match stat type
+    const projRaw = avg5 * 1.02;
+    const proj = isInteger ? parseFloat(projRaw.toFixed(1)) : parseFloat(projRaw.toFixed(1));
     const edge = parseFloat((((proj - prop.line)/prop.line)*100).toFixed(1));
     const confidence_score = Math.min(10, Math.max(3,
       hits >= 8 ? 9 : hits >= 6 ? 7 : hits >= 4 ? 5 : 3
