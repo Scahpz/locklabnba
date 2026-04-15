@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { User, Star, Trophy, Layers, CheckCircle2, XCircle, Clock, Trash2, Pencil, Check } from 'lucide-react';
+import { User, Star, Trophy, Layers, CheckCircle2, XCircle, Clock, Trash2, Pencil, Check, Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useLivePlayers } from '@/lib/useLivePlayers';
 import TeamLogo from '@/components/common/TeamLogo';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 
 const statusConfig = {
   pending: { label: 'Pending', icon: Clock, color: 'text-chart-4 bg-chart-4/10 border-chart-4/20' },
@@ -92,6 +93,17 @@ export default function Profile() {
   const [preferredName, setPreferredName] = useState('');
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  const [playerSearch, setPlayerSearch] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const searchRef = useRef(null);
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (searchRef.current && !searchRef.current.contains(e.target)) setShowDropdown(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -285,30 +297,80 @@ export default function Profile() {
         <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
           <Star className="w-4 h-4 text-chart-4" /> Favorite Players
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {players.map(player => {
-            const isFav = favorites.includes(player.player_name);
-            return (
-              <div
-                key={player.id}
-                className={cn(
-                  "flex items-center justify-between rounded-lg border p-3 transition-all cursor-pointer",
-                  isFav ? "border-chart-4/30 bg-chart-4/5" : "border-border hover:border-border/80"
-                )}
-                onClick={() => toggleFavorite(player.player_name)}
-              >
-                <div className="flex items-center gap-3">
-                  <TeamLogo team={player.team} className="w-10 h-10" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{player.player_name}</p>
-                    <p className="text-xs text-muted-foreground">{player.team} · {player.position}</p>
-                  </div>
-                </div>
-                <Star className={cn("w-5 h-5 transition-colors", isFav ? "text-chart-4 fill-chart-4" : "text-muted-foreground")} />
+
+        {/* Search to add favorites */}
+        <div className="relative mb-4" ref={searchRef}>
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search players to favorite…"
+            value={playerSearch}
+            onChange={e => { setPlayerSearch(e.target.value); setShowDropdown(true); }}
+            onFocus={() => setShowDropdown(true)}
+            className="pl-9 pr-8 bg-secondary border-border"
+          />
+          {playerSearch && (
+            <button onClick={() => { setPlayerSearch(''); setShowDropdown(false); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {showDropdown && playerSearch.trim() && (() => {
+            const q = playerSearch.toLowerCase();
+            const results = players.filter(p => p.player_name.toLowerCase().includes(q) || p.team.toLowerCase().includes(q)).slice(0, 8);
+            return results.length > 0 ? (
+              <div className="absolute top-full mt-1 w-full bg-popover border border-border rounded-lg shadow-xl z-50 overflow-hidden">
+                {results.map(p => {
+                  const isFav = favorites.includes(p.player_name);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => { toggleFavorite(p.player_name); setPlayerSearch(''); setShowDropdown(false); }}
+                      className="w-full flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-secondary transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-3">
+                        <TeamLogo team={p.team} className="w-7 h-7" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{p.player_name}</p>
+                          <p className="text-[10px] text-muted-foreground">{p.team} · {p.position}</p>
+                        </div>
+                      </div>
+                      <Star className={cn("w-4 h-4 flex-shrink-0", isFav ? "text-chart-4 fill-chart-4" : "text-muted-foreground")} />
+                    </button>
+                  );
+                })}
               </div>
-            );
-          })}
+            ) : null;
+          })()}
         </div>
+
+        {/* Pinned favorites list */}
+        {favorites.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">Search for players above to add favorites.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {favorites.map(name => {
+              const player = players.find(p => p.player_name === name);
+              return (
+                <div key={name} className="flex items-center justify-between rounded-lg border border-chart-4/30 bg-chart-4/5 p-3 transition-all">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {player && <TeamLogo team={player.team} className="w-10 h-10 flex-shrink-0" />}
+                    <div className="min-w-0">
+                      <Link
+                        to={`/trends?player=${encodeURIComponent(name)}`}
+                        className="text-sm font-medium text-foreground hover:text-primary transition-colors truncate block"
+                      >
+                        {name}
+                      </Link>
+                      {player && <p className="text-xs text-muted-foreground">{player.team} · {player.position}</p>}
+                    </div>
+                  </div>
+                  <button onClick={() => toggleFavorite(name)} className="ml-2 flex-shrink-0">
+                    <Star className="w-5 h-5 text-chart-4 fill-chart-4 hover:opacity-60 transition-opacity" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
