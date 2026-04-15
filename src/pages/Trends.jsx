@@ -38,8 +38,18 @@ export default function Trends() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {mockPlayers.map(p => (
-              <SelectItem key={p.id} value={p.player_name}>{p.player_name}</SelectItem>
+            {Object.entries(
+              mockPlayers.reduce((acc, p) => {
+                (acc[p.team] = acc[p.team] || []).push(p);
+                return acc;
+              }, {})
+            ).sort(([a], [b]) => a.localeCompare(b)).map(([team, players]) => (
+              <React.Fragment key={team}>
+                <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{team}</div>
+                {players.map(p => (
+                  <SelectItem key={p.id} value={p.player_name} className="pl-4">{p.player_name}</SelectItem>
+                ))}
+              </React.Fragment>
             ))}
           </SelectContent>
         </Select>
