@@ -4,9 +4,11 @@ import { cn } from '@/lib/utils';
 import TeamLogo from '@/components/common/TeamLogo';
 
 export default function LockOfTheDay({ props }) {
-  const locks = props.filter(p => p.is_lock);
-  if (locks.length === 0) return null;
-  const lock = locks[0];
+  const locks = props.filter(p => p.is_lock && p.injury_status !== 'out');
+  const lock = locks.length > 0
+    ? locks[0]
+    : [...props].filter(p => p.injury_status !== 'out').sort((a, b) => b.confidence_score - a.confidence_score)[0];
+  if (!lock) return null;
 
   return (
     <div className="relative rounded-xl border border-primary/30 bg-gradient-to-br from-primary/5 via-card to-primary/5 p-5 overflow-hidden">
