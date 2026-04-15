@@ -131,8 +131,8 @@ export default function AIPicks() {
               <span className="text-xs text-muted-foreground">({props.length} picks)</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {props.map((prop, i) => (
-                <PickCard key={`${prop.player_name}-${prop.prop_type}-${i}`} prop={prop} />
+              {props.filter(p => p).map((prop, i) => (
+                <PickCard key={`pick-${tier}-${i}`} prop={prop} />
               ))}
             </div>
           </div>
