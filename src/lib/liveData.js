@@ -1,7 +1,7 @@
 import { base44 } from '@/api/base44Client';
 
-const CACHE_KEY = 'locklab_live_props_v3';
-const CACHE_DATE_KEY = 'locklab_live_props_date_v3';
+const CACHE_KEY = 'locklab_live_props_v6';
+const CACHE_DATE_KEY = 'locklab_live_props_date_v6';
 
 function todayStr() {
   return new Date().toISOString().split('T')[0];
@@ -25,34 +25,33 @@ export async function fetchLiveProps() {
   try {
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     
-    const validTeams = ['ATL', 'BOS', 'BKN', 'CHA', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'GSW', 'HOU', 'LAC', 'LAL', 'MEM', 'MIA', 'MIL', 'MIN', 'NOP', 'NYK', 'OKC', 'ORL', 'PHI', 'PHX', 'POR', 'SAC', 'SAS', 'TOR', 'UTA', 'WAS'];
+    const validTeams = ['ATL', 'BOS', 'BKN', 'CHA', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'GSW', 'HOU', 'IND', 'LAC', 'LAL', 'MEM', 'MIA', 'MIL', 'MIN', 'NOP', 'NYK', 'OKC', 'ORL', 'PHI', 'PHX', 'POR', 'SAC', 'SAS', 'TOR', 'UTA', 'WAS'];
 
     const result = await base44.integrations.Core.InvokeLLM({
-      model: 'automatic',
-      prompt: `Today is ${today}. You MUST fetch ONLY TODAY's actual NBA games and REAL player prop lines from major sportsbooks (DraftKings, FanDuel, BetMGM, etc).
+      model: 'gemini_3_flash',
+      prompt: `Today is ${today}. Search the web RIGHT NOW for TODAY's real NBA player prop lines from DraftKings, FanDuel, or BetMGM.
 
-CRITICAL REQUIREMENTS:
-1. Only include games actually scheduled for TODAY (${today})
-2. Only include players who play for teams in this valid NBA roster: ${validTeams.join(', ')}
-3. Each player must be on a team that is playing TODAY
-4. Each opponent team must be playing that team TODAY
-5. All odds must be realistic (typically -110 to +150 for standard props)
-6. Only include healthy/GTD players in props
+Search for: "NBA player props today ${today} DraftKings" and "NBA prop lines today".
 
-Return a JSON object with:
-- game_date: today's date (e.g. "April 15, 2026")
-- games_summary: array of games like [{home: "LAL", away: "GSW", tipoff: "7:30 PM ET", total: 228.5}]
-- props: array of 20-30 VERIFIED player props from today. For each prop:
-  - player_name (real player), team (valid 3-letter code), opponent (valid 3-letter code)
-  - prop_type: points, rebounds, assists, PRA, 3PM, steals, blocks, or turnovers
-  - line (realistic number), over_odds, under_odds
-  - injury_status (healthy/questionable/out/GTD), injury_note
+RULES:
+1. ONLY include games scheduled for TODAY. Do NOT make up or guess any data.
+2. Use ONLY real player names from the actual NBA rosters (valid teams: ${validTeams.join(', ')})
+3. Lines and odds MUST come from real sportsbooks found in your search. Do NOT invent lines.
+4. If you cannot find actual real props for today, return an empty props array — do NOT hallucinate data.
+5. Odds are typically -110 to -115 for both sides on standard props.
+
+Return a JSON object:
+- game_date: today's date string
+- games_summary: [{home, away, tipoff, total}] — only real games today
+- props: up to 30 real prop lines. Each:
+  - player_name, team (3-letter abbrev), opponent (3-letter abbrev)
+  - prop_type: "points", "rebounds", "assists", "PRA", "3PM", "steals", "blocks", or "turnovers"
+  - line (the actual O/U number), over_odds, under_odds (e.g. -110)
+  - injury_status: "healthy", "questionable", "GTD", or "out"
   - position (PG/SG/SF/PF/C), is_starter (true/false)
-  - minutes_avg (15-40), usage_rate (15-35)
-  - matchup_note, matchup_rating (elite/favorable/neutral/tough/elite_defense)
-  - def_rank_vs_pos (1-30), game_total (180-250), pace_rating (90-120)
-
-If you cannot find real data for today, return empty props array.`,
+  - minutes_avg, usage_rate
+  - matchup_note, matchup_rating ("elite"/"favorable"/"neutral"/"tough"/"elite_defense")
+  - def_rank_vs_pos (1-30), game_total, pace_rating`,
       add_context_from_internet: true,
       response_json_schema: {
         type: 'object',
