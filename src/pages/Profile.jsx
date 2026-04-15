@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
-import { User, Star, Trophy, Layers, CheckCircle2, XCircle, Clock, Trash2 } from 'lucide-react';
+import { User, Star, Trophy, Layers, CheckCircle2, XCircle, Clock, Trash2, Pencil, Check } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useLivePlayers } from '@/lib/useLivePlayers';
 import TeamLogo from '@/components/common/TeamLogo';
@@ -88,6 +89,9 @@ export default function Profile() {
   const [parlays, setParlays] = useState([]);
   const [loadingParlays, setLoadingParlays] = useState(true);
   const [user, setUser] = useState(null);
+  const [preferredName, setPreferredName] = useState('');
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('');
 
   useEffect(() => {
     async function load() {
@@ -95,6 +99,9 @@ export default function Profile() {
       setUser(me);
       const savedFavs = me?.favorite_players || [];
       setFavorites(savedFavs);
+      const savedName = me?.preferred_name || '';
+      setPreferredName(savedName);
+      setNameInput(savedName);
     }
     load();
   }, []);
@@ -109,6 +116,13 @@ export default function Profile() {
     setParlays(data);
     setLoadingParlays(false);
   }
+
+  const savePreferredName = async () => {
+    await base44.auth.updateMe({ preferred_name: nameInput.trim() });
+    setPreferredName(nameInput.trim());
+    setEditingName(false);
+    toast.success('Name updated!');
+  };
 
   const toggleFavorite = async (name) => {
     const next = favorites.includes(name)
@@ -161,7 +175,37 @@ export default function Profile() {
           <User className="w-7 h-7 text-muted-foreground" />
           My Profile
         </h1>
-        {user && <p className="text-sm text-muted-foreground mt-1">{user.full_name || user.email}</p>}
+        {user && (
+        <div className="flex items-center gap-2 mt-1">
+          {editingName ? (
+            <div className="flex items-center gap-2">
+              <Input
+                value={nameInput}
+                onChange={e => setNameInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && savePreferredName()}
+                placeholder="Enter preferred name"
+                className="h-7 text-sm bg-secondary border-border w-48"
+                autoFocus
+              />
+              <button onClick={savePreferredName} className="text-primary hover:text-primary/80 transition-colors">
+                <Check className="w-4 h-4" />
+              </button>
+              <button onClick={() => { setEditingName(false); setNameInput(preferredName); }} className="text-muted-foreground hover:text-foreground transition-colors">
+                <XCircle className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">
+                {preferredName || user.full_name || user.email}
+              </p>
+              <button onClick={() => setEditingName(true)} className="text-muted-foreground hover:text-primary transition-colors">
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
+        </div>
+      )}
       </div>
 
       {/* Performance Stats */}
