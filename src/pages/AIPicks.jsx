@@ -14,6 +14,7 @@ const tierConfig = {
 };
 
 function PickCard({ prop }) {
+  if (!prop) return null;
   const tier = tierConfig[prop.confidence_tier] || tierConfig.C;
   const oddsDisplay = (odds) => odds > 0 ? `+${odds}` : odds;
 
@@ -91,7 +92,10 @@ export default function AIPicks() {
           setAllProps(data.props);
           setIsLive(true);
         }
-      } catch {}
+      } catch {
+        // Fallback to mock data on error
+        setAllProps(getAllProps());
+      }
     }
     load();
   }, []);
