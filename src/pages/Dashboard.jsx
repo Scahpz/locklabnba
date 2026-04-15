@@ -1,28 +1,52 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { getAllProps } from '@/lib/mockData';
-import { fetchLiveProps } from '@/lib/liveData';
+import { fetchLiveProps, clearLiveCache, isCacheValid } from '@/lib/liveData';
 import StatsOverview from '@/components/dashboard/StatsOverview';
 import PropFilters from '@/components/dashboard/PropFilters';
 import PropCard from '@/components/dashboard/PropCard';
 import LockOfTheDay from '@/components/dashboard/LockOfTheDay';
-import { Wifi, Calendar } from 'lucide-react';
+import { RefreshCw, Wifi, WifiOff, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function Dashboard() {
   const [selectedType, setSelectedType] = useState('all');
   const [sortBy, setSortBy] = useState('edge');
   const [selectedGames, setSelectedGames] = useState([]);
+  const [liveProps, setLiveProps] = useState(null);
+  const [loadingLive, setLoadingLive] = useState(false);
+  const [liveError, setLiveError] = useState(false);
   const [gameDate, setGameDate] = useState(null);
   const [gamesSummary, setGamesSummary] = useState([]);
+  const [useLive, setUseLive] = useState(isCacheValid()); // auto-on if cached
+
+  const staticProps = getAllProps();
+
+  const loadLive = async (forceRefresh = false) => {
+    setLoadingLive(true);
+    setLiveError(false);
+    if (forceRefresh) clearLiveCache();
+    try {
+      const data = await fetchLiveProps();
+      if (data?.props?.length > 0) {
+        setLiveProps(data.props);
+        setGameDate(data.game_date);
+        setGamesSummary(data.games_summary || []);
+        setUseLive(true);
+      } else {
+        setLiveError(true);
+      }
+    } catch {
+      setLiveError(true);
+    } finally {
+      setLoadingLive(false);
+    }
+  };
 
   useEffect(() => {
-    fetchLiveProps().then(data => {
-      setGameDate(data.game_date);
-      setGamesSummary(data.games_summary || []);
-    });
+    loadLive();
   }, []);
 
-  const allProps = getAllProps();
+  const allProps = useLive && liveProps ? liveProps : staticProps;
 
   const toggleGame = (g) => {
     const key = `${(g.away || '').toUpperCase().trim()}@${(g.home || '').toUpperCase().trim()}`;
@@ -59,12 +83,54 @@ export default function Dashboard() {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Player Props</h1>
           <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
-            <Wifi className="w-3.5 h-3.5 text-primary" />
-            <span>Today's Props</span>
-            {gameDate && <span>· {gameDate}</span>}
+            {useLive ? (
+              <>
+                <Wifi className="w-3.5 h-3.5 text-primary" />
+                <span className="text-primary font-medium">Live</span>
+                {gameDate && <span>· {gameDate}</span>}
+              </>
+            ) : loadingLive ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                Fetching today's lines…
+              </>
+            ) : (
+              <>
+                <WifiOff className="w-3.5 h-3.5 text-muted-foreground" />
+                Showing sample data
+              </>
+            )}
           </p>
         </div>
-
+        <div className="flex items-center gap-2">
+          {useLive && (
+            <button
+              onClick={() => setUseLive(false)}
+              className="text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg bg-secondary transition-colors"
+            >
+              Sample data
+            </button>
+          )}
+          {!useLive && liveProps && (
+            <button
+              onClick={() => setUseLive(true)}
+              className="text-xs text-primary hover:text-primary/80 px-3 py-1.5 rounded-lg bg-primary/10 transition-colors"
+            >
+              Use live data
+            </button>
+          )}
+          <button
+            onClick={() => loadLive(true)}
+            disabled={loadingLive}
+            className={cn(
+              "flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all border border-border",
+              loadingLive ? "text-muted-foreground bg-secondary/50" : "text-foreground bg-secondary hover:bg-secondary/80"
+            )}
+          >
+            <RefreshCw className={cn("w-3.5 h-3.5", loadingLive && "animate-spin")} />
+            {loadingLive ? "Fetching…" : "Refresh Lines"}
+          </button>
+        </div>
       </div>
 
       {/* Today's Games Bar */}
@@ -101,7 +167,12 @@ export default function Dashboard() {
         </div>
       )}
 
-
+      {liveError && (
+        <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive flex items-center gap-2">
+          <WifiOff className="w-4 h-4" />
+          Could not fetch live lines. Showing sample data. Try refreshing.
+        </div>
+      )}
 
       <StatsOverview />
       <LockOfTheDay props={allProps} />
