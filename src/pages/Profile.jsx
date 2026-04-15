@@ -4,6 +4,7 @@ import { User, Star, Trophy, Layers, CheckCircle2, XCircle, Clock, Trash2, Penci
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useLivePlayers } from '@/lib/useLivePlayers';
+import { mockPlayers } from '@/lib/mockData';
 import TeamLogo from '@/components/common/TeamLogo';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
@@ -315,7 +316,7 @@ export default function Profile() {
           )}
           {showDropdown && playerSearch.trim() && (() => {
             const q = playerSearch.toLowerCase();
-            const results = players.filter(p => p.player_name.toLowerCase().includes(q) || p.team.toLowerCase().includes(q)).slice(0, 8);
+            const results = mockPlayers.filter(p => p.player_name.toLowerCase().includes(q) || p.team.toLowerCase().includes(q)).slice(0, 8);
             return results.length > 0 ? (
               <div className="absolute top-full mt-1 w-full bg-popover border border-border rounded-lg shadow-xl z-50 overflow-hidden">
                 {results.map(p => {
@@ -348,7 +349,7 @@ export default function Profile() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {favorites.map(name => {
-              const player = players.find(p => p.player_name === name);
+              const player = mockPlayers.find(p => p.player_name === name);
               return (
                 <div key={name} className="flex items-center justify-between rounded-lg border border-chart-4/30 bg-chart-4/5 p-3 transition-all">
                   <div className="flex items-center gap-3 min-w-0">
