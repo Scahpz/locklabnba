@@ -1,14 +1,21 @@
 import React from 'react';
-import { Lock, Zap, TrendingUp } from 'lucide-react';
+import { Lock, Zap, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TeamLogo from '@/components/common/TeamLogo';
+import { useParlay } from '@/lib/ParlayContext';
 
 export default function LockOfTheDay({ props }) {
+  const { addLeg } = useParlay();
+  
   const locks = props.filter(p => p.is_lock && p.injury_status !== 'out');
   const lock = locks.length > 0
     ? locks[0]
     : [...props].filter(p => p.injury_status !== 'out').sort((a, b) => b.confidence_score - a.confidence_score)[0];
   if (!lock) return null;
+
+  const handleAddToParlay = () => {
+    addLeg(lock, 'over');
+  };
 
   return (
     <div className="relative rounded-xl border border-primary/30 bg-gradient-to-br from-primary/5 via-card to-primary/5 p-5 overflow-hidden">
@@ -50,12 +57,21 @@ export default function LockOfTheDay({ props }) {
           </div>
         </div>
 
-        {lock.streak_info && (
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-primary font-medium">
-            <Zap className="w-3.5 h-3.5" />
-            {lock.streak_info}
-          </div>
-        )}
+        <div className="mt-4 flex items-center gap-2">
+          {lock.streak_info && (
+            <div className="flex items-center gap-1.5 text-xs text-primary font-medium flex-1">
+              <Zap className="w-3.5 h-3.5" />
+              {lock.streak_info}
+            </div>
+          )}
+          <button
+            onClick={handleAddToParlay}
+            className="flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add to Parlay
+          </button>
+        </div>
       </div>
     </div>
   );

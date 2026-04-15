@@ -10,7 +10,7 @@ export default function StatsOverview() {
   const avgHitRate = props.length > 0
     ? Math.round(props.reduce((acc, p) => acc + (p.hit_rate_last_10 || 0), 0) / props.length)
     : 0;
-  const locks = props.filter(p => p.is_lock).length;
+  const locks = props.filter(p => p.confidence_score >= 8 && p.injury_status !== 'out').length;
   const traps = props.filter(p => p.trap_warning).length;
 
   const stats = [
