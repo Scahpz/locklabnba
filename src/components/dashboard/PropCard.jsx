@@ -65,23 +65,27 @@ export default function PropCard({ prop, onAddToParlay }) {
                 "flex flex-col items-center border rounded-lg px-3 py-1.5 transition-all",
                 isSelected(prop.player_name, prop.prop_type, 'over')
                   ? "bg-primary border-primary text-primary-foreground"
-                  : "bg-primary/10 hover:bg-primary/20 border-primary/20"
+                  : isPositiveEdge
+                  ? "bg-primary/10 hover:bg-primary/20 border-primary/20"
+                  : "bg-secondary hover:bg-secondary/80 border-border"
               )}
             >
-              <span className={cn("text-[10px] font-medium", isSelected(prop.player_name, prop.prop_type, 'over') ? 'text-primary-foreground' : 'text-primary')}>OVER</span>
-              <span className={cn("text-sm font-bold", isSelected(prop.player_name, prop.prop_type, 'over') ? 'text-primary-foreground' : 'text-primary')}>{oddsDisplay(prop.over_odds)}</span>
+              <span className={cn("text-[10px] font-medium", isSelected(prop.player_name, prop.prop_type, 'over') ? 'text-primary-foreground' : isPositiveEdge ? 'text-primary' : 'text-muted-foreground')}>OVER</span>
+              <span className={cn("text-sm font-bold", isSelected(prop.player_name, prop.prop_type, 'over') ? 'text-primary-foreground' : isPositiveEdge ? 'text-primary' : 'text-muted-foreground')}>{oddsDisplay(prop.over_odds)}</span>
             </button>
             <button
               onClick={(e) => { e.preventDefault(); addLeg(prop, 'under'); }}
               className={cn(
                 "flex flex-col items-center border rounded-lg px-3 py-1.5 transition-all",
                 isSelected(prop.player_name, prop.prop_type, 'under')
-                  ? "bg-foreground border-foreground"
+                  ? "bg-destructive border-destructive text-destructive-foreground"
+                  : !isPositiveEdge
+                  ? "bg-destructive/10 hover:bg-destructive/20 border-destructive/20"
                   : "bg-secondary hover:bg-secondary/80 border-border"
               )}
             >
-              <span className={cn("text-[10px] font-medium", isSelected(prop.player_name, prop.prop_type, 'under') ? 'text-background' : 'text-muted-foreground')}>UNDER</span>
-              <span className={cn("text-sm font-bold", isSelected(prop.player_name, prop.prop_type, 'under') ? 'text-background' : 'text-foreground')}>{oddsDisplay(prop.under_odds)}</span>
+              <span className={cn("text-[10px] font-medium", isSelected(prop.player_name, prop.prop_type, 'under') ? 'text-destructive-foreground' : !isPositiveEdge ? 'text-destructive' : 'text-muted-foreground')}>UNDER</span>
+              <span className={cn("text-sm font-bold", isSelected(prop.player_name, prop.prop_type, 'under') ? 'text-destructive-foreground' : !isPositiveEdge ? 'text-destructive' : 'text-muted-foreground')}>{oddsDisplay(prop.under_odds)}</span>
             </button>
           </div>
         </div>
