@@ -76,7 +76,7 @@ export default function MiniParlayBar() {
 
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
-            onClick={(e) => { e.stopPropagation(); clearLegs(); }}
+            onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); clearLegs(); }}
             className="text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1"
           >
             Clear
