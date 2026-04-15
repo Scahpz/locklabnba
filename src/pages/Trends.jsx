@@ -60,28 +60,33 @@ export default function Trends() {
           </div>
         </div>
 
-        {/* Quick Stats */}
+        {/* Quick Stats — Season Averages */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-secondary/50 rounded-lg p-3 text-center">
-            <Clock className="w-4 h-4 mx-auto text-chart-3 mb-1" />
-            <p className="text-lg font-bold text-foreground">{player.props[0]?.minutes_avg || 0}</p>
-            <p className="text-[10px] text-muted-foreground uppercase">Avg Minutes</p>
-          </div>
-          <div className="bg-secondary/50 rounded-lg p-3 text-center">
-            <Activity className="w-4 h-4 mx-auto text-accent mb-1" />
-            <p className="text-lg font-bold text-foreground">{player.props[0]?.usage_rate || 0}%</p>
-            <p className="text-[10px] text-muted-foreground uppercase">Usage Rate</p>
-          </div>
-          <div className="bg-secondary/50 rounded-lg p-3 text-center">
-            <Target className="w-4 h-4 mx-auto text-primary mb-1" />
-            <p className="text-lg font-bold text-foreground">{player.props[0]?.pace_rating || 0}</p>
-            <p className="text-[10px] text-muted-foreground uppercase">Pace</p>
-          </div>
-          <div className="bg-secondary/50 rounded-lg p-3 text-center">
-            <TrendingUp className="w-4 h-4 mx-auto text-chart-4 mb-1" />
-            <p className="text-lg font-bold text-foreground">{player.props[0]?.game_total || 0}</p>
-            <p className="text-[10px] text-muted-foreground uppercase">Game Total</p>
-          </div>
+          {(() => {
+            const propTypes = ['points', 'rebounds', 'assists', '3PM', 'steals', 'blocks', 'PRA'];
+            const labelMap = { points: 'PPG', rebounds: 'RPG', assists: 'APG', '3PM': '3PM', steals: 'SPG', blocks: 'BPG', PRA: 'PRA' };
+            const iconMap = { points: TrendingUp, rebounds: Activity, assists: Target, '3PM': Zap, steals: Clock, blocks: Clock, PRA: TrendingUp };
+            const colorMap = { points: 'text-primary', rebounds: 'text-accent', assists: 'text-chart-3', '3PM': 'text-chart-4', steals: 'text-chart-3', blocks: 'text-destructive', PRA: 'text-primary' };
+
+            // Show up to 4 stats: always minutes + whatever prop types this player has
+            const playerPropTypes = player.props.map(p => p.prop_type);
+            const statsToShow = [
+              { key: 'minutes', label: 'MIN', value: player.props[0]?.minutes_avg || 0, icon: Clock, color: 'text-chart-3' },
+              ...playerPropTypes.slice(0, 3).map(type => {
+                const prop = player.props.find(p => p.prop_type === type);
+                const Icon = iconMap[type] || TrendingUp;
+                return { key: type, label: labelMap[type] || type.toUpperCase(), value: prop?.avg_last_10 || prop?.line || 0, icon: Icon, color: colorMap[type] || 'text-primary' };
+              })
+            ].slice(0, 4);
+
+            return statsToShow.map(stat => (
+              <div key={stat.key} className="bg-secondary/50 rounded-lg p-3 text-center">
+                <stat.icon className={`w-4 h-4 mx-auto ${stat.color} mb-1`} />
+                <p className="text-lg font-bold text-foreground">{stat.value}</p>
+                <p className="text-[10px] text-muted-foreground uppercase">{stat.label}</p>
+              </div>
+            ));
+          })()}
         </div>
       </div>
 
