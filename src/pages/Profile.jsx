@@ -8,7 +8,7 @@ import { mockPlayers } from '@/lib/mockData';
 import TeamLogo from '@/components/common/TeamLogo';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 const statusConfig = {
   pending: { label: 'Pending', icon: Clock, color: 'text-chart-4 bg-chart-4/10 border-chart-4/20' },
@@ -87,6 +87,7 @@ function ParlayCard({ parlay, onStatusChange, onDelete }) {
 
 export default function Profile() {
   const { players } = useLivePlayers();
+  const navigate = useNavigate();
   const [favorites, setFavorites] = useState([]);
   const [parlays, setParlays] = useState([]);
   const [loadingParlays, setLoadingParlays] = useState(true);
@@ -352,15 +353,13 @@ export default function Profile() {
               const player = mockPlayers.find(p => p.player_name === name);
               return (
                 <div key={name} className="flex items-center justify-between rounded-lg border border-chart-4/30 bg-chart-4/5 p-3 transition-all">
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+                    onClick={() => navigate(`/trends?player=${encodeURIComponent(name)}`)}
+                  >
                     {player && <TeamLogo team={player.team} className="w-10 h-10 flex-shrink-0" />}
                     <div className="min-w-0">
-                      <Link
-                        to={`/trends?player=${encodeURIComponent(name)}`}
-                        className="text-sm font-medium text-foreground hover:text-primary transition-colors truncate block"
-                      >
-                        {name}
-                      </Link>
+                      <p className="text-sm font-medium text-foreground hover:text-primary transition-colors truncate">{name}</p>
                       {player && <p className="text-xs text-muted-foreground">{player.team} · {player.position}</p>}
                     </div>
                   </div>
