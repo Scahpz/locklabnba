@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getAllProps } from '@/lib/mockData';
-import { fetchLiveProps, isCacheValid } from '@/lib/liveData';
+import { fetchLiveProps } from '@/lib/liveData';
 import { Badge } from '@/components/ui/badge';
 import { Lock, Zap, Shield, AlertTriangle, Award, Wifi, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
