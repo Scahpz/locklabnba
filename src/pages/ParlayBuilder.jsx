@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchLiveProps, getAllProps } from '@/lib/liveData';
+import { fetchLiveProps } from '@/lib/liveData';
 import { getAllProps as getMockProps } from '@/lib/mockData';
 import { Layers, X, TrendingUp, CheckCircle2, Trophy, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
