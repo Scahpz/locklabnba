@@ -2,15 +2,15 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, TrendingUp, Zap, Shield, Layers, 
-  Bell, User, ChevronLeft, ChevronRight, Trophy, Flame
+  Bell, User, ChevronLeft, ChevronRight, Trophy, Flame, GitCompare
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/trends', label: 'Streaks & Trends', icon: TrendingUp },
   { path: '/picks', label: 'AI Picks', icon: Zap },
   { path: '/matchups', label: 'Matchups', icon: Shield },
+  { path: '/compare', label: 'Compare', icon: GitCompare },
   { path: '/parlay', label: 'Parlay Builder', icon: Layers },
   { path: '/alerts', label: 'Alerts', icon: Bell },
   { path: '/profile', label: 'Profile', icon: User },

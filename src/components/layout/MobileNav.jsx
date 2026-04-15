@@ -1,13 +1,13 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, TrendingUp, Zap, Layers, User } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Zap, Layers, User, GitCompare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { path: '/', label: 'Props', icon: LayoutDashboard },
   { path: '/trends', label: 'Trends', icon: TrendingUp },
   { path: '/picks', label: 'AI Picks', icon: Zap },
-  { path: '/parlay', label: 'Parlay', icon: Layers },
+  { path: '/compare', label: 'Compare', icon: GitCompare },
   { path: '/profile', label: 'Profile', icon: User },
 ];
 

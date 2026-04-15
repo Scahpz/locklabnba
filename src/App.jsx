@@ -13,6 +13,7 @@ import Matchups from '@/pages/Matchups';
 import ParlayBuilder from '@/pages/ParlayBuilder';
 import Alerts from '@/pages/Alerts';
 import Profile from '@/pages/Profile';
+import Compare from '@/pages/Compare';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -48,6 +49,7 @@ const AuthenticatedApp = () => {
         <Route path="/parlay" element={<ParlayBuilder />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/compare" element={<Compare />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
