@@ -25,53 +25,66 @@ export async function fetchLiveProps() {
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   const result = await base44.integrations.Core.InvokeLLM({
-    model: 'gemini_3_flash',
-    prompt: `Today is ${today}. You are an expert NBA prop betting analyst. Use the internet to fetch REAL data right now.
+    model: 'gemini_3_1_pro',
+    prompt: `TODAY'S DATE: ${today}
 
-STEP 1 — Find today's NBA schedule:
-Search "NBA schedule ${today}" and "NBA games today". Get every game being played TODAY specifically. Include tipoff time and if it's a playoff/play-in game.
+You are an NBA prop betting expert. Your task: Fetch REAL, CURRENT data for today's NBA games ONLY.
 
-STEP 2 — Get official injury reports:
-Search "NBA injury report today ${today}" on ESPN, nba.com, or Rotowire. For EVERY player on today's rosters, note their status: healthy, questionable, doubtful, GTD, or out.
+CRITICAL REQUIREMENTS:
+- Only include games scheduled for TODAY (${today})
+- Use ONLY official sources: ESPN.com, NBA.com, DraftKings, FanDuel, Rotowire
+- Return ACTUAL sportsbook lines (not estimates or projections)
+- Do NOT include past games or future games
+- Verify each player is on their CURRENT team and NOT injured (out status)
 
-STEP 3 — Get current 2025-26 rosters (use real current teams):
-Every player must be listed on their ACTUAL current 2025-26 team. Search "NBA trades 2025-26" for recent moves.
+PROCESS:
 
-STEP 4 — Get real sportsbook prop lines:
-Search "NBA player props ${today} DraftKings FanDuel" to find actual lines. Use real sportsbook lines, not estimates.
+1. FIND TODAY'S GAMES:
+   Search: "NBA games today" and "NBA schedule April 15 2026"
+   Return: All games with home team, away team, tipoff time, and over/under total
 
-STEP 5 — Build a list of 25-35 top props from today's games only:
-- Cover all games on the slate
-- Include star players (main event scorers, high-usage players)
-- Include value props (favorable matchups)
-- EXCLUDE players who are OUT
-- Flag players who are Questionable/GTD with trap_warning: true
+2. GET INJURY STATUS:
+   Search: "NBA injury report today 2026" on ESPN and NBA.com
+   For each player you include, confirm:
+   - NOT marked as "Out"
+   - Current team assignment
+   - Any Questionable/GTD/Doubtful status
 
-Return ONLY players confirmed to be playing today based on actual injury reports.
+3. FETCH REAL SPORTSBOOK LINES:
+   Search: "DraftKings FanDuel player props today" 
+   Get ACTUAL lines from today, including:
+   - Exact line numbers
+   - Exact odds (-110, +110, etc.)
+   - Player names and teams
 
-For each prop return ALL of these fields:
-- player_name: full name
-- team: 3-letter NBA abbreviation (current actual team)
-- opponent: 3-letter abbreviation (today's actual opponent)
-- prop_type: one of: points, rebounds, assists, PRA, 3PM, steals, blocks, turnovers
-- line: actual sportsbook line number
-- over_odds: e.g. -110 or +115
-- under_odds: e.g. -110 or -105
-- injury_status: healthy, questionable, doubtful, out, or GTD
-- injury_note: specific reason if not healthy, empty string if healthy
-- matchup_note: specific insight about this matchup (e.g. "PHX ranks 26th vs SG scoring this season")
-- def_rank_vs_pos: opponent's defensive rank vs this player's position (1=best D, 30=worst D)
-- matchup_rating: elite, favorable, neutral, tough, or elite_defense
-- game_total: the game's over/under total from sportsbooks
-- pace_rating: estimated game pace (typically 95-108)
-- position: PG, SG, SF, PF, or C
-- is_starter: true or false
-- minutes_avg: player's season average minutes per game
-- usage_rate: player's season usage rate percentage (e.g. 28.5)
+4. BUILD PROPS:
+   - 30-40 props from today's games ONLY
+   - Include star players and value opportunities
+   - Exclude any players marked OUT
+   - Flag Questionable/GTD players with trap_warning: true
 
-Also return:
-- game_date: today's date in format "April 15, 2026"
-- games_summary: array of today's games like [{home: "LAL", away: "GSW", tipoff: "7:30 PM ET", total: 228.5}]`,
+REQUIRED FIELDS FOR EACH PROP:
+- player_name (full name, exact spelling)
+- team (3-letter current team)
+- opponent (3-letter opponent)
+- prop_type (points, rebounds, assists, PRA, 3PM, steals, blocks, turnovers)
+- line (exact sportsbook line)
+- over_odds (exact odds)
+- under_odds (exact odds)
+- injury_status (healthy, questionable, doubtful, GTD, or out)
+- injury_note (reason if not healthy)
+- position (PG/SG/SF/PF/C)
+- is_starter (true/false)
+- minutes_avg (season average)
+- usage_rate (percentage)
+- matchup_rating (elite, favorable, neutral, tough, elite_defense)
+- matchup_note (specific insight with defensive rank)
+- game_total (official line)
+
+RETURN:
+- game_date: Today's date ("April 15, 2026")
+- games_summary: [{home, away, tipoff, total}, ...]
+- props: [complete prop objects from today only]`,
     add_context_from_internet: true,
     response_json_schema: {
       type: 'object',
