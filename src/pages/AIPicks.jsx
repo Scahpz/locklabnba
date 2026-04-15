@@ -14,7 +14,9 @@ const tierConfig = {
 };
 
 function PickCard({ prop }) {
-  const tier = tierConfig[prop?.confidence_tier] || tierConfig.C;
+  if (!prop?.team || !prop?.player_name) return null;
+  
+  const tier = tierConfig[prop.confidence_tier] || tierConfig.C;
   const oddsDisplay = (odds) => odds > 0 ? `+${odds}` : odds;
 
   return (
