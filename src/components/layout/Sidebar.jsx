@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 import { 
   LayoutDashboard, TrendingUp, Zap, Shield, Layers, 
   Bell, User, ChevronLeft, ChevronRight, Trophy, Flame, GitCompare
