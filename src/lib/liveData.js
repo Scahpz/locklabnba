@@ -24,25 +24,35 @@ export async function fetchLiveProps() {
 
   try {
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    
+    const validTeams = ['ATL', 'BOS', 'BKN', 'CHA', 'CHI', 'CLE', 'DAL', 'DEN', 'DET', 'GSW', 'HOU', 'LAC', 'LAL', 'MEM', 'MIA', 'MIL', 'MIN', 'NOP', 'NYK', 'OKC', 'ORL', 'PHI', 'PHX', 'POR', 'SAC', 'SAS', 'TOR', 'UTA', 'WAS'];
 
     const result = await base44.integrations.Core.InvokeLLM({
-      model: 'gemini_3_flash',
-      prompt: `Today is ${today}. Fetch TODAY's NBA games and real prop lines from major sportsbooks.
+      model: 'automatic',
+      prompt: `Today is ${today}. You MUST fetch ONLY TODAY's actual NBA games and REAL player prop lines from major sportsbooks (DraftKings, FanDuel, BetMGM, etc).
+
+CRITICAL REQUIREMENTS:
+1. Only include games actually scheduled for TODAY (${today})
+2. Only include players who play for teams in this valid NBA roster: ${validTeams.join(', ')}
+3. Each player must be on a team that is playing TODAY
+4. Each opponent team must be playing that team TODAY
+5. All odds must be realistic (typically -110 to +150 for standard props)
+6. Only include healthy/GTD players in props
 
 Return a JSON object with:
 - game_date: today's date (e.g. "April 15, 2026")
 - games_summary: array of games like [{home: "LAL", away: "GSW", tipoff: "7:30 PM ET", total: 228.5}]
-- props: array of 20-30 player props from today ONLY. For each prop include:
-  - player_name, team (3-letter), opponent (3-letter)
+- props: array of 20-30 VERIFIED player props from today. For each prop:
+  - player_name (real player), team (valid 3-letter code), opponent (valid 3-letter code)
   - prop_type: points, rebounds, assists, PRA, 3PM, steals, blocks, or turnovers
-  - line, over_odds, under_odds
+  - line (realistic number), over_odds, under_odds
   - injury_status (healthy/questionable/out/GTD), injury_note
   - position (PG/SG/SF/PF/C), is_starter (true/false)
-  - minutes_avg, usage_rate
+  - minutes_avg (15-40), usage_rate (15-35)
   - matchup_note, matchup_rating (elite/favorable/neutral/tough/elite_defense)
-  - def_rank_vs_pos (1-30), game_total, pace_rating
+  - def_rank_vs_pos (1-30), game_total (180-250), pace_rating (90-120)
 
-EXCLUDE: Players marked OUT. Flag questionable/GTD players.`,
+If you cannot find real data for today, return empty props array.`,
       add_context_from_internet: true,
       response_json_schema: {
         type: 'object',
@@ -89,6 +99,23 @@ EXCLUDE: Players marked OUT. Flag questionable/GTD players.`,
         }
       }
     });
+    
+    // Validate data quality
+    const validProps = (result.props || []).filter(prop => {
+      if (!validTeams.includes(prop.team) || !validTeams.includes(prop.opponent)) return false;
+      if (prop.line < 0 || prop.line > 100) return false;
+      if (Math.abs(prop.over_odds) > 250 || Math.abs(prop.under_odds) > 250) return false;
+      if (prop.minutes_avg < 10 || prop.minutes_avg > 45) return false;
+      return true;
+    });
+    
+    // If validation fails significantly, return empty to fallback to mock data
+    if (validProps.length === 0 && result.props && result.props.length > 0) {
+      console.warn('Live data validation failed - too many invalid props, falling back to mock data');
+      return { game_date: new Date().toLocaleDateString(), games_summary: [], props: [] };
+    }
+    
+    result.props = validProps;
 
     // Enrich each prop with computed historical simulation + analytics
     const enriched = (result.props || []).map((prop, i) => {
