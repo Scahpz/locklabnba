@@ -14,8 +14,6 @@ const tierConfig = {
 };
 
 function PickCard({ prop }) {
-  if (!prop?.team || !prop?.player_name) return null;
-  
   const tier = tierConfig[prop.confidence_tier] || tierConfig.C;
   const oddsDisplay = (odds) => odds > 0 ? `+${odds}` : odds;
 
@@ -40,18 +38,18 @@ function PickCard({ prop }) {
 
       <div className="flex items-center justify-between bg-secondary/50 rounded-lg p-3 mb-3">
         <div>
-          <p className="text-xs text-muted-foreground uppercase">{prop.prop_type || 'PROP'}</p>
-          <p className="text-xl font-bold text-foreground">Over {prop.line || '-'}</p>
+          <p className="text-xs text-muted-foreground uppercase">{prop.prop_type}</p>
+          <p className="text-xl font-bold text-foreground">Over {prop.line}</p>
         </div>
         <div className="text-right">
-          <p className="text-sm font-bold text-primary">{oddsDisplay(prop.over_odds || -110)}</p>
+          <p className="text-sm font-bold text-primary">{oddsDisplay(prop.over_odds)}</p>
           <div className="flex items-center gap-1 mt-1">
             <div className="flex gap-0.5">
               {Array.from({ length: 10 }, (_, i) => (
-                <div key={i} className={cn("w-1.5 h-4 rounded-sm", i < (prop.confidence_score || 0) ? "bg-primary" : "bg-secondary")} />
+                <div key={i} className={cn("w-1.5 h-4 rounded-sm", i < prop.confidence_score ? "bg-primary" : "bg-secondary")} />
               ))}
             </div>
-            <span className="text-[10px] text-muted-foreground ml-1">{prop.confidence_score || 0}/10</span>
+            <span className="text-[10px] text-muted-foreground ml-1">{prop.confidence_score}/10</span>
           </div>
         </div>
       </div>
@@ -59,15 +57,15 @@ function PickCard({ prop }) {
       <div className="grid grid-cols-3 gap-2 text-center">
         <div className="bg-secondary/30 rounded-lg p-2">
           <p className="text-[10px] text-muted-foreground">Projection</p>
-          <p className="text-sm font-bold text-foreground">{prop.projection || '-'}</p>
+          <p className="text-sm font-bold text-foreground">{prop.projection}</p>
         </div>
         <div className="bg-secondary/30 rounded-lg p-2">
           <p className="text-[10px] text-muted-foreground">Edge</p>
-          <p className="text-sm font-bold text-primary">+{prop.edge || 0}%</p>
+          <p className="text-sm font-bold text-primary">+{prop.edge}%</p>
         </div>
         <div className="bg-secondary/30 rounded-lg p-2">
           <p className="text-[10px] text-muted-foreground">Hit Rate</p>
-          <p className="text-sm font-bold text-foreground">{prop.hit_rate_last_10 || 0}%</p>
+          <p className="text-sm font-bold text-foreground">{prop.hit_rate_last_10}%</p>
         </div>
       </div>
 
@@ -100,11 +98,10 @@ export default function AIPicks() {
 
   const tiers = { A: [], B: [], C: [] };
   allProps
-    .filter(p => p?.injury_status !== 'out' && (p?.is_top_pick || (p?.confidence_score || 0) >= 6))
-    .sort((a, b) => (b?.confidence_score || 0) - (a?.confidence_score || 0))
+    .filter(p => p.injury_status !== 'out' && (p.is_top_pick || p.confidence_score >= 6))
+    .sort((a, b) => b.confidence_score - a.confidence_score)
     .forEach(p => {
-      const tier = p?.confidence_tier || 'C';
-      if (tiers[tier]) tiers[tier].push(p);
+      if (tiers[p.confidence_tier]) tiers[p.confidence_tier].push(p);
     });
 
   return (
@@ -133,8 +130,8 @@ export default function AIPicks() {
               <span className="text-xs text-muted-foreground">({props.length} picks)</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {props.filter(p => p).map((prop, i) => (
-                <PickCard key={`pick-${tier}-${i}`} prop={prop} />
+              {props.map((prop, i) => (
+                <PickCard key={`${prop.player_name}-${prop.prop_type}-${i}`} prop={prop} />
               ))}
             </div>
           </div>

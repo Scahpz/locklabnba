@@ -22,118 +22,76 @@ export async function fetchLiveProps() {
     try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch {}
   }
 
-  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  try {
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-  const result = await base44.integrations.Core.InvokeLLM({
-    model: 'gemini_3_1_pro',
-    prompt: `TODAY'S DATE: ${today}
+    const result = await base44.integrations.Core.InvokeLLM({
+      model: 'gemini_3_flash',
+      prompt: `Today is ${today}. Fetch TODAY's NBA games and real prop lines from major sportsbooks.
 
-You are an NBA prop betting expert. Your task: Fetch REAL, CURRENT data for today's NBA games ONLY.
+Return a JSON object with:
+- game_date: today's date (e.g. "April 15, 2026")
+- games_summary: array of games like [{home: "LAL", away: "GSW", tipoff: "7:30 PM ET", total: 228.5}]
+- props: array of 20-30 player props from today ONLY. For each prop include:
+  - player_name, team (3-letter), opponent (3-letter)
+  - prop_type: points, rebounds, assists, PRA, 3PM, steals, blocks, or turnovers
+  - line, over_odds, under_odds
+  - injury_status (healthy/questionable/out/GTD), injury_note
+  - position (PG/SG/SF/PF/C), is_starter (true/false)
+  - minutes_avg, usage_rate
+  - matchup_note, matchup_rating (elite/favorable/neutral/tough/elite_defense)
+  - def_rank_vs_pos (1-30), game_total, pace_rating
 
-CRITICAL REQUIREMENTS:
-- Only include games scheduled for TODAY (${today})
-- Use ONLY official sources: ESPN.com, NBA.com, DraftKings, FanDuel, Rotowire
-- Return ACTUAL sportsbook lines (not estimates or projections)
-- Do NOT include past games or future games
-- Verify each player is on their CURRENT team and NOT injured (out status)
-
-PROCESS:
-
-1. FIND TODAY'S GAMES:
-   Search: "NBA games today" and "NBA schedule April 15 2026"
-   Return: All games with home team, away team, tipoff time, and over/under total
-
-2. GET INJURY STATUS:
-   Search: "NBA injury report today 2026" on ESPN and NBA.com
-   For each player you include, confirm:
-   - NOT marked as "Out"
-   - Current team assignment
-   - Any Questionable/GTD/Doubtful status
-
-3. FETCH REAL SPORTSBOOK LINES:
-   Search: "DraftKings FanDuel player props today" 
-   Get ACTUAL lines from today, including:
-   - Exact line numbers
-   - Exact odds (-110, +110, etc.)
-   - Player names and teams
-
-4. BUILD PROPS:
-   - 30-40 props from today's games ONLY
-   - Include star players and value opportunities
-   - Exclude any players marked OUT
-   - Flag Questionable/GTD players with trap_warning: true
-
-REQUIRED FIELDS FOR EACH PROP:
-- player_name (full name, exact spelling)
-- team (3-letter current team)
-- opponent (3-letter opponent)
-- prop_type (points, rebounds, assists, PRA, 3PM, steals, blocks, turnovers)
-- line (exact sportsbook line)
-- over_odds (exact odds)
-- under_odds (exact odds)
-- injury_status (healthy, questionable, doubtful, GTD, or out)
-- injury_note (reason if not healthy)
-- position (PG/SG/SF/PF/C)
-- is_starter (true/false)
-- minutes_avg (season average)
-- usage_rate (percentage)
-- matchup_rating (elite, favorable, neutral, tough, elite_defense)
-- matchup_note (specific insight with defensive rank)
-- game_total (official line)
-
-RETURN:
-- game_date: Today's date ("April 15, 2026")
-- games_summary: [{home, away, tipoff, total}, ...]
-- props: [complete prop objects from today only]`,
-    add_context_from_internet: true,
-    response_json_schema: {
-      type: 'object',
-      properties: {
-        game_date: { type: 'string' },
-        games_summary: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              home: { type: 'string' },
-              away: { type: 'string' },
-              tipoff: { type: 'string' },
-              total: { type: 'number' },
+EXCLUDE: Players marked OUT. Flag questionable/GTD players.`,
+      add_context_from_internet: true,
+      response_json_schema: {
+        type: 'object',
+        properties: {
+          game_date: { type: 'string' },
+          games_summary: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                home: { type: 'string' },
+                away: { type: 'string' },
+                tipoff: { type: 'string' },
+                total: { type: 'number' },
+              }
             }
-          }
-        },
-        props: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              player_name: { type: 'string' },
-              team: { type: 'string' },
-              opponent: { type: 'string' },
-              prop_type: { type: 'string' },
-              line: { type: 'number' },
-              over_odds: { type: 'number' },
-              under_odds: { type: 'number' },
-              injury_status: { type: 'string' },
-              injury_note: { type: 'string' },
-              matchup_note: { type: 'string' },
-              def_rank_vs_pos: { type: 'number' },
-              matchup_rating: { type: 'string' },
-              game_total: { type: 'number' },
-              pace_rating: { type: 'number' },
-              position: { type: 'string' },
-              is_starter: { type: 'boolean' },
-              minutes_avg: { type: 'number' },
-              usage_rate: { type: 'number' },
+          },
+          props: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                player_name: { type: 'string' },
+                team: { type: 'string' },
+                opponent: { type: 'string' },
+                prop_type: { type: 'string' },
+                line: { type: 'number' },
+                over_odds: { type: 'number' },
+                under_odds: { type: 'number' },
+                injury_status: { type: 'string' },
+                injury_note: { type: 'string' },
+                matchup_note: { type: 'string' },
+                def_rank_vs_pos: { type: 'number' },
+                matchup_rating: { type: 'string' },
+                game_total: { type: 'number' },
+                pace_rating: { type: 'number' },
+                position: { type: 'string' },
+                is_starter: { type: 'boolean' },
+                minutes_avg: { type: 'number' },
+                usage_rate: { type: 'number' },
+              }
             }
           }
         }
       }
-    }
-  });
+    });
 
-  // Enrich each prop with computed historical simulation + analytics
-  const enriched = (result.props || []).map((prop, i) => {
+    // Enrich each prop with computed historical simulation + analytics
+    const enriched = (result.props || []).map((prop, i) => {
     const base = prop.line || 20;
     const variance = base * 0.2;
 
@@ -202,7 +160,12 @@ RETURN:
     props: enriched
   };
 
-  localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
-  localStorage.setItem(CACHE_DATE_KEY, todayStr());
-  return payload;
+    localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+    localStorage.setItem(CACHE_DATE_KEY, todayStr());
+    return payload;
+  } catch (error) {
+    console.warn('Failed to fetch live props, falling back to cache or mock data:', error);
+    // Return empty payload so app shows mock data instead
+    return { game_date: new Date().toLocaleDateString(), games_summary: [], props: [] };
+  }
 }
