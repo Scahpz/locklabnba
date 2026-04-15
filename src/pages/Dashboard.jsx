@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { getAllProps } from '@/lib/mockData';
-import { fetchLiveProps, clearLiveCache } from '@/lib/liveData';
+import { fetchLiveProps, clearLiveCache, isCacheValid } from '@/lib/liveData';
 import StatsOverview from '@/components/dashboard/StatsOverview';
 import PropFilters from '@/components/dashboard/PropFilters';
 import PropCard from '@/components/dashboard/PropCard';
@@ -15,7 +15,8 @@ export default function Dashboard() {
   const [loadingLive, setLoadingLive] = useState(false);
   const [liveError, setLiveError] = useState(false);
   const [gameDate, setGameDate] = useState(null);
-  const [useLive, setUseLive] = useState(false);
+  const [gamesSummary, setGamesSummary] = useState([]);
+  const [useLive, setUseLive] = useState(isCacheValid()); // auto-on if cached
 
   const staticProps = getAllProps();
 
@@ -28,6 +29,7 @@ export default function Dashboard() {
       if (data?.props?.length > 0) {
         setLiveProps(data.props);
         setGameDate(data.game_date);
+        setGamesSummary(data.games_summary || []);
         setUseLive(true);
       } else {
         setLiveError(true);
@@ -112,6 +114,19 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      {/* Today's Games Bar */}
+      {gamesSummary.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {gamesSummary.map((g, i) => (
+            <div key={i} className="flex items-center gap-2 bg-secondary/60 border border-border rounded-lg px-3 py-1.5 text-xs">
+              <span className="font-bold text-foreground">{g.away} @ {g.home}</span>
+              {g.tipoff && <span className="text-muted-foreground">{g.tipoff}</span>}
+              {g.total && <span className="text-primary font-medium">O/U {g.total}</span>}
+            </div>
+          ))}
+        </div>
+      )}
 
       {liveError && (
         <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive flex items-center gap-2">
