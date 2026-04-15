@@ -185,7 +185,10 @@ export default function Dashboard() {
           setSortBy={setSortBy}
         />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-          {filtered.map((prop, i) => (
+          {[...filtered].sort((a, b) => {
+            const tierOrder = { A: 0, B: 1, C: 2 };
+            return (tierOrder[a.confidence_tier] || 2) - (tierOrder[b.confidence_tier] || 2);
+          }).map((prop, i) => (
             <PropCard key={`${prop.player_name}-${prop.prop_type}-${i}`} prop={prop} />
           ))}
         </div>
