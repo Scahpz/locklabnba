@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 export default function Dashboard() {
   const [selectedType, setSelectedType] = useState('all');
   const [sortBy, setSortBy] = useState('edge');
+  const [selectedGames, setSelectedGames] = useState([]);
   const [liveProps, setLiveProps] = useState(null);
   const [loadingLive, setLoadingLive] = useState(false);
   const [liveError, setLiveError] = useState(false);
@@ -47,8 +48,24 @@ export default function Dashboard() {
 
   const allProps = useLive && liveProps ? liveProps : staticProps;
 
+  const toggleGame = (g) => {
+    const key = `${g.away}@${g.home}`;
+    setSelectedGames(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  };
+
   const filtered = useMemo(() => {
     let result = selectedType === 'all' ? allProps : allProps.filter(p => p.prop_type === selectedType);
+    if (selectedGames.length > 0) {
+      result = result.filter(p => {
+        const teams = [p.team, p.opponent];
+        return selectedGames.some(key => {
+          const [away, home] = key.split('@');
+          return teams.includes(away) && teams.includes(home);
+        });
+      });
+    }
     result = [...result].sort((a, b) => {
       if (sortBy === 'edge') return b.edge - a.edge;
       if (sortBy === 'hit_rate') return b.hit_rate_last_10 - a.hit_rate_last_10;
@@ -118,13 +135,34 @@ export default function Dashboard() {
       {/* Today's Games Bar */}
       {gamesSummary.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {gamesSummary.map((g, i) => (
-            <div key={i} className="flex items-center gap-2 bg-secondary/60 border border-border rounded-lg px-3 py-1.5 text-xs">
-              <span className="font-bold text-foreground">{g.away} @ {g.home}</span>
-              {g.tipoff && <span className="text-muted-foreground">{g.tipoff}</span>}
-              {g.total && <span className="text-primary font-medium">O/U {g.total}</span>}
-            </div>
-          ))}
+          {gamesSummary.map((g, i) => {
+            const key = `${g.away}@${g.home}`;
+            const active = selectedGames.includes(key);
+            return (
+              <button
+                key={i}
+                onClick={() => toggleGame(g)}
+                className={cn(
+                  "flex items-center gap-2 border rounded-lg px-3 py-1.5 text-xs transition-all",
+                  active
+                    ? "bg-primary/15 border-primary/50 text-foreground"
+                    : "bg-secondary/60 border-border text-foreground hover:border-primary/30"
+                )}
+              >
+                <span className="font-bold">{g.away} @ {g.home}</span>
+                {g.tipoff && <span className="text-muted-foreground">{g.tipoff}</span>}
+                {g.total && <span className={active ? "text-primary font-medium" : "text-primary/70 font-medium"}>O/U {g.total}</span>}
+              </button>
+            );
+          })}
+          {selectedGames.length > 0 && (
+            <button
+              onClick={() => setSelectedGames([])}
+              className="text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 transition-colors"
+            >
+              Clear filter
+            </button>
+          )}
         </div>
       )}
 
