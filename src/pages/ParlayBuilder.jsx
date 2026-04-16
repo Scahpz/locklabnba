@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { fetchLiveProps } from '@/lib/liveData';
-import { getAllProps as getMockProps } from '@/lib/mockData';
 import { Layers, X, TrendingUp, CheckCircle2, Trophy, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,10 +51,10 @@ export default function ParlayBuilder() {
         if (data?.props?.length > 0) {
           setAvailableProps(data.props);
         } else {
-          setAvailableProps(getMockProps());
+          setAvailableProps([]);
         }
       } catch {
-        setAvailableProps(getMockProps());
+        setAvailableProps([]);
       } finally {
         setLoadingProps(false);
       }
@@ -221,6 +220,12 @@ export default function ParlayBuilder() {
           {loadingProps ? (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : availableProps.length === 0 ? (
+            <div className="text-center py-20 text-muted-foreground">
+              <Layers className="w-12 h-12 mx-auto mb-3 opacity-20" />
+              <p className="text-lg font-medium">No props available today</p>
+              <p className="text-sm mt-1">Live sportsbook lines aren't up yet. Check back closer to game time.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
