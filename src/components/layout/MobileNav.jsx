@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, TrendingUp, Zap, Activity, Bell, Shield, User, Layers, GitCompare } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Zap, Activity, Shield, Layers, GitCompare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -11,8 +11,6 @@ const navItems = [
   { path: '/compare', label: 'Compare', icon: GitCompare },
   { path: '/odds', label: 'Live Odds', icon: Activity },
   { path: '/parlay', label: 'Parlay', icon: Layers },
-  { path: '/alerts', label: 'Alerts', icon: Bell },
-  { path: '/profile', label: 'Profile', icon: User },
 ];
 
 export default function MobileNav() {
@@ -21,7 +19,7 @@ export default function MobileNav() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-xl border-t border-border md:hidden">
       <div
-        className="flex items-center gap-1 px-3 py-2 overflow-x-auto scrollbar-none"
+        className="flex items-center gap-1 px-3 py-2 overflow-x-auto"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {navItems.map((item) => {
