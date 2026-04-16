@@ -1,11 +1,56 @@
-import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Plus, Check } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { ChevronDown, ChevronUp, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TeamLogo from '@/components/common/TeamLogo';
 import { fmtOdds } from '@/lib/oddsData';
 import { useParlay } from '@/lib/ParlayContext';
 
-function OddsButton({ label, value, sub, legId, leg, disabled }) {
+function BookDropdown({ books, activeKey, onSelect }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const active = books.find(b => b.key === activeKey) || books[0];
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  if (!books || books.length === 0) return null;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors bg-secondary/60 hover:bg-secondary rounded-md px-2 py-1"
+      >
+        <span className="font-medium">{active?.title ?? 'Book'}</span>
+        <ChevronDown className={cn("w-3 h-3 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-[140px] bg-popover border border-border rounded-lg shadow-xl overflow-hidden">
+          {books.map(b => (
+            <button
+              key={b.key}
+              onClick={() => { onSelect(b.key); setOpen(false); }}
+              className={cn(
+                "w-full flex items-center justify-between gap-2 px-3 py-2 text-xs transition-colors hover:bg-secondary text-left",
+                b.key === activeKey ? "text-primary font-semibold" : "text-foreground"
+              )}
+            >
+              <span>{b.title}</span>
+              {b.key === activeKey && <Check className="w-3 h-3 text-primary flex-shrink-0" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OddsButton({ label, value, sub, legId, leg }) {
   const { addGameLeg, isGameLegSelected } = useParlay();
   const selected = isGameLegSelected(legId);
 
@@ -36,7 +81,7 @@ function OddsButton({ label, value, sub, legId, leg, disabled }) {
   );
 }
 
-function TeamRow({ game, teamAbv, teamName, ml, spread, spreadOdds, isHome }) {
+function TeamRow({ game, teamAbv, ml, spread, spreadOdds, isHome }) {
   const side = isHome ? 'home' : 'away';
   const opponent = isHome ? game.awayAbv : game.homeAbv;
 
@@ -90,6 +135,7 @@ function TeamRow({ game, teamAbv, teamName, ml, spread, spreadOdds, isHome }) {
 
 export default function GameOddsCard({ game }) {
   const [showBooks, setShowBooks] = useState(false);
+  const [activeBookKey, setActiveBookKey] = useState(game.allBooks?.[0]?.key ?? null);
 
   const tipoff = new Date(game.commence_time).toLocaleTimeString('en-US', {
     hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York'
@@ -99,6 +145,18 @@ export default function GameOddsCard({ game }) {
   });
 
   const isToday = new Date(game.commence_time).toLocaleDateString() === new Date().toLocaleDateString();
+
+  // Resolve odds from selected book (or default primary)
+  const activeBook = game.allBooks?.find(b => b.key === activeBookKey);
+  const awayMl = activeBook?.ml_away ?? game.moneyline?.away;
+  const homeMl = activeBook?.ml_home ?? game.moneyline?.home;
+  const awaySpread = activeBook?.spread_away ?? game.spread?.away;
+  const awaySpreadOdds = activeBook?.spread_away_odds ?? game.spread?.awayOdds;
+  const homeSpread = activeBook?.spread_home ?? game.spread?.home;
+  const homeSpreadOdds = activeBook?.spread_home_odds ?? game.spread?.homeOdds;
+  const totalLine = activeBook?.total_line ?? game.total?.line;
+  const totalOver = activeBook?.total_over_odds ?? game.total?.overOdds;
+  const totalUnder = activeBook?.total_under_odds ?? game.total?.underOdds;
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden hover:border-primary/20 transition-all">
@@ -111,9 +169,15 @@ export default function GameOddsCard({ game }) {
           <span className="text-xs text-muted-foreground">{tipoff}</span>
         </div>
         <div className="flex items-center gap-2">
-          {game.moneyline?.bookmaker && (
+          {game.allBooks?.length > 0 ? (
+            <BookDropdown
+              books={game.allBooks}
+              activeKey={activeBookKey}
+              onSelect={setActiveBookKey}
+            />
+          ) : game.moneyline?.bookmaker ? (
             <span className="text-[10px] text-muted-foreground">{game.moneyline.bookmaker}</span>
-          )}
+          ) : null}
           <span className="text-[9px] text-muted-foreground bg-primary/10 text-primary px-1.5 py-0.5 rounded">Tap to add parlay</span>
         </div>
       </div>
@@ -123,32 +187,30 @@ export default function GameOddsCard({ game }) {
         <TeamRow
           game={game}
           teamAbv={game.awayAbv}
-          teamName={game.away}
-          ml={game.moneyline?.away}
-          spread={game.spread?.away}
-          spreadOdds={game.spread?.awayOdds}
+          ml={awayMl}
+          spread={awaySpread}
+          spreadOdds={awaySpreadOdds}
           isHome={false}
         />
         <div className="border-t border-border/50" />
         <TeamRow
           game={game}
           teamAbv={game.homeAbv}
-          teamName={game.home}
-          ml={game.moneyline?.home}
-          spread={game.spread?.home}
-          spreadOdds={game.spread?.homeOdds}
+          ml={homeMl}
+          spread={homeSpread}
+          spreadOdds={homeSpreadOdds}
           isHome={true}
         />
       </div>
 
       {/* Total */}
-      {game.total?.line != null && (
+      {totalLine != null && (
         <div className="px-4 pb-3 flex items-center gap-3">
           <div className="flex-1 border-t border-border/50" />
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">O/U {game.total.line}</span>
-            <span className="text-primary">O {fmtOdds(game.total.overOdds)}</span>
-            <span className="text-destructive">U {fmtOdds(game.total.underOdds)}</span>
+            <span className="font-medium text-foreground">O/U {totalLine}</span>
+            <span className="text-primary">O {fmtOdds(totalOver)}</span>
+            <span className="text-destructive">U {fmtOdds(totalUnder)}</span>
           </div>
           <div className="flex-1 border-t border-border/50" />
         </div>
@@ -185,9 +247,20 @@ export default function GameOddsCard({ game }) {
                   const isWorstAway = b.ml_away === worstAwayMl && worstAwayMl !== bestAwayMl;
                   const isBestHome = b.ml_home === bestHomeMl;
                   const isWorstHome = b.ml_home === worstHomeMl && worstHomeMl !== bestHomeMl;
+                  const isActive = b.key === activeBookKey;
                   return (
-                    <div key={b.key} className="grid grid-cols-5 text-xs bg-secondary/40 rounded-lg px-3 py-1.5 items-center">
-                      <span className="col-span-2 text-muted-foreground text-[10px] truncate">{b.title}</span>
+                    <button
+                      key={b.key}
+                      onClick={() => setActiveBookKey(b.key)}
+                      className={cn(
+                        "w-full grid grid-cols-5 text-xs rounded-lg px-3 py-1.5 items-center transition-all text-left",
+                        isActive ? "bg-primary/15 border border-primary/30" : "bg-secondary/40 hover:bg-secondary/70"
+                      )}
+                    >
+                      <span className={cn("col-span-2 text-[10px] truncate font-medium", isActive ? "text-primary" : "text-muted-foreground")}>
+                        {isActive && <Check className="w-2.5 h-2.5 inline mr-1" />}
+                        {b.title}
+                      </span>
                       <span className={cn("text-center font-mono font-bold",
                         isBestAway ? "text-primary" : isWorstAway ? "text-destructive" : "text-foreground"
                       )}>{fmtOdds(b.ml_away)}</span>
@@ -195,11 +268,11 @@ export default function GameOddsCard({ game }) {
                         isBestHome ? "text-primary" : isWorstHome ? "text-destructive" : "text-foreground"
                       )}>{fmtOdds(b.ml_home)}</span>
                       <span className="text-center font-mono font-medium text-foreground">{b.total_line ?? '—'}</span>
-                    </div>
+                    </button>
                   );
                 })}
                 <p className="text-[9px] text-muted-foreground text-center pt-0.5">
-                  <span className="text-primary font-medium">Green</span> = best odds · <span className="text-destructive font-medium">Red</span> = worst odds
+                  <span className="text-primary font-medium">Green</span> = best odds · <span className="text-destructive font-medium">Red</span> = worst odds · tap to switch
                 </p>
               </div>
             );
