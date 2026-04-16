@@ -178,7 +178,7 @@ export default function GameOddsCard({ game }) {
           ) : game.moneyline?.bookmaker ? (
             <span className="text-[10px] text-muted-foreground">{game.moneyline.bookmaker}</span>
           ) : null}
-          <span className="text-[9px] text-muted-foreground bg-primary/10 text-primary px-1.5 py-0.5 rounded">Tap to add parlay</span>
+
         </div>
       </div>
 
