@@ -56,7 +56,7 @@ export function useLivePlayers() {
 
   const players = useMemo(() => {
     if (liveProps) return buildPlayersFromLiveProps(liveProps);
-    return mockPlayers;
+    return [];
   }, [liveProps]);
 
   const isLive = !!liveProps;

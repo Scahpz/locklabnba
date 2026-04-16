@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { mockAlerts } from '@/lib/mockData';
 import { fetchLiveProps } from '@/lib/liveData';
 import { Bell, AlertTriangle, TrendingUp, Zap, Newspaper, Check, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -119,10 +118,10 @@ export default function Alerts() {
           setAlerts(buildLiveAlerts(data.props));
           setIsLive(true);
         } else {
-          setAlerts(mockAlerts);
+          setAlerts([]);
         }
       } catch {
-        setAlerts(mockAlerts);
+        setAlerts([]);
       }
       setLoading(false);
     }
@@ -165,6 +164,14 @@ export default function Alerts() {
           </button>
         )}
       </div>
+
+      {alerts.length === 0 && (
+        <div className="text-center py-20 text-muted-foreground">
+          <Bell className="w-12 h-12 mx-auto mb-3 opacity-20" />
+          <p className="text-lg font-medium">No alerts today</p>
+          <p className="text-sm mt-1">Alerts will appear here once live props are available.</p>
+        </div>
+      )}
 
       <div className="space-y-3">
         {alerts.map((alert) => {

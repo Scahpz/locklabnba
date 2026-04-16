@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { getAllProps } from '@/lib/mockData';
 import { fetchLiveProps } from '@/lib/liveData';
 import { Shield, TrendingUp, TrendingDown, Gauge, Target, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -60,10 +59,10 @@ export default function Matchups() {
           setAllMatchups(buildMatchups(data.props));
           setIsLive(true);
         } else {
-          setAllMatchups(buildMatchups(getAllProps()));
+          setAllMatchups([]);
         }
       } catch {
-        setAllMatchups(buildMatchups(getAllProps()));
+        setAllMatchups([]);
       }
       setLoading(false);
     }
@@ -120,6 +119,14 @@ export default function Matchups() {
           </ResponsiveContainer>
         </div>
       </div>
+
+      {allMatchups.length === 0 && (
+        <div className="text-center py-20 text-muted-foreground">
+          <Shield className="w-12 h-12 mx-auto mb-3 opacity-20" />
+          <p className="text-lg font-medium">No matchup data available today</p>
+          <p className="text-sm mt-1">There are no live props to analyze. Check back closer to game time.</p>
+        </div>
+      )}
 
       {/* Matchup Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

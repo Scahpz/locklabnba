@@ -93,23 +93,15 @@ export default function AIPicks() {
           setAllProps(data.props);
           setIsLive(true);
         } else {
-          setAllProps(getAllProps());
+          setAllProps([]);
         }
       } catch {
-        setAllProps(getAllProps());
+        setAllProps([]);
       }
       setLoading(false);
     }
     load();
   }, []);
-
-  const tiers = { A: [], B: [], C: [] };
-  allProps
-    .filter(p => p.injury_status !== 'out' && (p.is_top_pick || p.confidence_score >= 6))
-    .sort((a, b) => b.confidence_score - a.confidence_score)
-    .forEach(p => {
-      if (tiers[p.confidence_tier]) tiers[p.confidence_tier].push(p);
-    });
 
   if (loading) {
     return (
@@ -119,6 +111,14 @@ export default function AIPicks() {
       </div>
     );
   }
+
+  const tiers = { A: [], B: [], C: [] };
+  allProps
+    .filter(p => p.injury_status !== 'out' && (p.is_top_pick || p.confidence_score >= 6))
+    .sort((a, b) => b.confidence_score - a.confidence_score)
+    .forEach(p => {
+      if (tiers[p.confidence_tier]) tiers[p.confidence_tier].push(p);
+    });
 
   return (
     <div className="space-y-6">
@@ -133,6 +133,14 @@ export default function AIPicks() {
           </p>
         </div>
       </div>
+
+      {!isLive && allProps.length === 0 && (
+        <div className="text-center py-20 text-muted-foreground">
+          <Zap className="w-12 h-12 mx-auto mb-3 opacity-20" />
+          <p className="text-lg font-medium">No picks available today</p>
+          <p className="text-sm mt-1">There are no live props to generate picks from. Check back closer to game time.</p>
+        </div>
+      )}
 
       {Object.entries(tiers).map(([tier, props]) => {
         if (props.length === 0) return null;

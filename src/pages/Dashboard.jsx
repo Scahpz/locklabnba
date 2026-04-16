@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { getAllProps } from '@/lib/mockData';
-import { fetchLiveProps, clearLiveCache, isCacheValid, getStoredApiKey } from '@/lib/liveData';
+import { fetchLiveProps, clearLiveCache, getStoredApiKey } from '@/lib/liveData';
 import ApiKeyPrompt from '@/components/dashboard/ApiKeyPrompt';
 import StatsOverview from '@/components/dashboard/StatsOverview';
 import PropFilters from '@/components/dashboard/PropFilters';
@@ -13,15 +12,12 @@ export default function Dashboard() {
   const [selectedType, setSelectedType] = useState('all');
   const [sortBy, setSortBy] = useState('edge');
   const [selectedGames, setSelectedGames] = useState([]);
-  const [liveProps, setLiveProps] = useState(null);
-  const [loadingLive, setLoadingLive] = useState(false);
+  const [liveProps, setLiveProps] = useState(null); // null = not yet loaded
+  const [loadingLive, setLoadingLive] = useState(true);
   const [liveError, setLiveError] = useState(false);
   const [gameDate, setGameDate] = useState(null);
   const [gamesSummary, setGamesSummary] = useState([]);
-  const [useLive, setUseLive] = useState(isCacheValid());
   const [needsApiKey, setNeedsApiKey] = useState(!getStoredApiKey());
-
-  const staticProps = getAllProps();
 
   const loadLive = async (forceRefresh = false) => {
     setLoadingLive(true);
@@ -31,31 +27,26 @@ export default function Dashboard() {
       const data = await fetchLiveProps();
       if (data?.needsApiKey) {
         setNeedsApiKey(true);
-        setLoadingLive(false);
-        return;
-      }
-      if (data?.props?.length > 0) {
+        setLiveProps([]);
+      } else if (data?.props?.length > 0) {
         setLiveProps(data.props);
         setGameDate(data.game_date);
         setGamesSummary(data.games_summary || []);
-        setUseLive(true);
         setNeedsApiKey(false);
       } else {
-        setLiveError(true);
+        setLiveProps([]);
       }
     } catch (e) {
       setLiveError(true);
-      console.warn(e);
+      setLiveProps([]);
     } finally {
       setLoadingLive(false);
     }
   };
 
-  useEffect(() => {
-    loadLive();
-  }, []);
+  useEffect(() => { loadLive(); }, []);
 
-  const allProps = useLive && liveProps ? liveProps : staticProps;
+  const allProps = liveProps ?? [];
 
   const toggleGame = (g) => {
     const key = `${(g.away || '').toUpperCase().trim()}@${(g.home || '').toUpperCase().trim()}`;
@@ -86,60 +77,46 @@ export default function Dashboard() {
     return result;
   }, [allProps, selectedType, sortBy]);
 
+  if (loadingLive) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <RefreshCw className="w-6 h-6 animate-spin text-primary" />
+        <span className="ml-2 text-sm text-muted-foreground">Fetching today's lines…</span>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Player Props</h1>
           <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
-            {useLive ? (
+            {allProps.length > 0 ? (
               <>
                 <Wifi className="w-3.5 h-3.5 text-primary" />
                 <span className="text-primary font-medium">Live</span>
                 {gameDate && <span>· {gameDate}</span>}
               </>
-            ) : loadingLive ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
-                Fetching today's lines…
-              </>
             ) : (
               <>
                 <WifiOff className="w-3.5 h-3.5 text-muted-foreground" />
-                Showing sample data
+                No live data available
               </>
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {useLive && (
-            <button
-              onClick={() => setUseLive(false)}
-              className="text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-lg bg-secondary transition-colors"
-            >
-              Sample data
-            </button>
+        <button
+          onClick={() => loadLive(true)}
+          disabled={loadingLive}
+          className={cn(
+            "flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all border border-border",
+            "text-foreground bg-secondary hover:bg-secondary/80"
           )}
-          {!useLive && liveProps && (
-            <button
-              onClick={() => setUseLive(true)}
-              className="text-xs text-primary hover:text-primary/80 px-3 py-1.5 rounded-lg bg-primary/10 transition-colors"
-            >
-              Use live data
-            </button>
-          )}
-          <button
-            onClick={() => loadLive(true)}
-            disabled={loadingLive}
-            className={cn(
-              "flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all border border-border",
-              loadingLive ? "text-muted-foreground bg-secondary/50" : "text-foreground bg-secondary hover:bg-secondary/80"
-            )}
-          >
-            <RefreshCw className={cn("w-3.5 h-3.5", loadingLive && "animate-spin")} />
-            {loadingLive ? "Fetching…" : "Refresh Lines"}
-          </button>
-        </div>
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          Refresh Lines
+        </button>
       </div>
 
       {/* Today's Games Bar */}
@@ -179,7 +156,7 @@ export default function Dashboard() {
       {liveError && (
         <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive flex items-center gap-2">
           <WifiOff className="w-4 h-4" />
-          Could not fetch live lines. Showing sample data. Try refreshing.
+          Could not fetch live lines. Check your API key and try refreshing.
         </div>
       )}
 
@@ -187,41 +164,54 @@ export default function Dashboard() {
         <ApiKeyPrompt onKeySet={() => { setNeedsApiKey(false); loadLive(true); }} />
       )}
 
-      <StatsOverview />
-      <LockOfTheDay props={allProps} />
+      {allProps.length > 0 && (
+        <>
+          <StatsOverview props={allProps} />
+          <LockOfTheDay props={allProps} />
+        </>
+      )}
 
-      <div>
-        <PropFilters
-          selectedType={selectedType}
-          setSelectedType={setSelectedType}
-          sortBy={sortBy}
-          setSortBy={setSortBy}
-        />
-        {filtered.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <Calendar className="w-10 h-10 mx-auto mb-2 opacity-30" />
-            <p>No props found for this filter.</p>
-          </div>
-        ) : (
-          <div className="space-y-6 mt-4">
-            {['A', 'B', 'C'].map(tier => {
-              const tierProps = filtered.filter(p => p.confidence_tier === tier);
-              if (tierProps.length === 0) return null;
-              const tierLabels = { A: 'Tier A — High Confidence', B: 'Tier B — Solid Value', C: 'Tier C — Speculative' };
-              return (
-                <div key={tier}>
-                  <h3 className="text-sm font-bold text-foreground mb-3 uppercase tracking-wider">{tierLabels[tier]} ({tierProps.length})</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {tierProps.map((prop, i) => (
-                      <PropCard key={`${prop.player_name}-${prop.prop_type}-${i}`} prop={prop} />
-                    ))}
+      {!needsApiKey && allProps.length === 0 && !liveError && (
+        <div className="text-center py-20 text-muted-foreground">
+          <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p className="text-lg font-medium">No props available today</p>
+          <p className="text-sm mt-1">There are no player props available right now. Check back closer to game time.</p>
+        </div>
+      )}
+
+      {allProps.length > 0 && (
+        <div>
+          <PropFilters
+            selectedType={selectedType}
+            setSelectedType={setSelectedType}
+            sortBy={sortBy}
+            setSortBy={setSortBy}
+          />
+          {filtered.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>No props found for this filter.</p>
+            </div>
+          ) : (
+            <div className="space-y-6 mt-4">
+              {['A', 'B', 'C'].map(tier => {
+                const tierProps = filtered.filter(p => p.confidence_tier === tier);
+                if (tierProps.length === 0) return null;
+                const tierLabels = { A: 'Tier A — High Confidence', B: 'Tier B — Solid Value', C: 'Tier C — Speculative' };
+                return (
+                  <div key={tier}>
+                    <h3 className="text-sm font-bold text-foreground mb-3 uppercase tracking-wider">{tierLabels[tier]} ({tierProps.length})</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {tierProps.map((prop, i) => (
+                        <PropCard key={`${prop.player_name}-${prop.prop_type}-${i}`} prop={prop} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

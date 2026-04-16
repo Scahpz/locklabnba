@@ -87,6 +87,24 @@ export default function Trends() {
     );
   }
 
+  if (!loading && players.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
+            <Flame className="w-7 h-7 text-orange-400" />
+            Streaks & Trends
+          </h1>
+        </div>
+        <div className="text-center py-20 text-muted-foreground">
+          <Flame className="w-12 h-12 mx-auto mb-3 opacity-20" />
+          <p className="text-lg font-medium">No player data available today</p>
+          <p className="text-sm mt-1">Trends will appear here once live props are available. Check back closer to game time.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!player) return null;
 
   return (
