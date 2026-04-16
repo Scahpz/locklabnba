@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { mockPlayers, getAllProps } from '@/lib/mockData';
+import { getAllProps } from '@/lib/mockData';
 import { fetchLiveProps } from '@/lib/liveData';
-import { Shield, TrendingUp, TrendingDown, Gauge, Target, Wifi, WifiOff } from 'lucide-react';
+import { Shield, TrendingUp, TrendingDown, Gauge, Target, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -47,18 +47,25 @@ function buildMatchups(props) {
 }
 
 export default function Matchups() {
-  const [allMatchups, setAllMatchups] = useState(() => buildMatchups(getAllProps()));
+  const [allMatchups, setAllMatchups] = useState([]);
   const [isLive, setIsLive] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
       try {
         const data = await fetchLiveProps();
         if (data?.props?.length > 0) {
           setAllMatchups(buildMatchups(data.props));
           setIsLive(true);
+        } else {
+          setAllMatchups(buildMatchups(getAllProps()));
         }
-      } catch {}
+      } catch {
+        setAllMatchups(buildMatchups(getAllProps()));
+      }
+      setLoading(false);
     }
     load();
   }, []);
@@ -71,6 +78,15 @@ export default function Matchups() {
       rank: m.def_rank_vs_pos,
       fill: m.def_rank_vs_pos >= 25 ? 'hsl(142 71% 45%)' : m.def_rank_vs_pos >= 15 ? 'hsl(199 89% 48%)' : 'hsl(43 74% 66%)',
     }));
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <RefreshCw className="w-6 h-6 animate-spin text-primary" />
+        <span className="ml-2 text-sm text-muted-foreground">Loading today's matchups…</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

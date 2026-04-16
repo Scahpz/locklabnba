@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLivePlayers } from '@/lib/useLivePlayers';
-import { GitCompare } from 'lucide-react';
+import { GitCompare, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import PlayerSelector from '@/components/compare/PlayerSelector';
 import CompareColumn from '@/components/compare/CompareColumn';
 import ComparePropRow from '@/components/compare/ComparePropRow';
@@ -8,7 +8,7 @@ import ComparePropRow from '@/components/compare/ComparePropRow';
 const MAX_PLAYERS = 3;
 
 export default function Compare() {
-  const { players } = useLivePlayers();
+  const { players, isLive, loading } = useLivePlayers();
   const [selectedIds, setSelectedIds] = useState([]);
 
   // Set defaults once players load
@@ -40,6 +40,15 @@ export default function Compare() {
   // Collect all unique prop types across selected players
   const allPropTypes = [...new Set(selected.flatMap(p => p.props.map(pr => pr.prop_type)))];
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <RefreshCw className="w-6 h-6 animate-spin text-primary" />
+        <span className="ml-2 text-sm text-muted-foreground">Loading today's players…</span>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -47,7 +56,12 @@ export default function Compare() {
           <GitCompare className="w-7 h-7 text-accent" />
           Player Comparison
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">Compare up to 3 players side-by-side</p>
+        <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+          {isLive
+            ? <><Wifi className="w-3.5 h-3.5 text-primary" /><span className="text-primary font-medium">Live — today's players only</span></>
+            : <><WifiOff className="w-3.5 h-3.5" />Compare up to 3 players side-by-side</>
+          }
+        </p>
       </div>
 
       {/* Player Selector Row */}

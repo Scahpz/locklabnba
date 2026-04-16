@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { getAllProps } from '@/lib/mockData';
-import { fetchLiveProps, isCacheValid } from '@/lib/liveData';
+import { fetchLiveProps } from '@/lib/liveData';
 import { Badge } from '@/components/ui/badge';
-import { Lock, Zap, Shield, AlertTriangle, Award, Wifi, WifiOff } from 'lucide-react';
+import { Lock, Zap, Shield, AlertTriangle, Award, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import TeamLogo from '@/components/common/TeamLogo';
@@ -80,18 +80,25 @@ function PickCard({ prop }) {
 }
 
 export default function AIPicks() {
-  const [allProps, setAllProps] = useState(getAllProps());
+  const [allProps, setAllProps] = useState([]);
   const [isLive, setIsLive] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
       try {
         const data = await fetchLiveProps();
         if (data?.props?.length > 0) {
           setAllProps(data.props);
           setIsLive(true);
+        } else {
+          setAllProps(getAllProps());
         }
-      } catch {}
+      } catch {
+        setAllProps(getAllProps());
+      }
+      setLoading(false);
     }
     load();
   }, []);
@@ -103,6 +110,15 @@ export default function AIPicks() {
     .forEach(p => {
       if (tiers[p.confidence_tier]) tiers[p.confidence_tier].push(p);
     });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <RefreshCw className="w-6 h-6 animate-spin text-primary" />
+        <span className="ml-2 text-sm text-muted-foreground">Loading today's picks…</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
