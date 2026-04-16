@@ -50,9 +50,30 @@ function BookDropdown({ books, activeKey, onSelect }) {
   );
 }
 
+/**
+ * Risk classification based on American odds:
+ * - "good"   : heavy favorite (odds <= -140) — likely outcome, green
+ * - "neutral": near pick'em (-139 to -101 or +100 to +150) — slight favorite/coin flip, grey
+ * - "risky"  : underdog (+151 and above) — unlikely, red
+ */
+function riskLevel(oddsNum) {
+  if (oddsNum == null) return 'neutral';
+  if (oddsNum <= -140) return 'good';
+  if (oddsNum >= 151) return 'risky';
+  return 'neutral';
+}
+
+const riskStyles = {
+  good:    { idle: 'bg-green-500/10 border-green-500/20 hover:bg-green-500/20', text: 'text-green-400' },
+  neutral: { idle: 'bg-secondary/50 border-transparent hover:border-primary/30 hover:bg-primary/5', text: 'text-foreground' },
+  risky:   { idle: 'bg-red-500/10 border-red-500/20 hover:bg-red-500/20', text: 'text-red-400' },
+};
+
 function OddsButton({ label, value, sub, legId, leg }) {
   const { addGameLeg, isGameLegSelected } = useParlay();
   const selected = isGameLegSelected(legId);
+  const risk = riskLevel(leg?.odds);
+  const style = riskStyles[risk];
 
   if (!value || value === '—') {
     return (
@@ -69,12 +90,12 @@ function OddsButton({ label, value, sub, legId, leg }) {
       className={cn(
         "flex flex-col items-center justify-center rounded-lg px-2 py-2 min-w-[60px] transition-all border",
         selected
-          ? "bg-primary/20 border-primary/50 text-primary"
-          : "bg-secondary/50 border-transparent hover:border-primary/30 hover:bg-primary/5"
+          ? "bg-primary/20 border-primary/50"
+          : style.idle
       )}
     >
       <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">{label}</p>
-      <p className={cn("text-sm font-bold", selected ? "text-primary" : "text-foreground")}>{value}</p>
+      <p className={cn("text-sm font-bold", selected ? "text-primary" : style.text)}>{value}</p>
       {sub && <p className="text-[9px] text-muted-foreground">{sub}</p>}
       {selected && <Check className="w-2.5 h-2.5 text-primary mt-0.5" />}
     </button>
