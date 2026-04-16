@@ -114,24 +114,46 @@ export default function GameOddsCard({ game }) {
             {showBooks ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             {showBooks ? 'Hide' : 'Compare'} {game.allBooks.length} books
           </button>
-          {showBooks && (
-            <div className="px-4 pb-3 space-y-1.5">
-              <div className="grid grid-cols-5 text-[9px] text-muted-foreground uppercase tracking-wider mb-1 px-1">
-                <span className="col-span-2">Book</span>
-                <span className="text-center">{game.awayAbv} ML</span>
-                <span className="text-center">{game.homeAbv} ML</span>
-                <span className="text-center">O/U</span>
-              </div>
-              {game.allBooks.map(b => (
-                <div key={b.key} className="grid grid-cols-5 text-xs bg-secondary/40 rounded-lg px-3 py-1.5 items-center">
-                  <span className="col-span-2 text-muted-foreground text-[10px] truncate">{b.title}</span>
-                  <span className="text-center font-mono font-medium text-foreground">{fmtOdds(b.ml_away)}</span>
-                  <span className="text-center font-mono font-medium text-foreground">{fmtOdds(b.ml_home)}</span>
-                  <span className="text-center font-mono font-medium text-foreground">{b.total_line ?? '—'}</span>
+          {showBooks && (() => {
+            const awayMls = game.allBooks.map(b => b.ml_away).filter(v => v != null);
+            const homeMls = game.allBooks.map(b => b.ml_home).filter(v => v != null);
+            const bestAwayMl = awayMls.length ? Math.max(...awayMls) : null;
+            const worstAwayMl = awayMls.length ? Math.min(...awayMls) : null;
+            const bestHomeMl = homeMls.length ? Math.max(...homeMls) : null;
+            const worstHomeMl = homeMls.length ? Math.min(...homeMls) : null;
+
+            return (
+              <div className="px-4 pb-3 space-y-1.5">
+                <div className="grid grid-cols-5 text-[9px] text-muted-foreground uppercase tracking-wider mb-1 px-1">
+                  <span className="col-span-2">Book</span>
+                  <span className="text-center">{game.awayAbv} ML</span>
+                  <span className="text-center">{game.homeAbv} ML</span>
+                  <span className="text-center">O/U</span>
                 </div>
-              ))}
-            </div>
-          )}
+                {game.allBooks.map(b => {
+                  const isBestAway = b.ml_away === bestAwayMl;
+                  const isWorstAway = b.ml_away === worstAwayMl && worstAwayMl !== bestAwayMl;
+                  const isBestHome = b.ml_home === bestHomeMl;
+                  const isWorstHome = b.ml_home === worstHomeMl && worstHomeMl !== bestHomeMl;
+                  return (
+                    <div key={b.key} className="grid grid-cols-5 text-xs bg-secondary/40 rounded-lg px-3 py-1.5 items-center">
+                      <span className="col-span-2 text-muted-foreground text-[10px] truncate">{b.title}</span>
+                      <span className={cn("text-center font-mono font-bold",
+                        isBestAway ? "text-primary" : isWorstAway ? "text-destructive" : "text-foreground"
+                      )}>{fmtOdds(b.ml_away)}</span>
+                      <span className={cn("text-center font-mono font-bold",
+                        isBestHome ? "text-primary" : isWorstHome ? "text-destructive" : "text-foreground"
+                      )}>{fmtOdds(b.ml_home)}</span>
+                      <span className="text-center font-mono font-medium text-foreground">{b.total_line ?? '—'}</span>
+                    </div>
+                  );
+                })}
+                <p className="text-[9px] text-muted-foreground text-center pt-0.5">
+                  <span className="text-primary font-medium">Green</span> = best odds · <span className="text-destructive font-medium">Red</span> = worst odds
+                </p>
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>

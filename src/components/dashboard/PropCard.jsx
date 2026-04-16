@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { TrendingUp, TrendingDown, Lock, AlertTriangle, Award, Zap, ChevronDown, ChevronUp } from 'lucide-react';
+import { TrendingUp, TrendingDown, Lock, AlertTriangle, Award, Zap, ChevronDown, ChevronUp, Check } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import TeamLogo from '@/components/common/TeamLogo';
 import { useParlay } from '@/lib/ParlayContext';
@@ -27,13 +27,43 @@ const matchupColors = {
   tough: 'text-chart-5', elite_defense: 'text-destructive'
 };
 
-export default function PropCard({ prop, onAddToParlay }) {
+export default function PropCard({ prop }) {
   const { addLeg, isSelected } = useParlay();
   const [showBooks, setShowBooks] = useState(false);
+  const [selectedBook, setSelectedBook] = useState(null); // null = use primary
+
   const tier = tierConfig[prop.confidence_tier] || tierConfig.C;
   const isPositiveEdge = prop.edge > 0;
-  const oddsDisplay = (odds) => odds > 0 ? `+${odds}` : odds;
   const hasBooks = prop.all_books?.length > 1;
+
+  // Active book for odds display
+  const activeBook = selectedBook
+    ? prop.all_books?.find(b => b.key === selectedBook)
+    : null;
+
+  const displayOverOdds = activeBook?.over_odds ?? prop.over_odds;
+  const displayUnderOdds = activeBook?.under_odds ?? prop.under_odds;
+  const displayLine = activeBook?.line ?? prop.line;
+
+  // Best/worst over odds among books (higher = better for bettor)
+  const overOddsValues = (prop.all_books || []).map(b => b.over_odds).filter(v => v != null);
+  const underOddsValues = (prop.all_books || []).map(b => b.under_odds).filter(v => v != null);
+  const bestOverOdds = overOddsValues.length ? Math.max(...overOddsValues) : null;
+  const worstOverOdds = overOddsValues.length ? Math.min(...overOddsValues) : null;
+  const bestUnderOdds = underOddsValues.length ? Math.max(...underOddsValues) : null;
+  const worstUnderOdds = underOddsValues.length ? Math.min(...underOddsValues) : null;
+
+  const handlePick = (pick) => {
+    // Build enriched prop with active book's odds
+    const enrichedProp = {
+      ...prop,
+      over_odds: displayOverOdds,
+      under_odds: displayUnderOdds,
+      line: displayLine,
+      bookmaker: activeBook?.title ?? prop.bookmaker,
+    };
+    addLeg(enrichedProp, pick);
+  };
 
   return (
     <div className="group rounded-xl border border-border bg-card hover:border-primary/30 transition-all duration-300 hover:shadow-[0_0_20px_hsl(142,71%,45%,0.08)] overflow-hidden">
@@ -59,15 +89,23 @@ export default function PropCard({ prop, onAddToParlay }) {
           </div>
         </div>
 
+        {/* Active book indicator */}
+        {activeBook && (
+          <div className="mb-2 flex items-center gap-1.5 text-[10px] text-primary bg-primary/10 rounded-md px-2 py-1 w-fit">
+            <Check className="w-3 h-3" />
+            Using {activeBook.title}
+          </div>
+        )}
+
         {/* Prop Line */}
         <div className="flex items-center justify-between bg-secondary/50 rounded-lg p-3">
           <div>
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{propTypeLabels[prop.prop_type] || prop.prop_type}</p>
-            <p className="text-2xl font-bold text-foreground mt-0.5">{prop.line}</p>
+            <p className="text-2xl font-bold text-foreground mt-0.5">{displayLine}</p>
           </div>
           <div className="flex gap-2">
             <button
-              onClick={(e) => { e.preventDefault(); addLeg(prop, 'over'); }}
+              onClick={(e) => { e.preventDefault(); handlePick('over'); }}
               className={cn(
                 "flex flex-col items-center border rounded-lg px-3 py-1.5 transition-all",
                 isSelected(prop.player_name, prop.prop_type, 'over')
@@ -78,10 +116,10 @@ export default function PropCard({ prop, onAddToParlay }) {
               )}
             >
               <span className={cn("text-[10px] font-medium", isSelected(prop.player_name, prop.prop_type, 'over') ? 'text-primary-foreground' : isPositiveEdge ? 'text-primary' : 'text-muted-foreground')}>OVER</span>
-              <span className={cn("text-sm font-bold", isSelected(prop.player_name, prop.prop_type, 'over') ? 'text-primary-foreground' : isPositiveEdge ? 'text-primary' : 'text-muted-foreground')}>{oddsDisplay(prop.over_odds)}</span>
+              <span className={cn("text-sm font-bold", isSelected(prop.player_name, prop.prop_type, 'over') ? 'text-primary-foreground' : isPositiveEdge ? 'text-primary' : 'text-muted-foreground')}>{fmtOdds(displayOverOdds)}</span>
             </button>
             <button
-              onClick={(e) => { e.preventDefault(); addLeg(prop, 'under'); }}
+              onClick={(e) => { e.preventDefault(); handlePick('under'); }}
               className={cn(
                 "flex flex-col items-center border rounded-lg px-3 py-1.5 transition-all",
                 isSelected(prop.player_name, prop.prop_type, 'under')
@@ -92,7 +130,7 @@ export default function PropCard({ prop, onAddToParlay }) {
               )}
             >
               <span className={cn("text-[10px] font-medium", isSelected(prop.player_name, prop.prop_type, 'under') ? 'text-destructive-foreground' : !isPositiveEdge ? 'text-destructive' : 'text-muted-foreground')}>UNDER</span>
-              <span className={cn("text-sm font-bold", isSelected(prop.player_name, prop.prop_type, 'under') ? 'text-destructive-foreground' : !isPositiveEdge ? 'text-destructive' : 'text-muted-foreground')}>{oddsDisplay(prop.under_odds)}</span>
+              <span className={cn("text-sm font-bold", isSelected(prop.player_name, prop.prop_type, 'under') ? 'text-destructive-foreground' : !isPositiveEdge ? 'text-destructive' : 'text-muted-foreground')}>{fmtOdds(displayUnderOdds)}</span>
             </button>
           </div>
         </div>
@@ -148,18 +186,43 @@ export default function PropCard({ prop, onAddToParlay }) {
           </button>
           {showBooks && (
             <div className="px-4 pb-3 space-y-1.5">
-              <div className="grid grid-cols-4 text-[9px] text-muted-foreground uppercase tracking-wider mb-1 px-1">
+              <div className="grid grid-cols-5 text-[9px] text-muted-foreground uppercase tracking-wider mb-1 px-1">
                 <span className="col-span-2">Book</span>
+                <span className="text-center">Line</span>
                 <span className="text-center">Over</span>
                 <span className="text-center">Under</span>
               </div>
-              {prop.all_books.map(b => (
-                <div key={b.key} className="grid grid-cols-4 text-xs bg-secondary/40 rounded-lg px-3 py-1.5 items-center">
-                  <span className="col-span-2 text-muted-foreground text-[10px] truncate">{b.title}</span>
-                  <span className="text-center font-mono font-bold text-primary">{fmtOdds(b.over_odds)}</span>
-                  <span className="text-center font-mono font-bold text-destructive">{fmtOdds(b.under_odds)}</span>
-                </div>
-              ))}
+              {prop.all_books.map(b => {
+                const isActive = selectedBook === b.key || (!selectedBook && b.key === prop.all_books[0]?.key);
+                const isBestOver = b.over_odds === bestOverOdds;
+                const isWorstOver = b.over_odds === worstOverOdds && worstOverOdds !== bestOverOdds;
+                const isBestUnder = b.under_odds === bestUnderOdds;
+                const isWorstUnder = b.under_odds === worstUnderOdds && worstUnderOdds !== bestUnderOdds;
+
+                return (
+                  <button
+                    key={b.key}
+                    onClick={() => setSelectedBook(selectedBook === b.key ? null : b.key)}
+                    className={cn(
+                      "w-full grid grid-cols-5 text-xs rounded-lg px-3 py-1.5 items-center transition-all text-left",
+                      isActive ? "bg-primary/15 border border-primary/30" : "bg-secondary/40 hover:bg-secondary/70"
+                    )}
+                  >
+                    <span className={cn("col-span-2 text-[10px] truncate font-medium", isActive ? "text-primary" : "text-muted-foreground")}>
+                      {isActive && <Check className="w-2.5 h-2.5 inline mr-1" />}
+                      {b.title}
+                    </span>
+                    <span className="text-center font-mono text-foreground">{b.line ?? '—'}</span>
+                    <span className={cn("text-center font-mono font-bold",
+                      isBestOver ? "text-primary" : isWorstOver ? "text-destructive" : "text-foreground"
+                    )}>{fmtOdds(b.over_odds)}</span>
+                    <span className={cn("text-center font-mono font-bold",
+                      isBestUnder ? "text-primary" : isWorstUnder ? "text-destructive" : "text-foreground"
+                    )}>{fmtOdds(b.under_odds)}</span>
+                  </button>
+                );
+              })}
+              <p className="text-[9px] text-muted-foreground text-center pt-1">Tap a book to use its odds in your parlay</p>
             </div>
           )}
         </div>
