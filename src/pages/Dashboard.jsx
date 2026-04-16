@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { getAllProps } from '@/lib/mockData';
-import { fetchLiveProps, clearLiveCache, isCacheValid } from '@/lib/liveData';
+import { fetchLiveProps, clearLiveCache, isCacheValid, getStoredApiKey } from '@/lib/liveData';
+import ApiKeyPrompt from '@/components/dashboard/ApiKeyPrompt';
 import StatsOverview from '@/components/dashboard/StatsOverview';
 import PropFilters from '@/components/dashboard/PropFilters';
 import PropCard from '@/components/dashboard/PropCard';
@@ -17,7 +18,8 @@ export default function Dashboard() {
   const [liveError, setLiveError] = useState(false);
   const [gameDate, setGameDate] = useState(null);
   const [gamesSummary, setGamesSummary] = useState([]);
-  const [useLive, setUseLive] = useState(isCacheValid()); // auto-on if cached
+  const [useLive, setUseLive] = useState(isCacheValid());
+  const [needsApiKey, setNeedsApiKey] = useState(!getStoredApiKey());
 
   const staticProps = getAllProps();
 
@@ -27,16 +29,23 @@ export default function Dashboard() {
     if (forceRefresh) clearLiveCache();
     try {
       const data = await fetchLiveProps();
+      if (data?.needsApiKey) {
+        setNeedsApiKey(true);
+        setLoadingLive(false);
+        return;
+      }
       if (data?.props?.length > 0) {
         setLiveProps(data.props);
         setGameDate(data.game_date);
         setGamesSummary(data.games_summary || []);
         setUseLive(true);
+        setNeedsApiKey(false);
       } else {
         setLiveError(true);
       }
-    } catch {
+    } catch (e) {
       setLiveError(true);
+      console.warn(e);
     } finally {
       setLoadingLive(false);
     }
@@ -172,6 +181,10 @@ export default function Dashboard() {
           <WifiOff className="w-4 h-4" />
           Could not fetch live lines. Showing sample data. Try refreshing.
         </div>
+      )}
+
+      {needsApiKey && (
+        <ApiKeyPrompt onKeySet={() => { setNeedsApiKey(false); loadLive(true); }} />
       )}
 
       <StatsOverview />

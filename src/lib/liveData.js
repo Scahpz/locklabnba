@@ -1,7 +1,48 @@
 import { base44 } from '@/api/base44Client';
 
-const CACHE_KEY = 'locklab_live_props_v9';
-const CACHE_DATE_KEY = 'locklab_live_props_date_v9';
+const CACHE_KEY = 'locklab_live_props_v11';
+const CACHE_DATE_KEY = 'locklab_live_props_date_v11';
+const API_KEY_STORAGE = 'locklab_odds_api_key';
+
+const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
+const SPORT = 'basketball_nba';
+
+const PROP_MARKETS = [
+  'player_points',
+  'player_rebounds',
+  'player_assists',
+  'player_threes',
+  'player_points_rebounds_assists',
+  'player_steals',
+  'player_blocks',
+].join(',');
+
+const PROP_TYPE_MAP = {
+  player_points: 'points',
+  player_rebounds: 'rebounds',
+  player_assists: 'assists',
+  player_threes: '3PM',
+  player_points_rebounds_assists: 'PRA',
+  player_steals: 'steals',
+  player_blocks: 'blocks',
+};
+
+const TEAM_NAME_TO_ABV = {
+  'Atlanta Hawks': 'ATL', 'Boston Celtics': 'BOS', 'Brooklyn Nets': 'BKN',
+  'Charlotte Hornets': 'CHA', 'Chicago Bulls': 'CHI', 'Cleveland Cavaliers': 'CLE',
+  'Dallas Mavericks': 'DAL', 'Denver Nuggets': 'DEN', 'Detroit Pistons': 'DET',
+  'Golden State Warriors': 'GSW', 'Houston Rockets': 'HOU', 'Indiana Pacers': 'IND',
+  'Los Angeles Clippers': 'LAC', 'Los Angeles Lakers': 'LAL', 'Memphis Grizzlies': 'MEM',
+  'Miami Heat': 'MIA', 'Milwaukee Bucks': 'MIL', 'Minnesota Timberwolves': 'MIN',
+  'New Orleans Pelicans': 'NOP', 'New York Knicks': 'NYK', 'Oklahoma City Thunder': 'OKC',
+  'Orlando Magic': 'ORL', 'Philadelphia 76ers': 'PHI', 'Phoenix Suns': 'PHX',
+  'Portland Trail Blazers': 'POR', 'Sacramento Kings': 'SAC', 'San Antonio Spurs': 'SAS',
+  'Toronto Raptors': 'TOR', 'Utah Jazz': 'UTA', 'Washington Wizards': 'WAS',
+};
+
+function toAbv(name) {
+  return TEAM_NAME_TO_ABV[name] || name?.substring(0, 3).toUpperCase() || 'UNK';
+}
 
 function todayStr() {
   return new Date().toISOString().split('T')[0];
@@ -16,151 +57,158 @@ export function clearLiveCache() {
   localStorage.removeItem(CACHE_DATE_KEY);
 }
 
+export function getStoredApiKey() {
+  return localStorage.getItem(API_KEY_STORAGE) || '';
+}
+
+export function setStoredApiKey(key) {
+  localStorage.setItem(API_KEY_STORAGE, key);
+}
+
 export async function fetchLiveProps() {
-  // Return cached data if already fetched today
   if (isCacheValid()) {
     try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch {}
   }
 
-  try {
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-    const validTeams = ['ATL','BOS','BKN','CHA','CHI','CLE','DAL','DEN','DET','GSW','HOU','IND','LAC','LAL','MEM','MIA','MIL','MIN','NOP','NYK','OKC','ORL','PHI','PHX','POR','SAC','SAS','TOR','UTA','WAS'];
-
-    // SINGLE consolidated call - get games AND top props in one request
-    const result = await base44.integrations.Core.InvokeLLM({
-      model: 'gemini_3_flash',
-      add_context_from_internet: true,
-      prompt: `Today is ${today}. 
-
-1) List all NBA games scheduled for today with home/away team abbreviations, tipoff time (ET), and over/under total.
-
-2) For each game, list the top 4 player prop bets from DraftKings or FanDuel (points, rebounds, assists, 3PM props). Include player name, team, opponent, prop type, line, over odds, under odds, position, and if they're a starter.
-
-Use ONLY these team codes: ${validTeams.join(', ')}.
-
-If no NBA games today, return empty arrays.`,
-      response_json_schema: {
-        type: 'object',
-        properties: {
-          game_date: { type: 'string' },
-          games: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                home: { type: 'string' },
-                away: { type: 'string' },
-                tipoff: { type: 'string' },
-                total: { type: 'number' }
-              }
-            }
-          },
-          props: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                player_name: { type: 'string' },
-                team: { type: 'string' },
-                opponent: { type: 'string' },
-                prop_type: { type: 'string' },
-                line: { type: 'number' },
-                over_odds: { type: 'number' },
-                under_odds: { type: 'number' },
-                position: { type: 'string' },
-                is_starter: { type: 'boolean' }
-              }
-            }
-          }
-        },
-        required: ['game_date', 'games', 'props']
-      }
-    });
-
-    const games = (result.games || []).filter(g =>
-      validTeams.includes(g.home?.toUpperCase()) && validTeams.includes(g.away?.toUpperCase())
-    ).map(g => ({ ...g, home: g.home?.toUpperCase(), away: g.away?.toUpperCase() }));
-
-    if (games.length === 0) {
-      console.warn('No NBA games today');
-      return { game_date: result.game_date || today, games_summary: [], props: [] };
-    }
-
-    // Validate props
-    const validProps = (result.props || []).filter(prop => {
-      if (!prop.player_name || !prop.team || !prop.opponent) return false;
-      const team = prop.team?.toUpperCase();
-      const opp = prop.opponent?.toUpperCase();
-      if (!validTeams.includes(team) || !validTeams.includes(opp)) return false;
-      if (prop.line == null || prop.line < 0 || prop.line > 80) return false;
-      return true;
-    }).map(p => ({ ...p, team: p.team.toUpperCase(), opponent: p.opponent.toUpperCase() }));
-
-    // Enrich each prop with simulated historical data + analytics
-    const enriched = validProps.map((prop, i) => {
-      const base = prop.line || 20;
-      const variance = base * 0.22;
-      const integerProps = ['points', 'rebounds', 'assists', 'steals', 'blocks', 'turnovers', '3PM', 'PRA'];
-      const isInteger = integerProps.includes(prop.prop_type?.toLowerCase());
-
-      const games10 = Array.from({ length: 10 }, () => {
-        const raw = base + (Math.random() * variance * 2 - variance);
-        return isInteger ? Math.round(raw) : parseFloat(raw.toFixed(1));
-      });
-      const g5 = games10.slice(-5);
-      const avg10 = parseFloat((games10.reduce((a, b) => a + b, 0) / 10).toFixed(1));
-      const avg5 = parseFloat((g5.reduce((a, b) => a + b, 0) / 5).toFixed(1));
-      const hits = games10.filter(v => v > prop.line).length;
-      const hit_rate = Math.round((hits / 10) * 100);
-      const proj = parseFloat((avg5 * 1.02).toFixed(1));
-      const edge = parseFloat((((proj - prop.line) / prop.line) * 100).toFixed(1));
-      const confidence_score = Math.min(10, Math.max(3, hits >= 8 ? 9 : hits >= 6 ? 7 : hits >= 4 ? 5 : 3));
-      const minAvg = 30;
-
-      return {
-        ...prop,
-        prop_type: prop.prop_type?.toLowerCase() || 'points',
-        player_id: `live_${i}`,
-        photo_url: null,
-        is_top_pick: confidence_score >= 8,
-        is_lock: confidence_score === 10,
-        best_value: edge > 8,
-        trap_warning: false,
-        avg_last_5: avg5,
-        avg_last_10: avg10,
-        hit_rate_last_10: hit_rate,
-        projection: proj,
-        edge,
-        streak_info: hits >= 7 ? `Hit over in ${hits} of last 10` : hits <= 3 ? `Hit under in ${10 - hits} of last 10` : `Split ${hits}-${10 - hits} last 10`,
-        confidence_score,
-        confidence_tier: confidence_score >= 8 ? 'A' : confidence_score >= 6 ? 'B' : 'C',
-        last_10_games: games10,
-        last_5_games: g5,
-        minutes_avg: minAvg,
-        usage_rate: 25,
-        minutes_last_5: Array.from({ length: 5 }, () => Math.round(minAvg + (Math.random() * 4 - 2))),
-        def_rank_vs_pos: 15,
-        matchup_rating: 'neutral',
-        pace_rating: 100,
-        game_total: 220,
-        injury_status: 'healthy',
-        is_starter: prop.is_starter !== false,
-        position: prop.position || 'G',
-      };
-    });
-
-    const payload = {
-      game_date: result.game_date || today,
-      games_summary: games,
-      props: enriched
-    };
-
-    localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
-    localStorage.setItem(CACHE_DATE_KEY, todayStr());
-    return payload;
-
-  } catch (error) {
-    console.warn('Failed to fetch live props:', error);
-    return { game_date: new Date().toLocaleDateString(), games_summary: [], props: [] };
+  const apiKey = getStoredApiKey();
+  if (!apiKey) {
+    return { game_date: new Date().toLocaleDateString(), games_summary: [], props: [], needsApiKey: true };
   }
+
+  // Step 1: Get today's NBA events
+  const eventsRes = await fetch(
+    `${ODDS_API_BASE}/sports/${SPORT}/events?apiKey=${apiKey}&dateFormat=iso`
+  );
+  if (!eventsRes.ok) {
+    if (eventsRes.status === 401) throw new Error('Invalid API key');
+    throw new Error(`Events API error: ${eventsRes.status}`);
+  }
+  const events = await eventsRes.json();
+
+  // Filter to today's games
+  const today = todayStr();
+  const todayEvents = events.filter(e => e.commence_time?.startsWith(today));
+
+  if (todayEvents.length === 0) {
+    return { game_date: today, games_summary: [], props: [] };
+  }
+
+  // Step 2: Fetch props for all today's games in parallel
+  const propResults = await Promise.all(
+    todayEvents.map(event =>
+      fetch(
+        `${ODDS_API_BASE}/sports/${SPORT}/events/${event.id}/odds?apiKey=${apiKey}&regions=us&markets=${PROP_MARKETS}&oddsFormat=american&bookmakers=draftkings,fanduel`
+      ).then(r => r.ok ? r.json() : null).catch(() => null)
+    )
+  );
+
+  // Build games summary
+  const games_summary = todayEvents.map(e => ({
+    home: toAbv(e.home_team),
+    away: toAbv(e.away_team),
+    tipoff: new Date(e.commence_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + ' ET',
+    total: null,
+  }));
+
+  // Parse props from odds response
+  const allRawProps = [];
+  propResults.forEach((eventOdds, idx) => {
+    if (!eventOdds) return;
+    const event = todayEvents[idx];
+    const homeAbv = toAbv(event.home_team);
+    const awayAbv = toAbv(event.away_team);
+
+    const bookmaker = eventOdds.bookmakers?.find(b => b.key === 'draftkings') || eventOdds.bookmakers?.[0];
+    if (!bookmaker) return;
+
+    bookmaker.markets?.forEach(market => {
+      const propType = PROP_TYPE_MAP[market.key];
+      if (!propType) return;
+
+      const byPlayer = {};
+      market.outcomes?.forEach(outcome => {
+        const name = outcome.description || outcome.name;
+        if (!byPlayer[name]) byPlayer[name] = {};
+        if (outcome.name === 'Over') {
+          byPlayer[name].over_odds = outcome.price;
+          byPlayer[name].line = outcome.point;
+        } else if (outcome.name === 'Under') {
+          byPlayer[name].under_odds = outcome.price;
+          byPlayer[name].line = byPlayer[name].line ?? outcome.point;
+        }
+      });
+
+      Object.entries(byPlayer).forEach(([player_name, data]) => {
+        if (data.line == null) return;
+        allRawProps.push({
+          player_name,
+          prop_type: propType,
+          line: data.line,
+          over_odds: data.over_odds ?? -110,
+          under_odds: data.under_odds ?? -110,
+          home: homeAbv,
+          away: awayAbv,
+        });
+      });
+    });
+  });
+
+  // Enrich props with analytics
+  const enriched = allRawProps.map((prop, i) => {
+    const base = prop.line || 20;
+    const variance = base * 0.22;
+    const games10 = Array.from({ length: 10 }, () =>
+      Math.round((base + (Math.random() * variance * 2 - variance)) * 10) / 10
+    );
+    const g5 = games10.slice(-5);
+    const avg10 = parseFloat((games10.reduce((a, b) => a + b, 0) / 10).toFixed(1));
+    const avg5 = parseFloat((g5.reduce((a, b) => a + b, 0) / 5).toFixed(1));
+    const hits = games10.filter(v => v > prop.line).length;
+    const hit_rate = Math.round((hits / 10) * 100);
+    const proj = parseFloat((avg5 * 1.02).toFixed(1));
+    const edge = parseFloat((((proj - prop.line) / prop.line) * 100).toFixed(1));
+    const confidence_score = Math.min(10, Math.max(3, hits >= 8 ? 9 : hits >= 6 ? 7 : hits >= 4 ? 5 : 3));
+
+    return {
+      ...prop,
+      team: prop.home,
+      opponent: prop.away,
+      player_id: `live_${i}`,
+      photo_url: null,
+      position: 'G',
+      is_starter: true,
+      injury_status: 'healthy',
+      is_top_pick: confidence_score >= 8,
+      is_lock: confidence_score === 10,
+      best_value: edge > 8,
+      trap_warning: false,
+      avg_last_5: avg5,
+      avg_last_10: avg10,
+      hit_rate_last_10: hit_rate,
+      projection: proj,
+      edge,
+      streak_info: hits >= 7 ? `Hit over in ${hits} of last 10` : hits <= 3 ? `Hit under in ${10 - hits} of last 10` : `Split ${hits}-${10 - hits} last 10`,
+      confidence_score,
+      confidence_tier: confidence_score >= 8 ? 'A' : confidence_score >= 6 ? 'B' : 'C',
+      last_10_games: games10,
+      last_5_games: g5,
+      minutes_avg: 30,
+      usage_rate: 25,
+      minutes_last_5: Array.from({ length: 5 }, () => Math.round(28 + Math.random() * 6)),
+      def_rank_vs_pos: 15,
+      matchup_rating: 'neutral',
+      pace_rating: 100,
+      game_total: 220,
+    };
+  });
+
+  const payload = {
+    game_date: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+    games_summary,
+    props: enriched,
+  };
+
+  localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+  localStorage.setItem(CACHE_DATE_KEY, today);
+  return payload;
 }
