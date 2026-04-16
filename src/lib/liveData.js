@@ -1,7 +1,5 @@
-import { base44 } from '@/api/base44Client';
-
-const CACHE_KEY = 'locklab_live_props_v11';
-const CACHE_DATE_KEY = 'locklab_live_props_date_v11';
+const CACHE_KEY = 'locklab_live_props_v12';
+const CACHE_DATE_KEY = 'locklab_live_props_date_v12';
 const API_KEY_STORAGE = 'locklab_odds_api_key';
 
 const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
@@ -65,6 +63,30 @@ export function setStoredApiKey(key) {
   localStorage.setItem(API_KEY_STORAGE, key);
 }
 
+/** Parse all bookmakers for a single player+prop from an event odds response */
+function parseBookOdds(eventOddsData, playerName, marketKey) {
+  const books = [];
+  (eventOddsData?.bookmakers || []).forEach(bm => {
+    const market = bm.markets?.find(m => m.key === marketKey);
+    if (!market) return;
+    const overO = market.outcomes?.find(o => o.name === 'Over' && (o.description === playerName || (!o.description && false)));
+    const underO = market.outcomes?.find(o => o.name === 'Under' && (o.description === playerName || (!o.description && false)));
+    // For player props, description holds the player name
+    const over = market.outcomes?.find(o => o.name === 'Over' && o.description === playerName);
+    const under = market.outcomes?.find(o => o.name === 'Under' && o.description === playerName);
+    if (over || under) {
+      books.push({
+        key: bm.key,
+        title: bm.title,
+        line: over?.point ?? under?.point ?? null,
+        over_odds: over?.price ?? null,
+        under_odds: under?.price ?? null,
+      });
+    }
+  });
+  return books;
+}
+
 export async function fetchLiveProps() {
   if (isCacheValid()) {
     try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch {}
@@ -93,11 +115,11 @@ export async function fetchLiveProps() {
     return { game_date: today, games_summary: [], props: [] };
   }
 
-  // Step 2: Fetch props for all today's games in parallel
+  // Step 2: Fetch props for all today's games in parallel (all bookmakers)
   const propResults = await Promise.all(
     todayEvents.map(event =>
       fetch(
-        `${ODDS_API_BASE}/sports/${SPORT}/events/${event.id}/odds?apiKey=${apiKey}&regions=us&markets=${PROP_MARKETS}&oddsFormat=american&bookmakers=draftkings,fanduel`
+        `${ODDS_API_BASE}/sports/${SPORT}/events/${event.id}/odds?apiKey=${apiKey}&regions=us&markets=${PROP_MARKETS}&oddsFormat=american`
       ).then(r => r.ok ? r.json() : null).catch(() => null)
     )
   );
@@ -110,24 +132,30 @@ export async function fetchLiveProps() {
     total: null,
   }));
 
-  // Parse props from odds response
-  const allRawProps = [];
+  // Parse props — collect all books per player+prop
+  const propMap = {}; // key: `${player}__${propType}__${homeAbv}@${awayAbv}`
+
   propResults.forEach((eventOdds, idx) => {
     if (!eventOdds) return;
     const event = todayEvents[idx];
     const homeAbv = toAbv(event.home_team);
     const awayAbv = toAbv(event.away_team);
 
-    const bookmaker = eventOdds.bookmakers?.find(b => b.key === 'draftkings') || eventOdds.bookmakers?.[0];
-    if (!bookmaker) return;
+    // Use DraftKings or first bookmaker as the "primary" line
+    const primaryBm = eventOdds.bookmakers?.find(b => b.key === 'draftkings')
+      || eventOdds.bookmakers?.find(b => b.key === 'fanduel')
+      || eventOdds.bookmakers?.[0];
+    if (!primaryBm) return;
 
-    bookmaker.markets?.forEach(market => {
+    primaryBm.markets?.forEach(market => {
       const propType = PROP_TYPE_MAP[market.key];
       if (!propType) return;
 
+      // Group outcomes by player name (stored in `description`)
       const byPlayer = {};
       market.outcomes?.forEach(outcome => {
-        const name = outcome.description || outcome.name;
+        const name = outcome.description;
+        if (!name) return;
         if (!byPlayer[name]) byPlayer[name] = {};
         if (outcome.name === 'Over') {
           byPlayer[name].over_odds = outcome.price;
@@ -140,20 +168,31 @@ export async function fetchLiveProps() {
 
       Object.entries(byPlayer).forEach(([player_name, data]) => {
         if (data.line == null) return;
-        allRawProps.push({
+        const mapKey = `${player_name}__${propType}__${homeAbv}@${awayAbv}`;
+        if (propMap[mapKey]) return; // already added from another bookmaker pass
+
+        // Gather all bookmaker lines for this player+prop
+        const allBooks = parseBookOdds(eventOdds, player_name, market.key);
+
+        propMap[mapKey] = {
           player_name,
           prop_type: propType,
           line: data.line,
           over_odds: data.over_odds ?? -110,
           under_odds: data.under_odds ?? -110,
+          bookmaker: primaryBm.title,
+          all_books: allBooks,
           home: homeAbv,
           away: awayAbv,
-        });
+          market_key: market.key,
+        };
       });
     });
   });
 
-  // Enrich props with analytics
+  const allRawProps = Object.values(propMap);
+
+  // Enrich with analytics (simulated hit-rate / projection since historical data isn't in Odds API)
   const enriched = allRawProps.map((prop, i) => {
     const base = prop.line || 20;
     const variance = base * 0.22;

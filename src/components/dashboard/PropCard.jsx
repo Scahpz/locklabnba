@@ -1,10 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { TrendingUp, TrendingDown, Lock, AlertTriangle, Award, Zap } from 'lucide-react';
+import { TrendingUp, TrendingDown, Lock, AlertTriangle, Award, Zap, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import TeamLogo from '@/components/common/TeamLogo';
 import { useParlay } from '@/lib/ParlayContext';
+
+function fmtOdds(n) {
+  if (n == null) return '—';
+  return n > 0 ? `+${n}` : `${n}`;
+}
 
 const propTypeLabels = {
   points: 'PTS', rebounds: 'REB', assists: 'AST', PRA: 'PRA', '3PM': '3PM',
@@ -24,9 +29,11 @@ const matchupColors = {
 
 export default function PropCard({ prop, onAddToParlay }) {
   const { addLeg, isSelected } = useParlay();
+  const [showBooks, setShowBooks] = useState(false);
   const tier = tierConfig[prop.confidence_tier] || tierConfig.C;
   const isPositiveEdge = prop.edge > 0;
   const oddsDisplay = (odds) => odds > 0 ? `+${odds}` : odds;
+  const hasBooks = prop.all_books?.length > 1;
 
   return (
     <div className="group rounded-xl border border-border bg-card hover:border-primary/30 transition-all duration-300 hover:shadow-[0_0_20px_hsl(142,71%,45%,0.08)] overflow-hidden">
@@ -126,6 +133,35 @@ export default function PropCard({ prop, onAddToParlay }) {
           <p className={cn("text-xs font-medium", matchupColors[prop.matchup_rating])}>
             {prop.matchup_note}
           </p>
+        </div>
+      )}
+
+      {/* Book comparison */}
+      {hasBooks && (
+        <div className="border-t border-border">
+          <button
+            onClick={() => setShowBooks(s => !s)}
+            className="w-full flex items-center justify-center gap-1.5 py-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {showBooks ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            {showBooks ? 'Hide' : 'Compare'} {prop.all_books.length} books
+          </button>
+          {showBooks && (
+            <div className="px-4 pb-3 space-y-1.5">
+              <div className="grid grid-cols-4 text-[9px] text-muted-foreground uppercase tracking-wider mb-1 px-1">
+                <span className="col-span-2">Book</span>
+                <span className="text-center">Over</span>
+                <span className="text-center">Under</span>
+              </div>
+              {prop.all_books.map(b => (
+                <div key={b.key} className="grid grid-cols-4 text-xs bg-secondary/40 rounded-lg px-3 py-1.5 items-center">
+                  <span className="col-span-2 text-muted-foreground text-[10px] truncate">{b.title}</span>
+                  <span className="text-center font-mono font-bold text-primary">{fmtOdds(b.over_odds)}</span>
+                  <span className="text-center font-mono font-bold text-destructive">{fmtOdds(b.under_odds)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
