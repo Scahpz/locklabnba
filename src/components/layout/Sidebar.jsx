@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { 
   LayoutDashboard, TrendingUp, Zap, Shield, Layers, 
-  Bell, User, ChevronLeft, ChevronRight, Trophy, Flame, GitCompare
+  Bell, User, ChevronLeft, ChevronRight, Trophy, Flame, GitCompare, Activity
 } from 'lucide-react';
 
 const navItems = [
@@ -12,6 +12,7 @@ const navItems = [
   { path: '/picks', label: 'AI Picks', icon: Zap },
   { path: '/matchups', label: 'Matchups', icon: Shield },
   { path: '/compare', label: 'Compare', icon: GitCompare },
+  { path: '/odds', label: 'Live Odds', icon: Activity },
   { path: '/parlay', label: 'Parlay Builder', icon: Layers },
   { path: '/alerts', label: 'Alerts', icon: Bell },
   { path: '/profile', label: 'Profile', icon: User },

@@ -15,6 +15,7 @@ import ParlayBuilder from '@/pages/ParlayBuilder.jsx';
 import Alerts from '@/pages/Alerts';
 import Profile from '@/pages/Profile.jsx';
 import Compare from '@/pages/Compare';
+import LiveOdds from '@/pages/LiveOdds';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -51,6 +52,7 @@ const AuthenticatedApp = () => {
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/compare" element={<Compare />} />
+        <Route path="/odds" element={<LiveOdds />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>
