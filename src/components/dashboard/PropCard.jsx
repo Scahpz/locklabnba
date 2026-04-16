@@ -89,6 +89,19 @@ export default function PropCard({ prop }) {
           </div>
         </div>
 
+        {/* Data source badge */}
+        {prop.data_source && (
+          <div className={cn(
+            "mb-2 flex items-center gap-1.5 text-[10px] rounded-md px-2 py-1 w-fit",
+            prop.data_source === 'real'
+              ? "text-primary bg-primary/10"
+              : "text-muted-foreground bg-secondary/60"
+          )}>
+            <span className={cn("w-1.5 h-1.5 rounded-full", prop.data_source === 'real' ? "bg-primary" : "bg-muted-foreground")} />
+            {prop.data_source === 'real' ? 'Real stats' : 'Estimated stats'}
+          </div>
+        )}
+
         {/* Active book indicator */}
         {activeBook && (
           <div className="mb-2 flex items-center gap-1.5 text-[10px] text-primary bg-primary/10 rounded-md px-2 py-1 w-fit">
