@@ -1,13 +1,16 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, TrendingUp, Zap, Activity, Bell, Shield, User } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Zap, Activity, Bell, Shield, User, Layers, GitCompare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { path: '/', label: 'Props', icon: LayoutDashboard },
   { path: '/trends', label: 'Trends', icon: TrendingUp },
-  { path: '/odds', label: 'Odds', icon: Activity },
+  { path: '/picks', label: 'AI Picks', icon: Zap },
   { path: '/matchups', label: 'Matchups', icon: Shield },
+  { path: '/compare', label: 'Compare', icon: GitCompare },
+  { path: '/odds', label: 'Live Odds', icon: Activity },
+  { path: '/parlay', label: 'Parlay', icon: Layers },
   { path: '/alerts', label: 'Alerts', icon: Bell },
   { path: '/profile', label: 'Profile', icon: User },
 ];
