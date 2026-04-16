@@ -36,7 +36,7 @@ const riskColors = {
 };
 
 export default function ParlayBuilder() {
-  const { legs, addLeg: contextAddLeg, removeLeg: contextRemoveLeg, clearLegs } = useParlay();
+  const { legs, addLeg: contextAddLeg, removeLeg: contextRemoveLeg, removeGameLeg, clearLegs } = useParlay();
   const [wager, setWager] = useState(10);
   const [availableProps, setAvailableProps] = useState([]);
   const [loadingProps, setLoadingProps] = useState(true);
@@ -144,14 +144,23 @@ export default function ParlayBuilder() {
                       <div className="min-w-0">
                         <p className="text-xs font-medium text-foreground truncate">{leg.player_name}</p>
                         <p className="text-[10px] text-muted-foreground">
-                          <span className={cn("font-bold", leg.pick === 'over' ? 'text-primary' : 'text-foreground')}>
-                            {leg.pick.toUpperCase()}
-                          </span>
-                          {' '}{leg.line} {leg.prop_type.toUpperCase()} ({leg.odds > 0 ? '+' : ''}{leg.odds})
+                          {leg.is_game_bet ? (
+                            <span className="font-bold text-primary">{leg.prop_type.toUpperCase()} ({leg.odds > 0 ? '+' : ''}{leg.odds})</span>
+                          ) : (
+                            <>
+                              <span className={cn("font-bold", leg.pick === 'over' ? 'text-primary' : 'text-foreground')}>
+                                {leg.pick.toUpperCase()}
+                              </span>
+                              {' '}{leg.line} {leg.prop_type.toUpperCase()} ({leg.odds > 0 ? '+' : ''}{leg.odds})
+                            </>
+                          )}
                         </p>
                       </div>
                     </div>
-                    <button onClick={() => removeLeg(i)} className="text-muted-foreground hover:text-destructive transition-colors ml-2">
+                    <button
+                      onClick={() => leg.is_game_bet ? removeGameLeg(leg.leg_id) : removeLeg(i)}
+                      className="text-muted-foreground hover:text-destructive transition-colors ml-2"
+                    >
                       <X className="w-4 h-4" />
                     </button>
                   </div>

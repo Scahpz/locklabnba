@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import TeamLogo from '@/components/common/TeamLogo';
 
 export default function MiniParlayBar() {
-  const { legs, removeLeg, clearLegs } = useParlay();
+  const { legs, removeLeg, removeGameLeg, clearLegs } = useParlay();
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
 
@@ -28,13 +28,22 @@ export default function MiniParlayBar() {
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold text-foreground truncate">{leg.player_name}</p>
                   <p className="text-[10px] text-muted-foreground">
-                    <span className={cn("font-bold", leg.pick === 'over' ? 'text-primary' : 'text-foreground')}>
-                      {leg.pick.toUpperCase()}
-                    </span>
-                    {' '}{leg.line} {leg.prop_type.toUpperCase()} · {leg.odds > 0 ? '+' : ''}{leg.odds}
+                    {leg.is_game_bet ? (
+                      <span className="font-bold text-primary">{leg.prop_type.toUpperCase()} · {leg.odds > 0 ? '+' : ''}{leg.odds}</span>
+                    ) : (
+                      <>
+                        <span className={cn("font-bold", leg.pick === 'over' ? 'text-primary' : 'text-foreground')}>
+                          {leg.pick.toUpperCase()}
+                        </span>
+                        {' '}{leg.line} {leg.prop_type.toUpperCase()} · {leg.odds > 0 ? '+' : ''}{leg.odds}
+                      </>
+                    )}
                   </p>
                 </div>
-                <button onClick={() => removeLeg(leg.player_name, leg.prop_type)} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
+                <button
+                  onClick={() => leg.is_game_bet ? removeGameLeg(leg.leg_id) : removeLeg(leg.player_name, leg.prop_type)}
+                  className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
+                >
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -65,10 +74,16 @@ export default function MiniParlayBar() {
         <div className="hidden sm:flex items-center gap-1.5 flex-1 overflow-hidden">
           {legs.slice(0, 3).map((leg, i) => (
             <div key={i} className="bg-secondary rounded-md px-2 py-1 text-[10px] text-muted-foreground whitespace-nowrap">
-              <span className={cn("font-bold", leg.pick === 'over' ? 'text-primary' : 'text-foreground')}>
-                {leg.pick === 'over' ? 'O' : 'U'}
-              </span>
-              {' '}{leg.player_name.split(' ').pop()} {leg.line}
+              {leg.is_game_bet ? (
+                <span className="font-bold text-primary">{leg.player_name}</span>
+              ) : (
+                <>
+                  <span className={cn("font-bold", leg.pick === 'over' ? 'text-primary' : 'text-foreground')}>
+                    {leg.pick === 'over' ? 'O' : 'U'}
+                  </span>
+                  {' '}{leg.player_name.split(' ').pop()} {leg.line}
+                </>
+              )}
             </div>
           ))}
           {legs.length > 3 && <span className="text-[10px] text-muted-foreground">+{legs.length - 3} more</span>}

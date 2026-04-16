@@ -1,41 +1,86 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TeamLogo from '@/components/common/TeamLogo';
 import { fmtOdds } from '@/lib/oddsData';
+import { useParlay } from '@/lib/ParlayContext';
 
-function OddsCell({ label, value, sub, highlight }) {
+function OddsButton({ label, value, sub, legId, leg, disabled }) {
+  const { addGameLeg, isGameLegSelected } = useParlay();
+  const selected = isGameLegSelected(legId);
+
+  if (!value || value === '—') {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-lg px-2 py-2 min-w-[60px] bg-secondary/30">
+        <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">{label}</p>
+        <p className="text-sm font-bold text-muted-foreground">—</p>
+      </div>
+    );
+  }
+
   return (
-    <div className={cn(
-      "flex flex-col items-center justify-center rounded-lg px-2 py-2 min-w-[60px]",
-      highlight ? "bg-primary/10 border border-primary/20" : "bg-secondary/50"
-    )}>
+    <button
+      onClick={() => addGameLeg({ ...leg, leg_id: legId })}
+      className={cn(
+        "flex flex-col items-center justify-center rounded-lg px-2 py-2 min-w-[60px] transition-all border",
+        selected
+          ? "bg-primary/20 border-primary/50 text-primary"
+          : "bg-secondary/50 border-transparent hover:border-primary/30 hover:bg-primary/5"
+      )}
+    >
       <p className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">{label}</p>
-      <p className={cn("text-sm font-bold", highlight ? "text-primary" : "text-foreground")}>{value}</p>
+      <p className={cn("text-sm font-bold", selected ? "text-primary" : "text-foreground")}>{value}</p>
       {sub && <p className="text-[9px] text-muted-foreground">{sub}</p>}
-    </div>
+      {selected && <Check className="w-2.5 h-2.5 text-primary mt-0.5" />}
+    </button>
   );
 }
 
-function TeamRow({ teamAbv, teamName, ml, spread, spreadOdds, isHome }) {
-  const fav = ml != null && ml < 0;
+function TeamRow({ game, teamAbv, teamName, ml, spread, spreadOdds, isHome }) {
+  const side = isHome ? 'home' : 'away';
+  const opponent = isHome ? game.awayAbv : game.homeAbv;
+
   return (
     <div className="flex items-center gap-3">
       <TeamLogo team={teamAbv} className="w-9 h-9 flex-shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-foreground">{teamAbv}</p>
-        <p className="text-[10px] text-muted-foreground truncate">{isHome ? 'Home' : 'Away'}</p>
+        <p className="text-[10px] text-muted-foreground">{isHome ? 'Home' : 'Away'}</p>
       </div>
       <div className="flex items-center gap-1.5">
-        {/* Moneyline */}
-        <OddsCell label="ML" value={fmtOdds(ml)} highlight={fav} />
-        {/* Spread */}
+        <OddsButton
+          label="ML"
+          value={fmtOdds(ml)}
+          legId={`${game.id}_${side}_ml`}
+          leg={{
+            is_game_bet: true,
+            bet_type: 'moneyline',
+            player_name: `${teamAbv} ML`,
+            team: teamAbv,
+            opponent,
+            prop_type: 'moneyline',
+            line: null,
+            pick: side,
+            odds: ml,
+          }}
+        />
         {spread != null && (
-          <OddsCell
+          <OddsButton
             label="Spread"
             value={spread > 0 ? `+${spread}` : `${spread}`}
             sub={fmtOdds(spreadOdds)}
-            highlight={spread < 0}
+            legId={`${game.id}_${side}_spread`}
+            leg={{
+              is_game_bet: true,
+              bet_type: 'spread',
+              player_name: `${teamAbv} ${spread > 0 ? '+' : ''}${spread}`,
+              team: teamAbv,
+              opponent,
+              prop_type: 'spread',
+              line: spread,
+              pick: side,
+              odds: spreadOdds,
+            }}
           />
         )}
       </div>
@@ -65,14 +110,18 @@ export default function GameOddsCard({ game }) {
           </span>
           <span className="text-xs text-muted-foreground">{tipoff}</span>
         </div>
-        {game.moneyline?.bookmaker && (
-          <span className="text-[10px] text-muted-foreground">{game.moneyline.bookmaker}</span>
-        )}
+        <div className="flex items-center gap-2">
+          {game.moneyline?.bookmaker && (
+            <span className="text-[10px] text-muted-foreground">{game.moneyline.bookmaker}</span>
+          )}
+          <span className="text-[9px] text-muted-foreground bg-primary/10 text-primary px-1.5 py-0.5 rounded">Tap to add parlay</span>
+        </div>
       </div>
 
       {/* Teams + Odds */}
       <div className="p-4 space-y-3">
         <TeamRow
+          game={game}
           teamAbv={game.awayAbv}
           teamName={game.away}
           ml={game.moneyline?.away}
@@ -82,6 +131,7 @@ export default function GameOddsCard({ game }) {
         />
         <div className="border-t border-border/50" />
         <TeamRow
+          game={game}
           teamAbv={game.homeAbv}
           teamName={game.home}
           ml={game.moneyline?.home}
