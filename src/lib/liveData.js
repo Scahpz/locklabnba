@@ -55,12 +55,14 @@ export function clearLiveCache() {
   localStorage.removeItem(CACHE_DATE_KEY);
 }
 
+const HARDCODED_API_KEY = '5508f7fa9c244f635fdf5188a9fea52e';
+
 export function getStoredApiKey() {
-  return localStorage.getItem(API_KEY_STORAGE) || '';
+  return HARDCODED_API_KEY;
 }
 
 export function setStoredApiKey(key) {
-  localStorage.setItem(API_KEY_STORAGE, key);
+  // no-op: key is hardcoded
 }
 
 /** Parse all bookmakers for a single player+prop from an event odds response */

@@ -31,7 +31,6 @@ export function fmtOdds(n) {
  */
 export async function fetchGameOdds() {
   const apiKey = getStoredApiKey();
-  if (!apiKey) return { needsApiKey: true, games: [] };
 
   const res = await fetch(
     `${ODDS_API_BASE}/sports/${SPORT}/odds?apiKey=${apiKey}&regions=us&markets=h2h,spreads,totals&oddsFormat=american&dateFormat=iso`

@@ -17,7 +17,7 @@ export default function Dashboard() {
   const [liveError, setLiveError] = useState(false);
   const [gameDate, setGameDate] = useState(null);
   const [gamesSummary, setGamesSummary] = useState([]);
-  const [needsApiKey, setNeedsApiKey] = useState(!getStoredApiKey());
+  const [needsApiKey, setNeedsApiKey] = useState(false);
 
   const loadLive = async (forceRefresh = false) => {
     setLoadingLive(true);
