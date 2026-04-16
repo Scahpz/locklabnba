@@ -17,9 +17,9 @@ export default function MobileNav() {
   const location = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-xl border-t border-border md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-xl border-t border-border md:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div
-        className="flex items-center gap-1 px-3 py-2 overflow-x-auto"
+        className="flex items-center gap-1 px-3 py-3 overflow-x-auto"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {navItems.map((item) => {
@@ -29,15 +29,15 @@ export default function MobileNav() {
               key={item.path}
               to={item.path}
               className={cn(
-                "flex items-center gap-2 flex-shrink-0 px-3 py-2 rounded-full transition-all duration-200",
+                "flex items-center gap-2 flex-shrink-0 px-4 py-3 rounded-full transition-all duration-200",
                 isActive
                   ? "bg-primary/15 text-primary border border-primary/25"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <item.icon className={cn("w-4 h-4 flex-shrink-0", isActive && "drop-shadow-[0_0_6px_hsl(142,71%,45%)]")} />
+              <item.icon className={cn("w-5 h-5 flex-shrink-0", isActive && "drop-shadow-[0_0_6px_hsl(142,71%,45%)]")} />
               {isActive && (
-                <span className="text-xs font-semibold whitespace-nowrap">{item.label}</span>
+                <span className="text-sm font-semibold whitespace-nowrap">{item.label}</span>
               )}
             </Link>
           );
