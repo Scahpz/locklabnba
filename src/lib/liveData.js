@@ -1,5 +1,5 @@
-const CACHE_KEY = 'locklab_live_props_v14';
-const CACHE_DATE_KEY = 'locklab_live_props_date_v14';
+const CACHE_KEY = 'locklab_live_props_v15';
+const CACHE_DATE_KEY = 'locklab_live_props_date_v15';
 const API_KEY_STORAGE = 'locklab_odds_api_key';
 
 const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
@@ -194,6 +194,7 @@ export async function fetchLiveProps() {
   // Step 3: Enrich with REAL stats from balldontlie.io
   // Rate-limit: process in batches to avoid hammering the free API
   const { getRealPlayerAnalytics, getCachedPlayerTeam } = await import('@/lib/statsData');
+  const { getPlayerTeam } = await import('@/lib/nbaRosters');
 
   // Deduplicate players so we don't fetch same player multiple times
   const playerPropPairs = allRawProps.map(p => ({ player_name: p.player_name, prop_type: p.prop_type, line: p.line }));
@@ -244,7 +245,7 @@ export async function fetchLiveProps() {
       ...analyticsRest,
       confidence_score,
       data_source,
-      team: getCachedPlayerTeam(prop.player_name) || prop.home,
+      team: getPlayerTeam(prop.player_name) || getCachedPlayerTeam(prop.player_name) || prop.home,
       opponent: prop.away,
       player_id: `live_${i}`,
       photo_url: null,
