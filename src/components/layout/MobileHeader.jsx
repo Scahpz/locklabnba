@@ -81,7 +81,7 @@ export default function MobileHeader() {
                   : "bg-secondary text-muted-foreground hover:text-foreground hover:shadow-[0_0_15px_hsl(142,71%,45%,0.2)]"
               )}
             >
-              <Icon className="w-6 h-6" />
+              <Icon className="w-5 h-5" />
             </Link>
           );
         })}
