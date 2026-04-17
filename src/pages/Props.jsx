@@ -39,9 +39,7 @@ export default function Props() {
 
   const loadData = async (forceRefresh = false) => {
     setLoading(true);
-    if (forceRefresh) {
-      clearLiveCache();
-    }
+    // Don't clear cache on refresh — keep rankings consistent throughout the day
     try {
       const data = await fetchLiveProps();
       if (data?.props?.length > 0) {
@@ -59,12 +57,9 @@ export default function Props() {
         }).catch(() => setAiLoading(false));
       } else {
         setRawProps([]);
-        setIsLive(false);
       }
-    } catch (err) {
-      console.error('Error loading props:', err);
+    } catch {
       setRawProps([]);
-      setIsLive(false);
     }
     setLoading(false);
   };
