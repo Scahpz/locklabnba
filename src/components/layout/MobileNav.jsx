@@ -56,7 +56,16 @@ export default function MobileNav() {
         </button>
         
         <div className="flex-1 text-center">
-          <p className="text-sm font-semibold text-foreground">{currentLabel}</p>
+          {(() => {
+            const current = navItems.find(item => item.path === location.pathname);
+            const Icon = current?.icon;
+            return (
+              <div className="flex items-center justify-center gap-2">
+                {Icon && <Icon className="w-4 h-4 text-primary" />}
+                <p className="text-sm font-bold text-foreground bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">{currentLabel}</p>
+              </div>
+            );
+          })()}
         </div>
         
         <div className="w-6" />
