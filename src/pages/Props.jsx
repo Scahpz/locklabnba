@@ -71,12 +71,12 @@ export default function Props() {
     setSelectedGames(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
   };
 
-  // Locks of the day: top 1-2 props with AI confidence >= 90% and real stats
+  // Locks of the day: top 1-2 props with AI confidence >= 80% and real stats
   const locks = useMemo(() => {
     return rawProps
       .filter(p => {
         const aiConfidence = verdicts[`${p.player_name}__${p.prop_type}__${p.line}`]?.ai_confidence || 0;
-        return aiConfidence >= 90;
+        return aiConfidence >= 80;
       })
       .sort((a, b) => {
         const aAI = verdicts[`${a.player_name}__${a.prop_type}__${a.line}`]?.ai_confidence || 0;
