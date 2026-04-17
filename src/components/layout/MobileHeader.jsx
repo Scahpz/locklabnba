@@ -28,7 +28,7 @@ export default function MobileHeader() {
           </button>
 
           {/* Logo */}
-          <span className="text-sm font-bold text-foreground tracking-tight">LockLabNBA</span>
+          <span className="text-lg font-bold text-foreground tracking-tight">LockLabNBA</span>
 
           {/* Right icons */}
           <div className="flex items-center gap-1">
