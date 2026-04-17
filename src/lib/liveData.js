@@ -1,9 +1,9 @@
-const CACHE_KEY = 'locklab_live_props_v24';
-const CACHE_DATE_KEY = 'locklab_live_props_date_v24';
+const CACHE_KEY = 'locklab_live_props_v25';
+const CACHE_DATE_KEY = 'locklab_live_props_date_v25';
 
 // Clear any old versioned cache keys on load
 (function purgeOldCaches() {
-  for (let i = 1; i <= 23; i++) {
+  for (let i = 1; i <= 24; i++) {
     localStorage.removeItem(`locklab_live_props_v${i}`);
     localStorage.removeItem(`locklab_live_props_date_v${i}`);
   }
@@ -230,15 +230,15 @@ export async function fetchLiveProps() {
       const base = prop.line || 20;
       const variance = base * 0.22;
       const games10 = Array.from({ length: 10 }, () =>
-        Math.round((base + (Math.random() * variance * 2 - variance)) * 10) / 10
+        Math.round(base + (Math.random() * variance * 2 - variance))
       );
       const g5 = games10.slice(-5);
       const avg10 = parseFloat((games10.reduce((a, b) => a + b, 0) / 10).toFixed(1));
       const avg5 = parseFloat((g5.reduce((a, b) => a + b, 0) / 5).toFixed(1));
       const hits = games10.filter(v => v > prop.line).length;
       analytics = {
-        avg_last_5: avg5,
-        avg_last_10: avg10,
+        avg_last_5: Math.round(avg5),
+        avg_last_10: Math.round(avg10),
         hit_rate_last_10: Math.round((hits / 10) * 100),
         last_5_games: g5,
         last_10_games: games10,

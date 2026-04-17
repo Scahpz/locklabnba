@@ -126,9 +126,9 @@ export async function getRealPlayerAnalytics(playerName, propType, line) {
     const vals10 = last10.map(g => g.value);
     const vals5 = last5.map(g => g.value);
 
-    // Stats are whole integers from NBA API — round to be safe
-    const avg10 = parseFloat((vals10.reduce((a, b) => a + b, 0) / vals10.length).toFixed(1));
-    const avg5 = parseFloat((vals5.reduce((a, b) => a + b, 0) / vals5.length).toFixed(1));
+    // Stats are whole integers from NBA API — always round to whole numbers
+    const avg10 = Math.round(vals10.reduce((a, b) => a + b, 0) / vals10.length);
+    const avg5 = Math.round(vals5.reduce((a, b) => a + b, 0) / vals5.length);
 
     const hits = vals10.filter(v => v > line).length;
     const hit_rate = Math.round((hits / vals10.length) * 100);
