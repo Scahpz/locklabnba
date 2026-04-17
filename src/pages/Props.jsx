@@ -31,7 +31,7 @@ export default function Props() {
   const [gamesSummary, setGamesSummary] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
-  const [selectedGames, setSelectedGames] = useState([]);
+  const [selectedGames, setSelectedGames] = useState(null);
   const [selectedType, setSelectedType] = useState('all');
   const [sortBy, setSortBy] = useState('ai_rank');
   const [verdicts, setVerdicts] = useState({});
@@ -96,8 +96,8 @@ export default function Props() {
   const filteredAndRanked = useMemo(() => {
     let result = rawProps;
 
-    // Game filter
-    if (selectedGames.length > 0) {
+    // Game filter — show all props if no games selected
+    if (selectedGames && selectedGames.length > 0) {
       result = result.filter(p => {
         const pTeam = (p.team || '').toUpperCase();
         const pOpp = (p.opponent || '').toUpperCase();
@@ -185,8 +185,8 @@ export default function Props() {
               </button>
             );
           })}
-          {selectedGames.length > 0 && (
-            <button onClick={() => setSelectedGames([])} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 transition-colors">
+          {selectedGames && selectedGames.length > 0 && (
+            <button onClick={() => setSelectedGames(null)} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 transition-colors">
               Clear
             </button>
           )}
