@@ -29,6 +29,18 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
   const [showBooks, setShowBooks] = useState(false);
   const [selectedBook, setSelectedBook] = useState(null);
 
+  // Calculate AI confidence from grade criteria
+  function calculateGradeConfidence(p) {
+    const dvpPass = p.matchup_rating != null && ['elite', 'favorable', 'neutral'].includes(p.matchup_rating);
+    const usagePass = p.usage_rate != null && p.usage_rate >= 20;
+    const l10Pass = p.avg_last_10 != null && p.avg_last_10 > p.line;
+    const seasonPass = p.avg_last_10 != null && p.avg_last_10 > p.line;
+    const lineActualPass = p.projection != null && p.projection > p.line;
+    const passCount = [dvpPass, usagePass, l10Pass, seasonPass, lineActualPass].filter(Boolean).length;
+    return passCount * 20; // 0-5 passes = 0-100%
+  }
+
+  const gradeConfidence = calculateGradeConfidence(prop);
   const tier = tierConfig[prop.confidence_tier] || tierConfig.C;
   const isPositiveEdge = prop.edge > 0;
   const hasBooks = prop.all_books?.length > 1;
@@ -155,7 +167,7 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
         </div>
         <div>
           <p className="text-[10px] text-muted-foreground uppercase">AI Grade</p>
-          <p className="text-sm font-semibold text-foreground">{aiVerdict?.ai_confidence ?? '—'}%</p>
+          <p className="text-sm font-semibold text-foreground">{gradeConfidence}%</p>
         </div>
       </div>
 
