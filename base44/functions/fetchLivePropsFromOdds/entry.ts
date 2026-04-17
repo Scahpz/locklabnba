@@ -44,6 +44,14 @@ function todayStr() {
   return new Date().toISOString().split('T')[0];
 }
 
+function getDateRange() {
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  const yesterday = new Date(now.getTime() - 86400000).toISOString().split('T')[0];
+  const tomorrow = new Date(now.getTime() + 86400000).toISOString().split('T')[0];
+  return [yesterday, today, tomorrow];
+}
+
 function parseBookOdds(eventOddsData, playerName, marketKey) {
   const books = [];
   (eventOddsData?.bookmakers || []).forEach(bm => {
@@ -82,9 +90,10 @@ Deno.serve(async (req) => {
     }
     const events = await eventsRes.json();
 
-    // Filter to today's games
+    // Filter to today's games (check 3-day window for timezone differences)
     const today = todayStr();
-    const todayEvents = events.filter(e => e.commence_time?.startsWith(today));
+    const dateRange = getDateRange();
+    const todayEvents = events.filter(e => e.commence_time && dateRange.some(d => e.commence_time.startsWith(d)));
 
     if (todayEvents.length === 0) {
       return Response.json({ game_date: today, games_summary: [], props: [] });
