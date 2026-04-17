@@ -5,7 +5,7 @@
  */
 import { base44 } from '@/api/base44Client';
 
-const SESSION_KEY = 'locklab_ai_verdicts_v2';
+const SESSION_KEY = 'locklab_ai_verdicts_v3'; // Bumped version to clear old cache
 
 function getCachedVerdicts() {
   try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || '{}'); } catch { return {}; }
@@ -86,12 +86,15 @@ ${JSON.stringify(propSummaries, null, 2)}`,
     });
 
     const updated = { ...cache };
-    (result?.verdicts || []).forEach(v => {
-      updated[v.id] = {
-        verdict: v.verdict,
-        ai_confidence: v.ai_confidence,
-        reason: v.reason,
-      };
+    const verdicts = result?.verdicts || result || [];
+    (Array.isArray(verdicts) ? verdicts : []).forEach(v => {
+      if (v?.id) {
+        updated[v.id] = {
+          verdict: v.verdict || 'UNSAFE',
+          ai_confidence: v.ai_confidence || 50,
+          reason: v.reason || 'Inconclusive data',
+        };
+      }
     });
     setCachedVerdicts(updated);
     return updated;
