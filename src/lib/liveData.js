@@ -1,9 +1,9 @@
-const CACHE_KEY = 'locklab_live_props_v26';
-const CACHE_DATE_KEY = 'locklab_live_props_date_v26';
+const CACHE_KEY = 'locklab_live_props_v27';
+const CACHE_DATE_KEY = 'locklab_live_props_date_v27';
 
 // Clear any old versioned cache keys on load
 (function purgeOldCaches() {
-  for (let i = 1; i <= 25; i++) {
+  for (let i = 1; i <= 26; i++) {
     localStorage.removeItem(`locklab_live_props_v${i}`);
     localStorage.removeItem(`locklab_live_props_date_v${i}`);
   }
@@ -243,9 +243,9 @@ export async function fetchLiveProps() {
         last_5_games: g5,
         last_10_games: games10,
         game_logs_last_10: games10.map((value, idx) => ({
-          value,
-          opp: prop.away,
-          isHome: idx % 2 === 0,
+          value: Number(value),
+          opp: String(prop.away || 'OPP'),
+          isHome: Boolean(idx % 2 === 0),
         })),
         projection: Math.round(avg5 * 1.02),
         edge: parseFloat((((avg5 * 1.02 - prop.line) / prop.line) * 100).toFixed(1)),
@@ -257,9 +257,9 @@ export async function fetchLiveProps() {
 
     const { confidence_score, data_source, game_logs_last_10, ...analyticsRest } = analytics;
 
-    // Ensure game_logs_last_10 is a plain serializable array
-    const plainGameLogs = game_logs_last_10
-      ? game_logs_last_10.map(g => ({ value: Number(g.value), opp: String(g.opp), isHome: Boolean(g.isHome) }))
+    // Ensure game_logs_last_10 is a strictly plain serializable array (no class instances)
+    const plainGameLogs = Array.isArray(game_logs_last_10)
+      ? game_logs_last_10.map(g => ({ value: Number(g.value), opp: String(g.opp || 'OPP'), isHome: Boolean(g.isHome) }))
       : null;
 
     return {
