@@ -86,8 +86,10 @@ ${JSON.stringify(propSummaries, null, 2)}`,
     });
 
     const updated = { ...cache };
-    const verdicts = result?.verdicts || result || [];
-    (Array.isArray(verdicts) ? verdicts : []).forEach(v => {
+    const verdicts = (result?.verdicts || []);
+    console.log('AI verdicts response:', result, 'parsed verdicts:', verdicts);
+    
+    verdicts.forEach(v => {
       if (v?.id) {
         updated[v.id] = {
           verdict: v.verdict || 'UNSAFE',
