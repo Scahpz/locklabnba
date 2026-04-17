@@ -22,12 +22,13 @@ const NBA_PLAYER_TEAM = {
 
   // Charlotte Hornets
   'LaMelo Ball': 'CHA', 'Miles Bridges': 'CHA', 'Brandon Miller': 'CHA', 'Mark Williams': 'CHA',
+  'Coby White': 'CHA', 'Desmond Bane': 'CHA',
   'Terry Rozier': 'CHA', 'Davis Bertans': 'CHA', 'Grant Williams': 'CHA', 'Nick Richards': 'CHA',
   'Cody Martin': 'CHA', 'JT Thor': 'CHA', 'Moussa Diabate': 'CHA', 'Tre Mann': 'CHA',
 
   // Chicago Bulls
   'DeMar DeRozan': 'CHI', 'Zach LaVine': 'CHI', 'Nikola Vucevic': 'CHI', 'Patrick Williams': 'CHI',
-  'Coby White': 'CHI', 'Alex Caruso': 'CHI', 'Ayo Dosunmu': 'CHI', 'Andre Drummond': 'CHI',
+  'Alex Caruso': 'CHI', 'Ayo Dosunmu': 'CHI', 'Andre Drummond': 'CHI',
   'Torrey Craig': 'CHI', 'Onuralp Bitim': 'CHI', 'Dalen Terry': 'CHI', 'Julian Phillips': 'CHI',
 
   // Cleveland Cavaliers
@@ -83,7 +84,7 @@ const NBA_PLAYER_TEAM = {
   'Jarred Vanderbilt': 'LAL', 'Gabe Vincent': 'LAL',
 
   // Memphis Grizzlies
-  'Ja Morant': 'MEM', 'Jaren Jackson Jr.': 'MEM', 'Desmond Bane': 'MEM', 'Marcus Smart': 'MEM',
+  'Ja Morant': 'MEM', 'Jaren Jackson Jr.': 'MEM', 'Marcus Smart': 'MEM',
   'Santi Aldama': 'MEM', 'GG Jackson II': 'MEM', 'Luke Kennard': 'MEM', 'Vince Williams Jr.': 'MEM',
   'Brandon Clarke': 'MEM', 'John Konchar': 'MEM', 'Bismack Biyombo': 'MEM', 'David Roddy': 'MEM',
   'Ziaire Williams': 'MEM',
@@ -124,6 +125,7 @@ const NBA_PLAYER_TEAM = {
 
   // Orlando Magic
   'Paolo Banchero': 'ORL', 'Franz Wagner': 'ORL', 'Wendell Carter Jr.': 'ORL', 'Cole Anthony': 'ORL',
+  'Desmond Bane': 'ORL',
   'Markelle Fultz': 'ORL', 'Jalen Suggs': 'ORL', 'Jonathan Isaac': 'ORL', 'Gary Harris': 'ORL',
   'Joe Ingles': 'ORL', 'Goga Bitadze': 'ORL', 'Moritz Wagner': 'ORL', 'Caleb Houstan': 'ORL',
   'Anthony Black': 'ORL', 'Kentavious Caldwell-Pope': 'ORL',
