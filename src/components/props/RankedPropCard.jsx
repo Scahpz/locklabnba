@@ -117,16 +117,16 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
         </div>
 
         {/* Prop Line + Bet Buttons */}
-        <div className="flex items-center justify-between bg-secondary/50 rounded-lg p-3">
-          <div>
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{propTypeLabels[prop.prop_type] || prop.prop_type}</p>
-            <p className="text-2xl font-bold text-foreground mt-0.5">{displayLine}</p>
+        <div className="flex items-center justify-between bg-secondary/50 rounded-lg p-2.5 gap-2">
+          <div className="min-w-0">
+            <p className="text-[9px] text-muted-foreground font-medium uppercase tracking-wider">{propTypeLabels[prop.prop_type] || prop.prop_type}</p>
+            <p className="text-xl font-bold text-foreground mt-0.5">{displayLine}</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             <button
               onClick={() => handlePick('over')}
               className={cn(
-                "flex flex-col items-center border rounded-lg px-3 py-1.5 transition-all",
+                "flex flex-col items-center border rounded-lg px-2 py-1 transition-all flex-shrink-0",
                 isSelected(prop.player_name, prop.prop_type, 'over')
                   ? "bg-primary border-primary text-primary-foreground"
                   : isPositiveEdge
@@ -134,13 +134,13 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
                   : "bg-secondary hover:bg-secondary/80 border-border"
               )}
             >
-              <span className={cn("text-[10px] font-medium", isSelected(prop.player_name, prop.prop_type, 'over') ? 'text-primary-foreground' : isPositiveEdge ? 'text-primary' : 'text-muted-foreground')}>OVER</span>
-              <span className={cn("text-sm font-bold", isSelected(prop.player_name, prop.prop_type, 'over') ? 'text-primary-foreground' : isPositiveEdge ? 'text-primary' : 'text-muted-foreground')}>{fmtOdds(displayOverOdds)}</span>
+              <span className={cn("text-[9px] font-medium", isSelected(prop.player_name, prop.prop_type, 'over') ? 'text-primary-foreground' : isPositiveEdge ? 'text-primary' : 'text-muted-foreground')}>OVER</span>
+              <span className={cn("text-xs font-bold", isSelected(prop.player_name, prop.prop_type, 'over') ? 'text-primary-foreground' : isPositiveEdge ? 'text-primary' : 'text-muted-foreground')}>{fmtOdds(displayOverOdds)}</span>
             </button>
             <button
               onClick={() => handlePick('under')}
               className={cn(
-                "flex flex-col items-center border rounded-lg px-3 py-1.5 transition-all",
+                "flex flex-col items-center border rounded-lg px-2 py-1 transition-all flex-shrink-0",
                 isSelected(prop.player_name, prop.prop_type, 'under')
                   ? "bg-destructive border-destructive text-destructive-foreground"
                   : !isPositiveEdge
@@ -148,29 +148,29 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
                   : "bg-secondary hover:bg-secondary/80 border-border"
               )}
             >
-              <span className={cn("text-[10px] font-medium", isSelected(prop.player_name, prop.prop_type, 'under') ? 'text-destructive-foreground' : !isPositiveEdge ? 'text-destructive' : 'text-muted-foreground')}>UNDER</span>
-              <span className={cn("text-sm font-bold", isSelected(prop.player_name, prop.prop_type, 'under') ? 'text-destructive-foreground' : !isPositiveEdge ? 'text-destructive' : 'text-muted-foreground')}>{fmtOdds(displayUnderOdds)}</span>
+              <span className={cn("text-[9px] font-medium", isSelected(prop.player_name, prop.prop_type, 'under') ? 'text-destructive-foreground' : !isPositiveEdge ? 'text-destructive' : 'text-muted-foreground')}>UNDER</span>
+              <span className={cn("text-xs font-bold", isSelected(prop.player_name, prop.prop_type, 'under') ? 'text-destructive-foreground' : !isPositiveEdge ? 'text-destructive' : 'text-muted-foreground')}>{fmtOdds(displayUnderOdds)}</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="px-4 pb-3 grid grid-cols-4 gap-3">
+      <div className="px-4 pb-3 grid grid-cols-3 gap-2">
         <div>
-          <p className="text-[10px] text-muted-foreground uppercase">Projection</p>
-          <p className="text-sm font-semibold text-foreground">{prop.projection}</p>
+          <p className="text-[9px] text-muted-foreground uppercase">Projection</p>
+          <p className="text-xs font-semibold text-foreground">{prop.projection}</p>
         </div>
         <div>
-          <p className="text-[10px] text-muted-foreground uppercase">Edge</p>
-          <p className={cn("text-sm font-semibold flex items-center gap-0.5", isPositiveEdge ? 'text-primary' : 'text-destructive')}>
-            {isPositiveEdge ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+          <p className="text-[9px] text-muted-foreground uppercase">Edge</p>
+          <p className={cn("text-xs font-semibold flex items-center gap-0.5", isPositiveEdge ? 'text-primary' : 'text-destructive')}>
+            {isPositiveEdge ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
             {prop.edge > 0 ? '+' : ''}{prop.edge}%
           </p>
         </div>
         <div>
-          <p className="text-[10px] text-muted-foreground uppercase">Hit Rate</p>
-          <p className="text-sm font-semibold text-foreground">{prop.hit_rate_last_10}%</p>
+          <p className="text-[9px] text-muted-foreground uppercase">Hit Rate</p>
+          <p className="text-xs font-semibold text-foreground">{prop.hit_rate_last_10}%</p>
         </div>
       </div>
 
