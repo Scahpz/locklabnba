@@ -106,7 +106,7 @@ export default function LockCards({ locks, verdicts, aiLoading }) {
         <Lock className="w-4 h-4 text-chart-3" />
         <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Pick{locks.length > 1 ? 's' : ''} of the Day</h2>
       </div>
-      <div className={cn("grid gap-4", locks.length > 1 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3")}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {locks.map((prop, i) => {
           const key = `${prop.player_name}__${prop.prop_type}__${prop.line}`;
           return (
