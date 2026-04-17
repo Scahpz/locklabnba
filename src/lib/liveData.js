@@ -1,5 +1,7 @@
 const CACHE_KEY = 'locklab_live_props_v28';
 const CACHE_DATE_KEY = 'locklab_live_props_date_v28';
+const CACHE_TIMESTAMP_KEY = 'locklab_live_props_timestamp_v28';
+const CACHE_TTL_MINUTES = 5; // Refresh every 5 minutes
 
 // Clear any old versioned cache keys on load
 (function purgeOldCaches() {
@@ -55,7 +57,21 @@ function todayStr() {
 }
 
 export function isCacheValid() {
-  return localStorage.getItem(CACHE_DATE_KEY) === todayStr() && !!localStorage.getItem(CACHE_KEY);
+  const cachedDate = localStorage.getItem(CACHE_DATE_KEY);
+  const cachedTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+  
+  // Cache is invalid if it's a different day
+  if (cachedDate !== todayStr()) {
+    return false;
+  }
+  
+  // Cache is invalid if it's older than TTL
+  if (!cachedTimestamp) {
+    return false;
+  }
+  
+  const age = Date.now() - parseInt(cachedTimestamp, 10);
+  return age < CACHE_TTL_MINUTES * 60 * 1000;
 }
 
 export function clearLiveCache() {
@@ -298,5 +314,6 @@ export async function fetchLiveProps() {
 
   localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
   localStorage.setItem(CACHE_DATE_KEY, today);
+  localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
   return payload;
 }
