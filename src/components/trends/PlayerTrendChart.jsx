@@ -4,9 +4,11 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 export default function PlayerTrendChart({ games, line, propType, gameLogs }) {
   const data = games.map((val, i) => {
     const log = gameLogs?.[i];
+    const prefix = log?.date || '';
+    const opp = log?.opp || `G${i + 1}`;
     return {
-      game: log ? `${log.date}\n${log.opp}` : `G${i + 1}`,
-      label: log ? `${log.date} vs ${log.opp}` : `Game ${i + 1}`,
+      game: log ? `${prefix}\n${opp}` : `G${i + 1}`,
+      label: log ? `${prefix} ${opp}` : `Game ${i + 1}`,
       value: val,
       hit: val > line,
     };
