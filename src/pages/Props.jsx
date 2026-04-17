@@ -39,7 +39,7 @@ export default function Props() {
 
   const loadData = async (forceRefresh = false) => {
     setLoading(true);
-    if (forceRefresh) clearLiveCache();
+    // Don't clear cache on refresh — keep rankings consistent throughout the day
     try {
       const data = await fetchLiveProps();
       if (data?.props?.length > 0) {
@@ -71,13 +71,20 @@ export default function Props() {
     setSelectedGames(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
   };
 
-  // Locks of the day: top 1-2 props with confidence >= 9 and real stats
+  // Locks of the day: top 1-2 props with AI confidence >= 90% and real stats
   const locks = useMemo(() => {
     return rawProps
-      .filter(p => p.confidence_score >= 9)
-      .sort((a, b) => b.confidence_score - a.confidence_score)
+      .filter(p => {
+        const aiConfidence = verdicts[`${p.player_name}__${p.prop_type}__${p.line}`]?.ai_confidence || 0;
+        return aiConfidence >= 90;
+      })
+      .sort((a, b) => {
+        const aAI = verdicts[`${a.player_name}__${a.prop_type}__${a.line}`]?.ai_confidence || 0;
+        const bAI = verdicts[`${b.player_name}__${b.prop_type}__${b.line}`]?.ai_confidence || 0;
+        return bAI - aAI;
+      })
       .slice(0, 2);
-  }, [rawProps]);
+  }, [rawProps, verdicts]);
 
   const filteredAndRanked = useMemo(() => {
     let result = rawProps;
