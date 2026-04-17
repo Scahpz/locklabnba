@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
+const BALLDONTLIE_BASE = 'https://api.balldontlie.io/v1';
 const SPORT = 'basketball_nba';
 
 const PROP_MARKETS = [
@@ -50,6 +51,19 @@ function getDateRange() {
   const yesterday = new Date(now.getTime() - 86400000).toISOString().split('T')[0];
   const tomorrow = new Date(now.getTime() + 86400000).toISOString().split('T')[0];
   return [yesterday, today, tomorrow];
+}
+
+async function getPlayerTeam(playerName, apiKey) {
+  try {
+    const url = `${BALLDONTLIE_BASE}/players?search=${encodeURIComponent(playerName)}`;
+    const res = await fetch(url, { headers: { 'Authorization': apiKey } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const player = data.data?.[0];
+    return player?.team?.abbreviation || null;
+  } catch {
+    return null;
+  }
 }
 
 function parseBookOdds(eventOddsData, playerName, marketKey) {
@@ -172,6 +186,21 @@ Deno.serve(async (req) => {
     });
 
     const allRawProps = Object.values(propMap);
+    const bdlApiKey = Deno.env.get('BALLDONTLIE_API_KEY');
+    
+    // Fetch player teams in parallel
+    if (bdlApiKey) {
+      const teamResults = await Promise.all(
+        allRawProps.map(p => getPlayerTeam(p.player_name, bdlApiKey))
+      );
+      allRawProps.forEach((p, i) => {
+        const playerTeam = teamResults[i];
+        if (playerTeam) {
+          p.player_team = playerTeam;
+        }
+      });
+    }
+    
     return Response.json({ game_date: today, games_summary, rawProps: allRawProps });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
