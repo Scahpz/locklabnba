@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import TeamLogo from '@/components/common/TeamLogo';
 import { useParlay } from '@/lib/ParlayContext';
 import VerdictBadge from '@/components/props/VerdictBadge';
+import PropGradeChecklist from '@/components/props/PropGradeChecklist';
 
 function fmtOdds(n) {
   if (n == null) return '—';
@@ -167,6 +168,9 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
           </p>
         </div>
       )}
+
+      {/* Grade Checklist */}
+      <PropGradeChecklist prop={prop} />
 
       {/* Book comparison */}
       {hasBooks && (
