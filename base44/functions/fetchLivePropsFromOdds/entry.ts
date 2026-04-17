@@ -53,14 +53,42 @@ function getDateRange() {
   return [yesterday, today, tomorrow];
 }
 
+// Quick manual roster for common players (can expand as needed)
+const PLAYER_TEAM_CACHE = {
+  'LaMelo Ball': 'CHA',
+  'Jalen Suggs': 'ORL',
+  'Paolo Banchero': 'ORL',
+  'Cole Anthony': 'ORL',
+  'Franz Wagner': 'ORL',
+  'P.J. Washington': 'CHA',
+  'Gordon Hayward': 'CHA',
+  'LiAngelo Ball': 'CHA',
+  'Timothe Luwawu-Cabarrot': 'CHA',
+  'Tre Mann': 'ORL',
+  'Gary Harris': 'ORL',
+  'Caleb Martin': 'CHA',
+  'Mark Williams': 'CHA',
+  'Nick Richards': 'CHA',
+  'Ish Smith': 'CHA',
+};
+
 async function getPlayerTeam(playerName, apiKey) {
   try {
-    const url = `${BALLDONTLIE_BASE}/players?search=${encodeURIComponent(playerName)}`;
-    const res = await fetch(url, { headers: { 'Authorization': apiKey } });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const player = data.data?.[0];
-    return player?.team?.abbreviation || null;
+    // Check manual cache first (instant lookup)
+    if (PLAYER_TEAM_CACHE[playerName]) {
+      return PLAYER_TEAM_CACHE[playerName];
+    }
+    
+    // Try BallDontLie
+    const bdlRes = await fetch(`${BALLDONTLIE_BASE}/players?search=${encodeURIComponent(playerName)}`, 
+      { headers: { 'Authorization': apiKey } });
+    if (bdlRes.ok) {
+      const data = await bdlRes.json();
+      const team = data.data?.[0]?.team?.abbreviation;
+      if (team) return team;
+    }
+    
+    return null;
   } catch {
     return null;
   }
