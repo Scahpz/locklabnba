@@ -1,5 +1,5 @@
-const CACHE_KEY = 'locklab_live_props_v15';
-const CACHE_DATE_KEY = 'locklab_live_props_date_v15';
+const CACHE_KEY = 'locklab_live_props_v16';
+const CACHE_DATE_KEY = 'locklab_live_props_date_v16';
 const API_KEY_STORAGE = 'locklab_odds_api_key';
 
 const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
@@ -193,18 +193,22 @@ export async function fetchLiveProps() {
 
   // Step 3: Enrich with REAL stats from balldontlie.io
   // Rate-limit: process in batches to avoid hammering the free API
-  const { getRealPlayerAnalytics, getCachedPlayerTeam } = await import('@/lib/statsData');
+  const { getRealPlayerAnalytics, getCachedPlayerTeam, prefetchPlayerTeams } = await import('@/lib/statsData');
   const { getPlayerTeam } = await import('@/lib/nbaRosters');
 
   // Deduplicate players so we don't fetch same player multiple times
   const playerPropPairs = allRawProps.map(p => ({ player_name: p.player_name, prop_type: p.prop_type, line: p.line }));
 
-  // Fetch real analytics for all props in parallel (balldontlie allows ~60 req/min free)
-  const analyticsResults = await Promise.all(
-    playerPropPairs.map(({ player_name, prop_type, line }) =>
-      getRealPlayerAnalytics(player_name, prop_type, line).catch(() => null)
-    )
-  );
+  // Prefetch current team for all players from live API (runs in parallel with analytics)
+  const uniquePlayerNames = [...new Set(allRawProps.map(p => p.player_name))];
+  const [analyticsResults] = await Promise.all([
+    Promise.all(
+      playerPropPairs.map(({ player_name, prop_type, line }) =>
+        getRealPlayerAnalytics(player_name, prop_type, line).catch(() => null)
+      )
+    ),
+    prefetchPlayerTeams(uniquePlayerNames),
+  ]);
 
   const enriched = allRawProps.map((prop, i) => {
     const real = analyticsResults[i];
@@ -245,7 +249,7 @@ export async function fetchLiveProps() {
       ...analyticsRest,
       confidence_score,
       data_source,
-      team: getPlayerTeam(prop.player_name) || getCachedPlayerTeam(prop.player_name) || prop.home,
+      team: getCachedPlayerTeam(prop.player_name) || getPlayerTeam(prop.player_name) || prop.home,
       opponent: prop.away,
       player_id: `live_${i}`,
       photo_url: null,

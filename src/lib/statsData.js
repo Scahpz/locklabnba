@@ -38,8 +38,50 @@ export async function getBallDontLiePlayerId(playerName) {
   return null;
 }
 
+// balldontlie → standard abbreviation overrides where they differ
+const BDL_ABV_MAP = {
+  'GS': 'GSW', 'NY': 'NYK', 'SA': 'SAS', 'NO': 'NOP',
+  'OKC': 'OKC', 'UTA': 'UTA',
+};
+
+function normAbv(abv) {
+  return BDL_ABV_MAP[abv] || abv;
+}
+
 export function getCachedPlayerTeam(playerName) {
   return playerTeamCache[playerName] || null;
+}
+
+/**
+ * Fetch and cache the current team for a list of player names.
+ * Deduplicates requests and runs them in parallel.
+ */
+export async function prefetchPlayerTeams(playerNames) {
+  const unique = [...new Set(playerNames)].filter(n => !playerTeamCache[n] && !playerIdCache[n]);
+  if (unique.length === 0) return;
+
+  await Promise.all(
+    unique.map(async (playerName) => {
+      try {
+        const parts = playerName.trim().split(' ');
+        const res = await fetch(`${BASE}/players?search=${encodeURIComponent(parts[0])}&per_page=25`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const nameLower = playerName.toLowerCase();
+        const match = data.data?.find(p =>
+          `${p.first_name} ${p.last_name}`.toLowerCase() === nameLower
+        ) || data.data?.find(p =>
+          `${p.first_name} ${p.last_name}`.toLowerCase().includes(parts[parts.length - 1].toLowerCase())
+        );
+        if (match) {
+          playerIdCache[playerName] = match.id;
+          if (match.team?.abbreviation) {
+            playerTeamCache[playerName] = normAbv(match.team.abbreviation);
+          }
+        }
+      } catch {}
+    })
+  );
 }
 
 const PROP_TO_STAT = {
