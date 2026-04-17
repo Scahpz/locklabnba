@@ -43,8 +43,7 @@ export default function Props() {
     try {
       const data = await fetchLiveProps();
       if (data?.props?.length > 0) {
-        // Only real stats — no estimates
-        const realProps = data.props.filter(p => p.data_source === 'real' && p.injury_status !== 'out');
+        const realProps = data.props.filter(p => p.injury_status !== 'out');
         setRawProps(realProps);
         setGameDate(data.game_date);
         setGamesSummary(data.games_summary || []);
@@ -136,7 +135,7 @@ export default function Props() {
           </h1>
           <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
             {isLive ? (
-              <><Wifi className="w-3.5 h-3.5 text-primary" /><span className="text-primary font-medium">Live · real stats only</span>{gameDate && <span className="text-muted-foreground">· {gameDate}</span>}</>
+              <><Wifi className="w-3.5 h-3.5 text-primary" /><span className="text-primary font-medium">Live</span>{gameDate && <span className="text-muted-foreground">· {gameDate}</span>}</>
             ) : (
               <><WifiOff className="w-3.5 h-3.5" />No live data available</>
             )}
@@ -184,8 +183,8 @@ export default function Props() {
       {rawProps.length === 0 && (
         <div className="text-center py-20 text-muted-foreground">
           <Zap className="w-12 h-12 mx-auto mb-3 opacity-20" />
-          <p className="text-lg font-medium">No props with verified stats today</p>
-          <p className="text-sm mt-1">Check back closer to game time once the NBA Stats API has data.</p>
+          <p className="text-lg font-medium">No props available today</p>
+          <p className="text-sm mt-1">Check back closer to game time once props are posted.</p>
         </div>
       )}
 
