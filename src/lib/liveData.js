@@ -1,9 +1,9 @@
-const CACHE_KEY = 'locklab_live_props_v27';
-const CACHE_DATE_KEY = 'locklab_live_props_date_v27';
+const CACHE_KEY = 'locklab_live_props_v28';
+const CACHE_DATE_KEY = 'locklab_live_props_date_v28';
 
 // Clear any old versioned cache keys on load
 (function purgeOldCaches() {
-  for (let i = 1; i <= 26; i++) {
+  for (let i = 1; i <= 27; i++) {
     localStorage.removeItem(`locklab_live_props_v${i}`);
     localStorage.removeItem(`locklab_live_props_date_v${i}`);
   }
@@ -244,7 +244,7 @@ export async function fetchLiveProps() {
         last_10_games: games10,
         game_logs_last_10: games10.map((value, idx) => ({
           value: Number(value),
-          opp: String(prop.away || 'OPP'),
+          opp: `G${idx + 1}`,
           isHome: Boolean(idx % 2 === 0),
         })),
         projection: Math.round(avg5 * 1.02),
