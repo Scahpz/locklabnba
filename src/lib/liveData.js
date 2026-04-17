@@ -55,7 +55,7 @@ function todayStr() {
 }
 
 export function isCacheValid() {
-  return localStorage.getItem(CACHE_DATE_KEY) === todayStr() && !!localStorage.getItem(CACHE_KEY);
+  return false; // Temporarily disable cache to test live data
 }
 
 export function clearLiveCache() {
