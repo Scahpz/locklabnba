@@ -9,7 +9,7 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AppLayout from '@/components/layout/AppLayout';
 import Props from '@/pages/Props.jsx';
 import Trends from '@/pages/Trends.jsx';
-import Matchups from '@/pages/Matchups';
+
 import ParlayBuilder from '@/pages/ParlayBuilder.jsx';
 import Alerts from '@/pages/Alerts';
 import Profile from '@/pages/Profile.jsx';
@@ -45,7 +45,7 @@ const AuthenticatedApp = () => {
       <Route element={<AppLayout />}>
         <Route path="/" element={<Props />} />
         <Route path="/trends" element={<Trends />} />
-        <Route path="/matchups" element={<Matchups />} />
+
         <Route path="/parlay" element={<ParlayBuilder />} />
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/profile" element={<Profile />} />

@@ -9,7 +9,7 @@ import {
 const navItems = [
   { path: '/', label: 'Props', icon: Zap },
   { path: '/trends', label: 'Streaks & Trends', icon: TrendingUp },
-  { path: '/matchups', label: 'Matchups', icon: Shield },
+
   { path: '/compare', label: 'Compare', icon: GitCompare },
   { path: '/odds', label: 'Live Odds', icon: Activity },
   { path: '/parlay', label: 'Parlay Builder', icon: Layers },

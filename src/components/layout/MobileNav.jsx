@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 const navItems = [
   { path: '/', label: 'Props', icon: Zap },
   { path: '/trends', label: 'Trends', icon: TrendingUp },
-  { path: '/matchups', label: 'Matchups', icon: Shield },
+
   { path: '/compare', label: 'Compare', icon: GitCompare },
   { path: '/odds', label: 'Live Odds', icon: Activity },
   { path: '/parlay', label: 'Parlay', icon: Layers },
