@@ -13,6 +13,23 @@ function fmtOdds(n) {
 function LockCard({ prop, aiVerdict, aiLoading }) {
   const { addLeg } = useParlay();
 
+  // Calculate grade confidence (same as RankedPropCard)
+  function calculateGradeConfidence(p) {
+    const dvpPass = p.matchup_rating != null && ['elite', 'favorable', 'neutral'].includes(p.matchup_rating);
+    const usagePass = p.usage_rate != null && p.usage_rate >= 20;
+    const l10Pass = p.avg_last_10 != null && p.avg_last_10 > p.line;
+    const seasonPass = p.avg_last_10 != null && p.avg_last_10 > p.line;
+    const lineActualPass = p.projection != null && p.projection > p.line;
+    const passCount = [dvpPass, usagePass, l10Pass, seasonPass, lineActualPass].filter(Boolean).length;
+    return passCount * 20;
+  }
+
+  const gradeConfidence = calculateGradeConfidence(prop);
+  const isPositiveEdge = prop.edge > 0;
+  const localVerdict = gradeConfidence >= 60
+    ? (isPositiveEdge ? 'OVER' : 'UNDER')
+    : 'UNSAFE';
+
   return (
     <div className="rounded-xl border border-chart-3/40 bg-gradient-to-br from-chart-3/10 via-card to-card p-4 shadow-[0_0_30px_hsl(199,89%,48%,0.2)] flex flex-col gap-3">
       <div className="flex items-center justify-between">
@@ -31,7 +48,7 @@ function LockCard({ prop, aiVerdict, aiLoading }) {
         </div>
       </div>
 
-      <VerdictBadge verdict={aiVerdict?.verdict} ai_confidence={aiVerdict?.ai_confidence} loading={aiLoading && !aiVerdict} isPickOfDay={true} />
+      <VerdictBadge verdict={localVerdict} ai_confidence={gradeConfidence} loading={aiLoading && !aiVerdict} isPickOfDay={true} />
       {aiVerdict?.reason && (
         <p className="text-xs text-muted-foreground leading-snug">{aiVerdict.reason}</p>
       )}
