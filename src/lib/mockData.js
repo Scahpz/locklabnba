@@ -116,24 +116,24 @@ export const mockPlayers = [
   ]),
 
   // ══ CHARLOTTE HORNETS ══
-  mkPlayer('cha1','LaMelo Ball','CHA','MIA','PG',true,'healthy','',[
+  mkPlayer('cha1','LaMelo Ball','CHA','ORL','PG',true,'healthy','',[
     mkProp('points',23.5,{min:36,usage:30,pace:101,total:230}),
     mkProp('rebounds',5.5,{min:36,usage:30,pace:101,total:230}),
     mkProp('assists',8.5,{min:36,usage:30,pace:101,total:230}),
   ]),
-  mkPlayer('cha2','Brandon Miller','CHA','MIA','SF',true,'healthy','',[
+  mkPlayer('cha2','Brandon Miller','CHA','ORL','SF',true,'healthy','',[
     mkProp('points',19.5,{min:34,usage:23,pace:101,total:230}),
     mkProp('3PM',3.5,{min:34,usage:23,pace:101,total:230}),
   ]),
-  mkPlayer('cha3','Kon Knueppel','CHA','MIA','SG',true,'healthy','',[
+  mkPlayer('cha3','Kon Knueppel','CHA','ORL','SG',true,'healthy','',[
     mkProp('points',16.5,{min:30,usage:20,pace:101,total:230}),
     mkProp('3PM',3.5,{min:30,usage:20,pace:101,total:230}),
   ]),
-  mkPlayer('cha4','Mark Williams','CHA','MIA','C',true,'healthy','',[
+  mkPlayer('cha4','Mark Williams','CHA','ORL','C',true,'healthy','',[
     mkProp('points',14.5,{min:28,usage:16,pace:101,total:230}),
     mkProp('rebounds',9.5,{min:28,usage:16,pace:101,total:230}),
   ]),
-  mkPlayer('cha5','Collin Sexton','CHA','MIA','SG',false,'healthy','',[
+  mkPlayer('cha5','Collin Sexton','CHA','ORL','SG',false,'healthy','',[
     mkProp('points',15.5,{min:24,usage:20,pace:101,total:230}),
   ]),
 
@@ -254,24 +254,24 @@ export const mockPlayers = [
   ]),
 
   // ══ GOLDEN STATE WARRIORS ══
-  mkPlayer('gsw1','Stephen Curry','GSW','LAC','PG',true,'healthy','',[
+  mkPlayer('gsw1','Stephen Curry','GSW','PHX','PG',true,'healthy','',[
     mkProp('points',26.5,{min:34,usage:30,pace:101,total:225}),
     mkProp('3PM',4.5,{min:34,usage:30,pace:101,total:225}),
     mkProp('assists',6.5,{min:34,usage:30,pace:101,total:225}),
   ]),
-  mkPlayer('gsw2','Andrew Wiggins','GSW','LAC','SF',true,'healthy','',[
+  mkPlayer('gsw2','Andrew Wiggins','GSW','PHX','SF',true,'healthy','',[
     mkProp('points',17.5,{min:32,usage:19,pace:101,total:225}),
     mkProp('rebounds',5.5,{min:32,usage:19,pace:101,total:225}),
   ]),
-  mkPlayer('gsw3','Draymond Green','GSW','LAC','PF',true,'healthy','',[
+  mkPlayer('gsw3','Draymond Green','GSW','PHX','PF',true,'healthy','',[
     mkProp('assists',6.5,{min:30,usage:16,pace:101,total:225}),
     mkProp('rebounds',7.5,{min:30,usage:16,pace:101,total:225}),
   ]),
-  mkPlayer('gsw4','Buddy Hield','GSW','LAC','SG',false,'healthy','',[
+  mkPlayer('gsw4','Buddy Hield','GSW','PHX','SG',false,'healthy','',[
     mkProp('points',13.5,{min:24,usage:17,pace:101,total:225}),
     mkProp('3PM',3.5,{min:24,usage:17,pace:101,total:225}),
   ]),
-  mkPlayer('gsw5','Moses Moody','GSW','LAC','SG',true,'healthy','',[
+  mkPlayer('gsw5','Moses Moody','GSW','PHX','SG',true,'healthy','',[
     mkProp('points',13.5,{min:26,usage:15,pace:101,total:225}),
     mkProp('3PM',2.5,{min:26,usage:15,pace:101,total:225}),
   ]),
@@ -540,25 +540,25 @@ export const mockPlayers = [
   ]),
 
   // ══ ORLANDO MAGIC ══
-  mkPlayer('orl1','Paolo Banchero','ORL','ATL','PF',true,'healthy','',[
+  mkPlayer('orl1','Paolo Banchero','ORL','CHA','PF',true,'healthy','',[
     mkProp('points',22.5,{min:33,usage:26,pace:99,total:218}),
     mkProp('rebounds',6.5,{min:33,usage:26,pace:99,total:218}),
     mkProp('assists',5.5,{min:33,usage:26,pace:99,total:218}),
   ]),
-  mkPlayer('orl2','Franz Wagner','ORL','ATL','SF',true,'healthy','',[
+  mkPlayer('orl2','Franz Wagner','ORL','CHA','SF',true,'healthy','',[
     mkProp('points',19.5,{min:32,usage:22,pace:99,total:218}),
     mkProp('assists',4.5,{min:32,usage:22,pace:99,total:218}),
   ]),
-  mkPlayer('orl3','Wendell Carter Jr.','ORL','ATL','C',true,'healthy','',[
+  mkPlayer('orl3','Wendell Carter Jr.','ORL','CHA','C',true,'healthy','',[
     mkProp('rebounds',9.5,{min:26,usage:14,pace:99,total:218}),
     mkProp('points',11.5,{min:26,usage:14,pace:99,total:218}),
   ]),
-  mkPlayer('orl4','Jalen Suggs','ORL','ATL','PG',true,'healthy','',[
+  mkPlayer('orl4','Jalen Suggs','ORL','CHA','PG',true,'healthy','',[
     mkProp('points',13.5,{min:30,usage:16,pace:99,total:218}),
     mkProp('assists',5.5,{min:30,usage:16,pace:99,total:218}),
     mkProp('steals',1.5,{min:30,usage:16,pace:99,total:218}),
   ]),
-  mkPlayer('orl5','Moritz Wagner','ORL','ATL','PF',false,'healthy','',[
+  mkPlayer('orl5','Moritz Wagner','ORL','CHA','PF',false,'healthy','',[
     mkProp('points',11.5,{min:20,usage:14,pace:99,total:218}),
     mkProp('rebounds',5.5,{min:20,usage:14,pace:99,total:218}),
   ]),
@@ -586,23 +586,23 @@ export const mockPlayers = [
   ]),
 
   // ══ PHOENIX SUNS ══
-  mkPlayer('phx1','Devin Booker','PHX','POR','SG',true,'healthy','',[
+  mkPlayer('phx1','Devin Booker','PHX','GSW','SG',true,'healthy','',[
     mkProp('points',28.5,{min:36,usage:32,pace:100,total:222}),
     mkProp('3PM',3.5,{min:36,usage:32,pace:100,total:222}),
     mkProp('assists',5.5,{min:36,usage:32,pace:100,total:222}),
   ]),
-  mkPlayer('phx2','Bradley Beal','PHX','POR','SG',true,'healthy','',[
+  mkPlayer('phx2','Bradley Beal','PHX','GSW','SG',true,'healthy','',[
     mkProp('points',18.5,{min:30,usage:22,pace:100,total:222}),
     mkProp('assists',5.5,{min:30,usage:22,pace:100,total:222}),
   ]),
-  mkPlayer('phx3','Kevin Durant','PHX','POR','PF',true,'healthy','',[
+  mkPlayer('phx3','Kevin Durant','PHX','GSW','PF',true,'healthy','',[
     mkProp('points',26.5,{min:34,usage:29,pace:100,total:222}),
     mkProp('rebounds',6.5,{min:34,usage:29,pace:100,total:222}),
     mkProp('assists',4.5,{min:34,usage:29,pace:100,total:222}),
   ]),
-  mkPlayer('phx4','Grayson Allen','PHX','POR','SG',true,'questionable','Hamstring',[]
+  mkPlayer('phx4','Grayson Allen','PHX','GSW','SG',true,'questionable','Hamstring',[]
     .concat([mkProp('3PM',2.5,{min:28,usage:17,pace:100,total:222,trap:true})])),
-  mkPlayer('phx5','Royce O\'Neale','PHX','POR','SF',false,'healthy','',[
+  mkPlayer('phx5','Royce O\'Neale','PHX','GSW','SF',false,'healthy','',[
     mkProp('3PM',2.5,{min:24,usage:14,pace:100,total:222}),
     mkProp('points',9.5,{min:24,usage:14,pace:100,total:222}),
   ]),
