@@ -165,10 +165,6 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
           <p className="text-[10px] text-muted-foreground uppercase">Hit Rate</p>
           <p className="text-sm font-semibold text-foreground">{prop.hit_rate_last_10}%</p>
         </div>
-        <div>
-          <p className="text-[10px] text-muted-foreground uppercase">AI Grade</p>
-          <p className="text-sm font-semibold text-foreground">{gradeConfidence}%</p>
-        </div>
       </div>
 
       {/* Streak */}
