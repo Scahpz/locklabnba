@@ -154,8 +154,8 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
           <p className="text-sm font-semibold text-foreground">{prop.hit_rate_last_10}%</p>
         </div>
         <div>
-          <p className="text-[10px] text-muted-foreground uppercase">Conf</p>
-          <p className="text-sm font-semibold text-foreground">{prop.confidence_score}/10</p>
+          <p className="text-[10px] text-muted-foreground uppercase">AI Grade</p>
+          <p className="text-sm font-semibold text-foreground">{aiVerdict?.ai_confidence ?? '—'}%</p>
         </div>
       </div>
 
