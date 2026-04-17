@@ -149,7 +149,7 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
       </div>
 
       {/* Stats */}
-      <div className="px-4 pb-3 grid grid-cols-4 gap-2">
+      <div className="px-4 pb-3 grid grid-cols-4 gap-3">
         <div>
           <p className="text-[10px] text-muted-foreground uppercase">Projection</p>
           <p className="text-sm font-semibold text-foreground">{prop.projection}</p>
