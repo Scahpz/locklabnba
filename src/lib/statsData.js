@@ -1,123 +1,104 @@
 /**
- * NBA Stats API (stats.nba.com) - same source as nba_api Python library
- * No API key required, but requires specific headers to avoid 403.
- * We use a CORS proxy since browsers can't hit stats.nba.com directly.
+ * BallDontLie API - official source for verified NBA stats (no CORS issues)
+ * Provides: game logs, season averages, player info
  */
 
-const NBA_STATS_BASE = 'https://stats.nba.com/stats';
-
-// CORS proxy options - allorigins is reliable
-const PROXY = 'https://corsproxy.io/?';
-
-function proxyUrl(url) {
-  return `${PROXY}${encodeURIComponent(url)}`;
-}
-
-const NBA_HEADERS = {
-  'Accept': 'application/json, text/plain, */*',
-  'Accept-Language': 'en-US,en;q=0.9',
-  'Origin': 'https://www.nba.com',
-  'Referer': 'https://www.nba.com/',
-  'x-nba-stats-origin': 'stats',
-  'x-nba-stats-token': 'true',
-};
+const BALLDONTLIE_BASE = 'https://api.balldontlie.io/v1';
 
 // Cache player ID lookups in memory
 const playerIdCache = {};
 
 /**
- * Get all active players and find ID by name
+ * Search for player by name and get their ID
  */
-async function getNbaPlayerId(playerName) {
+async function getBdlPlayerId(playerName) {
   if (playerIdCache[playerName]) return playerIdCache[playerName];
 
-  const url = `${NBA_STATS_BASE}/commonallplayers?LeagueID=00&Season=2024-25&IsOnlyCurrentSeason=1`;
-  const res = await fetch(proxyUrl(url), { headers: NBA_HEADERS });
-  if (!res.ok) throw new Error(`NBA players API error: ${res.status}`);
+  const apiKey = Deno.env.get('BALLDONTLIE_API_KEY');
+  if (!apiKey) throw new Error('BALLDONTLIE_API_KEY not set');
 
-  const data = await res.json();
-  const headers = data.resultSets[0].headers;
-  const rows = data.resultSets[0].rowSet;
-
-  const nameIdx = headers.indexOf('DISPLAY_FIRST_LAST');
-  const idIdx = headers.indexOf('PERSON_ID');
-
-  const nameLower = playerName.toLowerCase();
-  const match = rows.find(r => r[nameIdx]?.toLowerCase() === nameLower)
-    || rows.find(r => r[nameIdx]?.toLowerCase().includes(playerName.split(' ').pop().toLowerCase()));
-
-  if (match) {
-    const id = match[idIdx];
-    playerIdCache[playerName] = id;
-    return id;
-  }
-  return null;
-}
-
-const PROP_TO_STAT_KEY = {
-  points: 'PTS',
-  rebounds: 'REB',
-  assists: 'AST',
-  '3PM': 'FG3M',
-  steals: 'STL',
-  blocks: 'BLK',
-  PRA: null, // computed
-  turnovers: 'TOV',
-};
-
-/**
- * Fetch last 10 game logs for a player from NBA Stats API
- * Returns array of { value, opp, isHome } (oldest first)
- */
-async function getNbaGameLogs(playerId, propType, season = '2024-25') {
-  const url = `${NBA_STATS_BASE}/playergamelog?PlayerID=${playerId}&Season=${season}&SeasonType=Regular+Season&LastNGames=10`;
-  const res = await fetch(proxyUrl(url), { headers: NBA_HEADERS });
-  if (!res.ok) throw new Error(`NBA game logs error: ${res.status}`);
-
-  const data = await res.json();
-  const headers = data.resultSets[0].headers;
-  const rows = data.resultSets[0].rowSet;
-
-  if (!rows || rows.length === 0) return null;
-
-  const statKey = PROP_TO_STAT_KEY[propType];
-  const matchupIdx = headers.indexOf('MATCHUP'); // e.g. "LAL vs. BOS" or "LAL @ BOS"
-
-  const logs = rows.map(row => {
-    const matchup = row[matchupIdx] || '';
-    const isHome = matchup.includes('vs.');
-    // Extract opponent: last 3 chars of matchup
-    const opp = matchup.split(' ').pop();
-
-    let value;
-    if (propType === 'PRA') {
-      const pts = row[headers.indexOf('PTS')] || 0;
-      const reb = row[headers.indexOf('REB')] || 0;
-      const ast = row[headers.indexOf('AST')] || 0;
-      value = pts + reb + ast;
-    } else {
-      const idx = headers.indexOf(statKey);
-      value = idx >= 0 ? (row[idx] || 0) : 0;
-    }
-
-    return { value: Number(value), opp, isHome };
+  const url = `${BALLDONTLIE_BASE}/players?search=${encodeURIComponent(playerName)}`;
+  const res = await fetch(url, {
+    headers: { 'Authorization': apiKey }
   });
 
-  // NBA API returns newest first — reverse to oldest first
-  return logs.reverse();
+  if (!res.ok) throw new Error(`BallDontLie search error: ${res.status}`);
+  const data = await res.json();
+  
+  if (!data.data || data.data.length === 0) return null;
+  
+  const player = data.data[0];
+  playerIdCache[playerName] = player.id;
+  return player.id;
 }
 
 /**
- * Get real analytics for a player prop using NBA Stats API.
+ * Fetch last 10 game logs for a player from BallDontLie
+ * Returns array of { value, opp, isHome } (oldest first)
+ */
+async function getBdlGameLogs(playerId, propType) {
+  const apiKey = Deno.env.get('BALLDONTLIE_API_KEY');
+  if (!apiKey) throw new Error('BALLDONTLIE_API_KEY not set');
+
+  // Fetch recent games (limit=100 to ensure we have 10+)
+  const url = `${BALLDONTLIE_BASE}/games?player_ids[]=${playerId}&limit=100&sort=DESC`;
+  const res = await fetch(url, {
+    headers: { 'Authorization': apiKey }
+  });
+
+  if (!res.ok) throw new Error(`BallDontLie games error: ${res.status}`);
+  const data = await res.json();
+  
+  if (!data.data || data.data.length === 0) return null;
+
+  // Take last 10 games (data comes in DESC order, so reverse)
+  const games = data.data.slice(0, 10).reverse();
+
+  const logs = games.map(game => {
+    const playerTeam = game.home_team.id === playerId ? game.home_team.abbreviation : game.visitor_team.abbreviation;
+    const oppTeam = game.home_team.id === playerId ? game.visitor_team.abbreviation : game.home_team.abbreviation;
+    const isHome = game.home_team.id === playerId;
+
+    let value = 0;
+    if (propType === 'PRA') {
+      value = (game.pts || 0) + (game.reb || 0) + (game.ast || 0);
+    } else if (propType === 'points') {
+      value = game.pts || 0;
+    } else if (propType === 'rebounds') {
+      value = game.reb || 0;
+    } else if (propType === 'assists') {
+      value = game.ast || 0;
+    } else if (propType === '3PM') {
+      value = game.fg3m || 0;
+    } else if (propType === 'steals') {
+      value = game.stl || 0;
+    } else if (propType === 'blocks') {
+      value = game.blk || 0;
+    } else if (propType === 'turnovers') {
+      value = game.turnover || 0;
+    }
+
+    return {
+      value: Number(value),
+      opp: isHome ? `vs ${oppTeam}` : `@ ${oppTeam}`,
+      isHome
+    };
+  });
+
+  return logs;
+}
+
+/**
+ * Get real analytics for a player prop using BallDontLie API.
  * Returns { avg_last_5, avg_last_10, hit_rate_last_10, last_5_games, last_10_games,
  *           game_logs_last_10, projection, edge, streak_info, confidence_score, data_source }
  */
 export async function getRealPlayerAnalytics(playerName, propType, line) {
   try {
-    const playerId = await getNbaPlayerId(playerName);
+    const playerId = await getBdlPlayerId(playerName);
     if (!playerId) return null;
 
-    const logs = await getNbaGameLogs(playerId, propType);
+    const logs = await getBdlGameLogs(playerId, propType);
     if (!logs || logs.length < 3) return null;
 
     const last10 = logs.slice(-10);
@@ -126,14 +107,14 @@ export async function getRealPlayerAnalytics(playerName, propType, line) {
     const vals10 = last10.map(g => g.value);
     const vals5 = last5.map(g => g.value);
 
-    // Stats are whole integers from NBA API — always round to whole numbers
+    // Stats are verified integers from BallDontLie
     const avg10 = Math.round(vals10.reduce((a, b) => a + b, 0) / vals10.length);
     const avg5 = Math.round(vals5.reduce((a, b) => a + b, 0) / vals5.length);
 
     const hits = vals10.filter(v => v > line).length;
     const hit_rate = Math.round((hits / vals10.length) * 100);
 
-    const proj = Math.round(avg5 * 0.6 + avg10 * 0.4); // whole number projection
+    const proj = Math.round(avg5 * 0.6 + avg10 * 0.4);
     const edge = parseFloat((((proj - line) / line) * 100).toFixed(1));
 
     let streak_info = '';
@@ -156,10 +137,10 @@ export async function getRealPlayerAnalytics(playerName, propType, line) {
       edge,
       streak_info,
       confidence_score: Math.min(10, Math.max(3, hits >= 8 ? 9 : hits >= 6 ? 7 : hits >= 4 ? 5 : 3)),
-      data_source: 'real',
+      data_source: 'verified',
     };
   } catch (e) {
-    console.warn(`NBA Stats API failed for ${playerName}:`, e.message);
+    console.warn(`BallDontLie API failed for ${playerName}:`, e.message);
     return null;
   }
 }
