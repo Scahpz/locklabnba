@@ -7,9 +7,8 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { ParlayProvider } from '@/lib/ParlayContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AppLayout from '@/components/layout/AppLayout';
-import Dashboard from '@/pages/Dashboard.jsx';
+import Props from '@/pages/Props.jsx';
 import Trends from '@/pages/Trends.jsx';
-import AIPicks from '@/pages/AIPicks';
 import Matchups from '@/pages/Matchups';
 import ParlayBuilder from '@/pages/ParlayBuilder.jsx';
 import Alerts from '@/pages/Alerts';
@@ -44,9 +43,8 @@ const AuthenticatedApp = () => {
   return (
     <Routes>
       <Route element={<AppLayout />}>
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/" element={<Props />} />
         <Route path="/trends" element={<Trends />} />
-        <Route path="/picks" element={<AIPicks />} />
         <Route path="/matchups" element={<Matchups />} />
         <Route path="/parlay" element={<ParlayBuilder />} />
         <Route path="/alerts" element={<Alerts />} />

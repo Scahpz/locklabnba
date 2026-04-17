@@ -1,12 +1,11 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, TrendingUp, Zap, Activity, Shield, Layers, GitCompare } from 'lucide-react';
+import { TrendingUp, Zap, Activity, Shield, Layers, GitCompare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { path: '/', label: 'Props', icon: LayoutDashboard },
+  { path: '/', label: 'Props', icon: Zap },
   { path: '/trends', label: 'Trends', icon: TrendingUp },
-  { path: '/picks', label: 'AI Picks', icon: Zap },
   { path: '/matchups', label: 'Matchups', icon: Shield },
   { path: '/compare', label: 'Compare', icon: GitCompare },
   { path: '/odds', label: 'Live Odds', icon: Activity },

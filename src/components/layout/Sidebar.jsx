@@ -7,9 +7,8 @@ import {
 } from 'lucide-react';
 
 const navItems = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/', label: 'Props', icon: Zap },
   { path: '/trends', label: 'Streaks & Trends', icon: TrendingUp },
-  { path: '/picks', label: 'AI Picks', icon: Zap },
   { path: '/matchups', label: 'Matchups', icon: Shield },
   { path: '/compare', label: 'Compare', icon: GitCompare },
   { path: '/odds', label: 'Live Odds', icon: Activity },
