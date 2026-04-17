@@ -142,7 +142,7 @@ export default function LiveOdds() {
       )}
 
       {loading && games.length === 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="rounded-xl border border-border bg-card h-52 animate-pulse" />
           ))}
@@ -150,7 +150,7 @@ export default function LiveOdds() {
       )}
 
       {filtered.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4">
           {filtered.map(game => (
             <GameOddsCard key={game.id} game={game} />
           ))}
