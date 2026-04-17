@@ -1,12 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { TrendingUp, Zap, Activity, Shield, Layers, GitCompare } from 'lucide-react';
+import { TrendingUp, Zap, Activity, Layers, GitCompare, Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { path: '/', label: 'Props', icon: Zap },
   { path: '/trends', label: 'Trends', icon: TrendingUp },
-
   { path: '/compare', label: 'Compare', icon: GitCompare },
   { path: '/odds', label: 'Live Odds', icon: Activity },
   { path: '/parlay', label: 'Parlay', icon: Layers },
@@ -14,33 +13,53 @@ const navItems = [
 
 export default function MobileNav() {
   const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+  
+  const currentLabel = navItems.find(item => item.path === location.pathname)?.label || 'Menu';
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-xl border-t border-border md:hidden" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <div
-        className="flex items-center gap-1 px-3 py-3 overflow-x-auto"
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-      >
-        {navItems.map((item) => {
-          const isActive = location.pathname === item.path;
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={cn(
-                "flex items-center gap-2 flex-shrink-0 px-4 py-3 rounded-full transition-all duration-200",
-                isActive
-                  ? "bg-primary/15 text-primary border border-primary/25"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <item.icon className={cn("w-5 h-5 flex-shrink-0", isActive && "drop-shadow-[0_0_6px_hsl(142,71%,45%)]")} />
-              {isActive && (
-                <span className="text-sm font-semibold whitespace-nowrap">{item.label}</span>
-              )}
-            </Link>
-          );
-        })}
+      {/* Menu Panel (slides up) */}
+      {menuOpen && (
+        <div className="absolute bottom-full left-0 right-0 bg-card border-t border-border rounded-t-xl">
+          <div className="p-4 space-y-2">
+            {navItems.map((item) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={() => setMenuOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-lg transition-all",
+                    isActive
+                      ? "bg-primary/15 text-primary"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                  )}
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span className="font-medium">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Bar */}
+      <div className="flex items-center justify-between px-4 py-3 gap-3">
+        <button
+          onClick={() => setMenuOpen(!menuOpen)}
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+        >
+          {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
+        
+        <div className="flex-1 text-center">
+          <p className="text-sm font-semibold text-foreground">{currentLabel}</p>
+        </div>
+        
+        <div className="w-6" />
       </div>
     </nav>
   );
