@@ -5,8 +5,9 @@
 
 const BASE = 'https://www.balldontlie.io/api/v1';
 
-// Cache player IDs in memory for the session
+// Cache player data in memory for the session
 const playerIdCache = {};
+const playerTeamCache = {};
 
 export async function getBallDontLiePlayerId(playerName) {
   if (playerIdCache[playerName]) return playerIdCache[playerName];
@@ -28,9 +29,17 @@ export async function getBallDontLiePlayerId(playerName) {
 
   if (match) {
     playerIdCache[playerName] = match.id;
+    // Cache team abbreviation from balldontlie
+    if (match.team?.abbreviation) {
+      playerTeamCache[playerName] = match.team.abbreviation;
+    }
     return match.id;
   }
   return null;
+}
+
+export function getCachedPlayerTeam(playerName) {
+  return playerTeamCache[playerName] || null;
 }
 
 const PROP_TO_STAT = {
