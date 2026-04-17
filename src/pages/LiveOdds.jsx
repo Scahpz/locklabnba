@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { fetchGameOdds } from '@/lib/oddsData';
-import { getStoredApiKey } from '@/lib/liveData';
+import { base44 } from '@/api/base44Client';
 import GameOddsCard from '@/components/odds/GameOddsCard';
-import ApiKeyPrompt from '@/components/dashboard/ApiKeyPrompt';
 import { RefreshCw, Activity, Clock, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -13,21 +11,34 @@ export default function LiveOdds() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [needsApiKey, setNeedsApiKey] = useState(!getStoredApiKey());
   const [filter, setFilter] = useState('all'); // 'all' | 'today' | 'upcoming'
   const [countdown, setCountdown] = useState(REFRESH_INTERVAL_MS / 1000);
 
   const load = useCallback(async () => {
-    if (!getStoredApiKey()) { setNeedsApiKey(true); return; }
     setLoading(true);
     setError(null);
     setCountdown(REFRESH_INTERVAL_MS / 1000);
     try {
-      const result = await fetchGameOdds();
-      if (result.needsApiKey) { setNeedsApiKey(true); return; }
-      setGames(result.games || []);
-      setLastUpdated(result.lastUpdated);
-      setNeedsApiKey(false);
+      const res = await base44.functions.invoke('fetchLivePropsFromOdds', {});
+      const data = res.data;
+      
+      // Convert props format to games format for display
+      const gamesByMatch = {};
+      (data.rawProps || []).forEach(prop => {
+        const key = `${prop.away}@${prop.home}`;
+        if (!gamesByMatch[key]) {
+          gamesByMatch[key] = {
+            id: key,
+            away_team: prop.away,
+            home_team: prop.home,
+            commence_time: new Date().toISOString(),
+          };
+        }
+      });
+      
+      setGames(Object.values(gamesByMatch));
+      setLastUpdated(new Date());
+      setError(null);
     } catch (e) {
       setError(e.message || 'Failed to fetch odds');
     } finally {
@@ -40,17 +51,16 @@ export default function LiveOdds() {
 
   // Auto-refresh every 5 minutes
   useEffect(() => {
-    if (needsApiKey) return;
     const interval = setInterval(load, REFRESH_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [load, needsApiKey]);
+  }, [load]);
 
   // Countdown ticker
   useEffect(() => {
-    if (needsApiKey || loading) return;
+    if (loading) return;
     const tick = setInterval(() => setCountdown(c => Math.max(0, c - 1)), 1000);
     return () => clearInterval(tick);
-  }, [loading, needsApiKey]);
+  }, [loading]);
 
   const today = new Date().toLocaleDateString();
   const filtered = games.filter(g => {
@@ -76,30 +86,25 @@ export default function LiveOdds() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {lastUpdated && !needsApiKey && (
+          {lastUpdated && (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="w-3.5 h-3.5" />
               <span>Next refresh in {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, '0')}</span>
             </div>
           )}
           <button
-            onClick={load}
-            disabled={loading || needsApiKey}
-            className={cn(
-              "flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all border border-border",
-              loading ? "text-muted-foreground bg-secondary/50" : "text-foreground bg-secondary hover:bg-secondary/80"
-            )}
-          >
+                onClick={load}
+                disabled={loading}
+                className={cn(
+                  "flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all border border-border",
+                  loading ? "text-muted-foreground bg-secondary/50" : "text-foreground bg-secondary hover:bg-secondary/80"
+                )}
+              >
             <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
             {loading ? 'Loading…' : 'Refresh'}
           </button>
         </div>
       </div>
-
-      {/* API Key Prompt */}
-      {needsApiKey && (
-        <ApiKeyPrompt onKeySet={() => { setNeedsApiKey(false); load(); }} />
-      )}
 
       {/* Error */}
       {error && (
@@ -110,7 +115,7 @@ export default function LiveOdds() {
       )}
 
       {/* Filter tabs */}
-      {!needsApiKey && games.length > 0 && (
+      {games.length > 0 && (
         <div className="flex items-center gap-1.5">
           {[
             { key: 'all', label: `All Games (${games.length})` },
@@ -134,7 +139,7 @@ export default function LiveOdds() {
       )}
 
       {/* Games grid */}
-      {!needsApiKey && !loading && filtered.length === 0 && !error && (
+      {!loading && filtered.length === 0 && !error && (
         <div className="text-center py-16 text-muted-foreground">
           <Activity className="w-10 h-10 mx-auto mb-3 opacity-30" />
           <p className="text-sm">No games found for this filter.</p>
@@ -157,11 +162,11 @@ export default function LiveOdds() {
         </div>
       )}
 
-      {lastUpdated && !needsApiKey && (
-        <p className="text-center text-[11px] text-muted-foreground">
-          Last updated: {lastUpdated.toLocaleTimeString()}
-        </p>
-      )}
+      {lastUpdated && (
+         <p className="text-center text-[11px] text-muted-foreground">
+           Last updated: {lastUpdated.toLocaleTimeString()}
+         </p>
+       )}
     </div>
   );
 }
