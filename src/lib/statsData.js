@@ -99,7 +99,7 @@ const PROP_TO_STAT = {
  * Fetch last N game logs for a player for a specific stat.
  * Returns array of stat values (most recent last).
  */
-export async function getPlayerGameLogs(playerId, propType, season = 2024, games = 10) {
+export async function getPlayerGameLogs(playerId, propType, season = 2025, games = 10) {
   const res = await fetch(
     `${BASE}/stats?player_ids[]=${playerId}&seasons[]=${season}&per_page=${games}&sort_direction=desc`
   );
@@ -118,7 +118,7 @@ export async function getPlayerGameLogs(playerId, propType, season = 2024, games
 /**
  * Fetch season averages for a player.
  */
-export async function getPlayerSeasonAverages(playerId, season = 2024) {
+export async function getPlayerSeasonAverages(playerId, season = 2025) {
   const res = await fetch(`${BASE}/season_averages?player_ids[]=${playerId}&season=${season}`);
   if (!res.ok) return null;
   const data = await res.json();
@@ -135,7 +135,7 @@ export async function getRealPlayerAnalytics(playerName, propType, line) {
     const playerId = await getBallDontLiePlayerId(playerName);
     if (!playerId) return null;
 
-    const logs = await getPlayerGameLogs(playerId, propType, 2024, 15);
+    const logs = await getPlayerGameLogs(playerId, propType, 2025, 15);
     if (!logs || logs.length < 3) return null;
 
     const last10 = logs.slice(-10);

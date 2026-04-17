@@ -1,5 +1,5 @@
-const CACHE_KEY = 'locklab_live_props_v18';
-const CACHE_DATE_KEY = 'locklab_live_props_date_v18';
+const CACHE_KEY = 'locklab_live_props_v19';
+const CACHE_DATE_KEY = 'locklab_live_props_date_v19';
 const API_KEY_STORAGE = 'locklab_odds_api_key';
 
 const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
