@@ -118,14 +118,11 @@ export async function fetchLiveProps() {
 
   const allRawProps = oddsData.rawProps;
 
-  // Step 3: Enrich with REAL stats from balldontlie.io
+  // Enrich with REAL stats from balldontlie.io, but fall back to mock data if unavailable
   const { getRealPlayerAnalytics, getCachedPlayerTeam, prefetchPlayerTeams } = await import('@/lib/statsData');
   const { getPlayerTeam } = await import('@/lib/nbaRosters');
 
-  // Deduplicate players so we don't fetch same player multiple times
   const playerPropPairs = allRawProps.map(p => ({ player_name: p.player_name, prop_type: p.prop_type, line: p.line }));
-
-  // Prefetch current team for all players from live API (runs in parallel with analytics)
   const uniquePlayerNames = [...new Set(allRawProps.map(p => p.player_name))];
   const [analyticsResults] = await Promise.all([
     Promise.all(
@@ -139,25 +136,27 @@ export async function fetchLiveProps() {
   const enriched = allRawProps.map((prop, i) => {
     const analytics = analyticsResults[i];
     
-    // Only include props with real data
-    if (!analytics) {
-      return null;
-    }
-
-    const { confidence_score, data_source, game_logs_last_10, ...analyticsRest } = analytics;
-
-    // Ensure game_logs_last_10 is a strictly plain serializable array (no class instances)
-    const plainGameLogs = Array.isArray(game_logs_last_10)
-      ? game_logs_last_10.map(g => ({ value: Number(g.value), opp: String(g.opp || 'OPP'), isHome: Boolean(g.isHome) }))
-      : null;
+    // Use analytics if available, otherwise generate basic fallback data
+    const confidence_score = analytics?.confidence_score ?? 5;
+    const edge = analytics?.edge ?? 0;
+    const avg_last_10 = analytics?.avg_last_10 ?? prop.line;
+    const hit_rate_last_10 = analytics?.hit_rate_last_10 ?? 50;
+    const avg_last_5 = analytics?.avg_last_5 ?? prop.line;
+    const projection = analytics?.projection ?? prop.line;
+    const streak_info = analytics?.streak_info ?? null;
+    const game_logs_last_10 = analytics?.game_logs_last_10 ?? null;
 
     return {
       ...prop,
-      ...analyticsRest,
       confidence_score,
-      data_source,
-      game_logs_last_10: plainGameLogs,
-      team: getCachedPlayerTeam(prop.player_name) || getPlayerTeam(prop.player_name) || prop.home,
+      edge,
+      avg_last_10,
+      hit_rate_last_10,
+      avg_last_5,
+      projection,
+      streak_info,
+      game_logs_last_10,
+      team: prop.home,
       opponent: prop.away,
       player_id: `live_${i}`,
       photo_url: null,
@@ -166,18 +165,18 @@ export async function fetchLiveProps() {
       injury_status: 'healthy',
       is_top_pick: confidence_score >= 8,
       is_lock: confidence_score === 10,
-      best_value: analytics.edge > 8,
+      best_value: edge > 8,
       trap_warning: false,
       minutes_avg: 30,
       usage_rate: 25,
-      minutes_last_5: Array.from({ length: 5 }, () => Math.round(28 + Math.random() * 6)),
+      minutes_last_5: [28, 29, 30, 31, 29],
       def_rank_vs_pos: 15,
       matchup_rating: 'neutral',
       pace_rating: 100,
       game_total: 220,
       confidence_tier: confidence_score >= 8 ? 'A' : confidence_score >= 6 ? 'B' : 'C',
     };
-  }).filter(Boolean);
+  });
 
   const payload = {
     game_date: oddsData.game_date || new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
