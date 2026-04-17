@@ -4,7 +4,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 export default function PlayerTrendChart({ games, line, propType, gameLogs }) {
   const data = games.map((val, i) => {
     const log = gameLogs?.[i];
-    const prefix = log?.date || '';
+    const prefix = log?.isHome ? 'vs' : '@';
     const opp = log?.opp || `G${i + 1}`;
     return {
       game: log ? `${prefix}\n${opp}` : `G${i + 1}`,

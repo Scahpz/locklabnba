@@ -49,13 +49,12 @@ export default function Trends() {
   function buildGameLogs(prop) {
     if (prop?.game_logs_last_10?.length > 0) {
       return prop.game_logs_last_10.map(g => ({
-        date: g.isHome ? 'vs' : '@',
+        isHome: g.isHome,
         opp: g.opp,
       }));
     }
-    // Fallback: no opponent data available
     return (prop?.last_10_games || []).map((_, i) => ({
-      date: '',
+      isHome: false,
       opp: `G${i + 1}`,
     }));
   }
