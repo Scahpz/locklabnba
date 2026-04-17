@@ -26,23 +26,71 @@ function DefRankBar({ rank }) {
   );
 }
 
+function calculateMatchupRating(defRank, avg, line, propType) {
+  // Excellent defense (top 5) vs mediocre performer = elite defense
+  if (defRank <= 5 && avg < line) return 'elite_defense';
+  
+  // Top 10 defense generally tough
+  if (defRank <= 10) return avg > line ? 'favorable' : 'tough';
+  
+  // Mid-range defense (11-20)
+  if (defRank <= 20) {
+    if (avg > line + 5) return 'elite';
+    if (avg > line) return 'favorable';
+    return 'neutral';
+  }
+  
+  // Weak defense (21+)
+  if (avg > line) return 'elite';
+  if (avg > line - 3) return 'favorable';
+  return 'neutral';
+}
+
+function buildMatchupNote(playerName, propType, avg, line, defRank, matchupRating) {
+  const diff = Math.round(avg - line);
+  
+  if (matchupRating === 'elite_defense') {
+    return `${playerName} averaging ${avg} vs elite ${propType} defense (rank #${defRank}).`;
+  }
+  
+  if (matchupRating === 'elite') {
+    return `${playerName} crushing ${propType} (${avg} avg) vs weak defense (rank #${defRank}).`;
+  }
+  
+  if (matchupRating === 'favorable') {
+    return `${propType} matchup favors ${playerName} — ${diff > 0 ? `+${diff}` : diff} vs line.`;
+  }
+  
+  if (matchupRating === 'tough') {
+    return `Tough ${propType} matchup for ${playerName} vs strong defense (rank #${defRank}).`;
+  }
+  
+  return `Neutral ${propType} matchup — ${playerName} ${diff > 0 ? `+${diff}` : diff} vs line.`;
+}
+
 function buildMatchups(props) {
   return props
     .filter(p => p.injury_status !== 'out')
-    .map(prop => ({
-      player_name: prop.player_name,
-      team: prop.team,
-      opponent: prop.opponent,
-      position: prop.position,
-      prop_type: prop.prop_type,
-      line: prop.line,
-      matchup_rating: prop.matchup_rating,
-      matchup_note: prop.matchup_note,
-      def_rank_vs_pos: prop.def_rank_vs_pos,
-      pace_rating: prop.pace_rating,
-      game_total: prop.game_total,
-      edge: prop.edge,
-    }));
+    .map(prop => {
+      const matchup_rating = calculateMatchupRating(prop.def_rank_vs_pos, prop.avg_last_10, prop.line, prop.prop_type);
+      const matchup_note = buildMatchupNote(prop.player_name, prop.prop_type, prop.avg_last_10, prop.line, prop.def_rank_vs_pos, matchup_rating);
+      
+      return {
+        player_name: prop.player_name,
+        team: prop.team,
+        opponent: prop.opponent,
+        position: prop.position,
+        prop_type: prop.prop_type,
+        line: prop.line,
+        avg_last_10: prop.avg_last_10,
+        matchup_rating,
+        matchup_note,
+        def_rank_vs_pos: prop.def_rank_vs_pos,
+        pace_rating: prop.pace_rating,
+        game_total: prop.game_total,
+        edge: prop.edge,
+      };
+    });
 }
 
 export default function Matchups() {
