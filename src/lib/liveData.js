@@ -63,14 +63,12 @@ export function clearLiveCache() {
   localStorage.removeItem(CACHE_DATE_KEY);
 }
 
-const HARDCODED_API_KEY = '5508f7fa9c244f635fdf5188a9fea52e';
-
 export function getStoredApiKey() {
-  return HARDCODED_API_KEY;
+  return null;
 }
 
 export function setStoredApiKey(key) {
-  // no-op: key is hardcoded
+  // no-op
 }
 
 /** Parse all bookmakers for a single player+prop from an event odds response */
@@ -102,105 +100,24 @@ export async function fetchLiveProps() {
     try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch {}
   }
 
-  const apiKey = getStoredApiKey();
-  if (!apiKey) {
-    return { game_date: new Date().toLocaleDateString(), games_summary: [], props: [], needsApiKey: true };
+  // Fetch props from backend function (uses ODDS_API_KEY secret securely)
+  const { base44 } = await import('@/api/base44Client');
+  let oddsData;
+  try {
+    const res = await base44.functions.invoke('fetchLivePropsFromOdds', {});
+    oddsData = res.data;
+  } catch (e) {
+    console.error('Backend odds fetch failed:', e.message);
+    return { game_date: new Date().toLocaleDateString(), games_summary: [], props: [] };
   }
 
-  // Step 1: Get today's NBA events
-  const eventsRes = await fetch(
-    `${ODDS_API_BASE}/sports/${SPORT}/events?apiKey=${apiKey}&dateFormat=iso`
-  );
-  if (!eventsRes.ok) {
-    if (eventsRes.status === 401) throw new Error('Invalid API key');
-    throw new Error(`Events API error: ${eventsRes.status}`);
-  }
-  const events = await eventsRes.json();
-
-  // Filter to today's games
-  const today = todayStr();
-  const todayEvents = events.filter(e => e.commence_time?.startsWith(today));
-
-  if (todayEvents.length === 0) {
-    return { game_date: today, games_summary: [], props: [] };
+  if (!oddsData.rawProps || oddsData.rawProps.length === 0) {
+    return { game_date: oddsData.game_date, games_summary: oddsData.games_summary || [], props: [] };
   }
 
-  // Step 2: Fetch props for all today's games in parallel (all bookmakers)
-  const propResults = await Promise.all(
-    todayEvents.map(event =>
-      fetch(
-        `${ODDS_API_BASE}/sports/${SPORT}/events/${event.id}/odds?apiKey=${apiKey}&regions=us&markets=${PROP_MARKETS}&oddsFormat=american`
-      ).then(r => r.ok ? r.json() : null).catch(() => null)
-    )
-  );
-
-  // Build games summary
-  const games_summary = todayEvents.map(e => ({
-    home: toAbv(e.home_team),
-    away: toAbv(e.away_team),
-    tipoff: new Date(e.commence_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + ' ET',
-    total: null,
-  }));
-
-  // Parse props — collect all books per player+prop
-  const propMap = {};
-
-  propResults.forEach((eventOdds, idx) => {
-    if (!eventOdds) return;
-    const event = todayEvents[idx];
-    const homeAbv = toAbv(event.home_team);
-    const awayAbv = toAbv(event.away_team);
-
-    const primaryBm = eventOdds.bookmakers?.find(b => b.key === 'draftkings')
-      || eventOdds.bookmakers?.find(b => b.key === 'fanduel')
-      || eventOdds.bookmakers?.[0];
-    if (!primaryBm) return;
-
-    primaryBm.markets?.forEach(market => {
-      const propType = PROP_TYPE_MAP[market.key];
-      if (!propType) return;
-
-      const byPlayer = {};
-      market.outcomes?.forEach(outcome => {
-        const name = outcome.description;
-        if (!name) return;
-        if (!byPlayer[name]) byPlayer[name] = {};
-        if (outcome.name === 'Over') {
-          byPlayer[name].over_odds = outcome.price;
-          byPlayer[name].line = outcome.point;
-        } else if (outcome.name === 'Under') {
-          byPlayer[name].under_odds = outcome.price;
-          byPlayer[name].line = byPlayer[name].line ?? outcome.point;
-        }
-      });
-
-      Object.entries(byPlayer).forEach(([player_name, data]) => {
-        if (data.line == null) return;
-        const mapKey = `${player_name}__${propType}__${homeAbv}@${awayAbv}`;
-        if (propMap[mapKey]) return;
-
-        const allBooks = parseBookOdds(eventOdds, player_name, market.key);
-
-        propMap[mapKey] = {
-          player_name,
-          prop_type: propType,
-          line: data.line,
-          over_odds: data.over_odds ?? -110,
-          under_odds: data.under_odds ?? -110,
-          bookmaker: primaryBm.title,
-          all_books: allBooks,
-          home: homeAbv,
-          away: awayAbv,
-          market_key: market.key,
-        };
-      });
-    });
-  });
-
-  const allRawProps = Object.values(propMap);
+  const allRawProps = oddsData.rawProps;
 
   // Step 3: Enrich with REAL stats from balldontlie.io
-  // Rate-limit: process in batches to avoid hammering the free API
   const { getRealPlayerAnalytics, getCachedPlayerTeam, prefetchPlayerTeams } = await import('@/lib/statsData');
   const { getPlayerTeam } = await import('@/lib/nbaRosters');
 
@@ -219,40 +136,11 @@ export async function fetchLiveProps() {
   ]);
 
   const enriched = allRawProps.map((prop, i) => {
-    const real = analyticsResults[i];
-
-    // Use real data if available, otherwise fall back to simulated
-    let analytics;
-    if (real) {
-      analytics = real;
-    } else {
-      // Simulated fallback (clearly marked)
-      const base = prop.line || 20;
-      const variance = base * 0.22;
-      const games10 = Array.from({ length: 10 }, () =>
-        Math.round(base + (Math.random() * variance * 2 - variance))
-      );
-      const g5 = games10.slice(-5);
-      const avg10 = parseFloat((games10.reduce((a, b) => a + b, 0) / 10).toFixed(1));
-      const avg5 = parseFloat((g5.reduce((a, b) => a + b, 0) / 5).toFixed(1));
-      const hits = games10.filter(v => v > prop.line).length;
-      analytics = {
-        avg_last_5: Math.round(avg5),
-        avg_last_10: Math.round(avg10),
-        hit_rate_last_10: Math.round((hits / 10) * 100),
-        last_5_games: g5,
-        last_10_games: games10,
-        game_logs_last_10: games10.map((value, idx) => ({
-          value: Number(value),
-          opp: `G${idx + 1}`,
-          isHome: Boolean(idx % 2 === 0),
-        })),
-        projection: Math.round(avg5 * 1.02),
-        edge: parseFloat((((avg5 * 1.02 - prop.line) / prop.line) * 100).toFixed(1)),
-        streak_info: hits >= 7 ? `Hit over in ${hits} of last 10` : hits <= 3 ? `Hit under in ${10 - hits} of last 10` : `Split ${hits}-${10 - hits} last 10`,
-        confidence_score: Math.min(10, Math.max(3, hits >= 8 ? 9 : hits >= 6 ? 7 : hits >= 4 ? 5 : 3)),
-        data_source: 'estimated',
-      };
+    const analytics = analyticsResults[i];
+    
+    // Only include props with real data
+    if (!analytics) {
+      return null;
     }
 
     const { confidence_score, data_source, game_logs_last_10, ...analyticsRest } = analytics;
@@ -288,11 +176,11 @@ export async function fetchLiveProps() {
       game_total: 220,
       confidence_tier: confidence_score >= 8 ? 'A' : confidence_score >= 6 ? 'B' : 'C',
     };
-  });
+  }).filter(Boolean);
 
   const payload = {
-    game_date: new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
-    games_summary,
+    game_date: oddsData.game_date || new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+    games_summary: oddsData.games_summary || [],
     props: enriched,
   };
 
