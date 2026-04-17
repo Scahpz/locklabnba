@@ -71,23 +71,16 @@ export default function Props() {
     setSelectedGames(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
   };
 
-  // Locks of the day: top 1-2 props with grade criteria >= 80% (4/5 passes) and real stats
+  // Locks of the day: top 2 ranked picks overall
   const locks = useMemo(() => {
-    const calculateGradeConfidence = (p) => {
-      const dvpPass = p.matchup_rating != null && ['elite', 'favorable', 'neutral'].includes(p.matchup_rating);
-      const usagePass = p.usage_rate != null && p.usage_rate >= 20;
-      const l10Pass = p.avg_last_10 != null && p.avg_last_10 > p.line;
-      const seasonPass = p.avg_last_10 != null && p.avg_last_10 > p.line;
-      const lineActualPass = p.projection != null && p.projection > p.line;
-      const passCount = [dvpPass, usagePass, l10Pass, seasonPass, lineActualPass].filter(Boolean).length;
-      return passCount * 20;
-    };
-
-    return rawProps
-      .filter(p => calculateGradeConfidence(p) >= 80)
-      .sort((a, b) => calculateGradeConfidence(b) - calculateGradeConfidence(a))
+    return [...rawProps]
+      .sort((a, b) => {
+        const ka = `${a.player_name}__${a.prop_type}__${a.line}`;
+        const kb = `${b.player_name}__${b.prop_type}__${b.line}`;
+        return compositeScore(b, verdicts[kb]) - compositeScore(a, verdicts[ka]);
+      })
       .slice(0, 2);
-  }, [rawProps]);
+  }, [rawProps, verdicts]);
 
   const filteredAndRanked = useMemo(() => {
     let result = rawProps;
