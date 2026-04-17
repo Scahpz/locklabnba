@@ -1,5 +1,5 @@
-const CACHE_KEY = 'locklab_live_props_v20';
-const CACHE_DATE_KEY = 'locklab_live_props_date_v20';
+const CACHE_KEY = 'locklab_live_props_v21';
+const CACHE_DATE_KEY = 'locklab_live_props_date_v21';
 const API_KEY_STORAGE = 'locklab_odds_api_key';
 
 const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
@@ -244,12 +244,17 @@ export async function fetchLiveProps() {
 
     const { confidence_score, data_source, game_logs_last_10, ...analyticsRest } = analytics;
 
+    // Ensure game_logs_last_10 is a plain serializable array
+    const plainGameLogs = game_logs_last_10
+      ? game_logs_last_10.map(g => ({ value: Number(g.value), opp: String(g.opp), isHome: Boolean(g.isHome) }))
+      : null;
+
     return {
       ...prop,
       ...analyticsRest,
       confidence_score,
       data_source,
-      game_logs_last_10: game_logs_last_10 || null,
+      game_logs_last_10: plainGameLogs,
       team: getCachedPlayerTeam(prop.player_name) || getPlayerTeam(prop.player_name) || prop.home,
       opponent: prop.away,
       player_id: `live_${i}`,
