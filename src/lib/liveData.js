@@ -102,6 +102,7 @@ export async function fetchLiveProps() {
 
   // Fetch props from backend function (uses ODDS_API_KEY secret securely)
   const { base44 } = await import('@/api/base44Client');
+  const today = todayStr();
   let oddsData;
   try {
     const res = await base44.functions.invoke('fetchLivePropsFromOdds', {});
