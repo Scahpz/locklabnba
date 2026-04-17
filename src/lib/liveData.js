@@ -1,5 +1,5 @@
-const CACHE_KEY = 'locklab_live_props_v19';
-const CACHE_DATE_KEY = 'locklab_live_props_date_v19';
+const CACHE_KEY = 'locklab_live_props_v20';
+const CACHE_DATE_KEY = 'locklab_live_props_date_v20';
 const API_KEY_STORAGE = 'locklab_odds_api_key';
 
 const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
@@ -242,13 +242,14 @@ export async function fetchLiveProps() {
       };
     }
 
-    const { confidence_score, data_source, ...analyticsRest } = analytics;
+    const { confidence_score, data_source, game_logs_last_10, ...analyticsRest } = analytics;
 
     return {
       ...prop,
       ...analyticsRest,
       confidence_score,
       data_source,
+      game_logs_last_10: game_logs_last_10 || null,
       team: getCachedPlayerTeam(prop.player_name) || getPlayerTeam(prop.player_name) || prop.home,
       opponent: prop.away,
       player_id: `live_${i}`,

@@ -95,9 +95,23 @@ const PROP_TO_STAT = {
   turnovers: 'turnover',
 };
 
+// Normalize team abbreviations from balldontlie to standard
+const BDL_TEAM_ABV = {
+  'ATL': 'ATL', 'BOS': 'BOS', 'BKN': 'BKN', 'CHA': 'CHA', 'CHI': 'CHI',
+  'CLE': 'CLE', 'DAL': 'DAL', 'DEN': 'DEN', 'DET': 'DET', 'GS': 'GSW',
+  'HOU': 'HOU', 'IND': 'IND', 'LAC': 'LAC', 'LAL': 'LAL', 'MEM': 'MEM',
+  'MIA': 'MIA', 'MIL': 'MIL', 'MIN': 'MIN', 'NO': 'NOP', 'NY': 'NYK',
+  'OKC': 'OKC', 'ORL': 'ORL', 'PHI': 'PHI', 'PHX': 'PHX', 'POR': 'POR',
+  'SAC': 'SAC', 'SA': 'SAS', 'TOR': 'TOR', 'UTA': 'UTA', 'WAS': 'WAS',
+};
+
+function normTeam(abv) {
+  return BDL_TEAM_ABV[abv] || abv || '???';
+}
+
 /**
  * Fetch last N game logs for a player for a specific stat.
- * Returns array of stat values (most recent last).
+ * Returns array of { value, opp, isHome } objects (most recent last).
  */
 export async function getPlayerGameLogs(playerId, propType, season = 2025, games = 10) {
   const res = await fetch(
@@ -109,9 +123,26 @@ export async function getPlayerGameLogs(playerId, propType, season = 2025, games
   const logs = data.data || [];
 
   return logs.map(g => {
-    if (propType === 'PRA') return (g.pts || 0) + (g.reb || 0) + (g.ast || 0);
-    const key = PROP_TO_STAT[propType];
-    return key ? (g[key] || 0) : 0;
+    let value;
+    if (propType === 'PRA') value = (g.pts || 0) + (g.reb || 0) + (g.ast || 0);
+    else {
+      const key = PROP_TO_STAT[propType];
+      value = key ? (g[key] || 0) : 0;
+    }
+
+    // Determine opponent and home/away from game data
+    const game = g.game;
+    let opp = '???';
+    let isHome = true;
+    if (game) {
+      const homeTeam = normTeam(game.home_team_abbreviation);
+      const visitorTeam = normTeam(game.visitor_team_abbreviation);
+      const playerTeam = normTeam(g.team?.abbreviation);
+      isHome = playerTeam === homeTeam;
+      opp = isHome ? visitorTeam : homeTeam;
+    }
+
+    return { value, opp, isHome };
   }).filter(v => v != null).reverse(); // oldest first
 }
 
@@ -141,17 +172,19 @@ export async function getRealPlayerAnalytics(playerName, propType, line) {
     const last10 = logs.slice(-10);
     const last5 = logs.slice(-5);
 
-    const avg10 = parseFloat((last10.reduce((a, b) => a + b, 0) / last10.length).toFixed(1));
-    const avg5 = parseFloat((last5.reduce((a, b) => a + b, 0) / last5.length).toFixed(1));
+    // Extract just values for calculations
+    const vals10 = last10.map(g => g.value);
+    const vals5 = last5.map(g => g.value);
 
-    const hits = last10.filter(v => v > line).length;
-    const hit_rate = Math.round((hits / last10.length) * 100);
+    const avg10 = parseFloat((vals10.reduce((a, b) => a + b, 0) / vals10.length).toFixed(1));
+    const avg5 = parseFloat((vals5.reduce((a, b) => a + b, 0) / vals5.length).toFixed(1));
 
-    // Projection: weighted average (last 5 weighted more)
+    const hits = vals10.filter(v => v > line).length;
+    const hit_rate = Math.round((hits / vals10.length) * 100);
+
     const proj = parseFloat(((avg5 * 0.6 + avg10 * 0.4)).toFixed(1));
     const edge = parseFloat((((proj - line) / line) * 100).toFixed(1));
 
-    // Streak info
     let streak_info = '';
     if (hits >= 7) streak_info = `Hit over in ${hits} of last 10`;
     else if (hits <= 3) streak_info = `Hit under in ${10 - hits} of last 10`;
@@ -161,8 +194,10 @@ export async function getRealPlayerAnalytics(playerName, propType, line) {
       avg_last_5: avg5,
       avg_last_10: avg10,
       hit_rate_last_10: hit_rate,
-      last_5_games: last5,
-      last_10_games: last10,
+      last_5_games: vals5,
+      last_10_games: vals10,
+      // Rich game log with opponent info for charts
+      game_logs_last_10: last10.map(g => ({ value: g.value, opp: g.opp, isHome: g.isHome })),
       projection: proj,
       edge,
       streak_info,

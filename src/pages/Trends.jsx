@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { mockGameLogs } from '@/lib/mockData';
 import { useLivePlayers } from '@/lib/useLivePlayers';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, Clock, Target, Activity, Zap, Search, Flame, X, Wifi, WifiOff } from 'lucide-react';
@@ -46,14 +45,20 @@ export default function Trends() {
     [players, resolvedSelected]
   );
 
-  // Game logs: use mock if available, otherwise generate simple labels
-  const gameLogs = useMemo(() => {
-    if (!player) return [];
-    return mockGameLogs[player.id] || player.props[0]?.last_10_games?.map((_, i) => ({
-      date: `G${i + 1}`,
-      opp: player.opponent || 'OPP',
-    })) || [];
-  }, [player]);
+  // Build game log labels from real opponent data per-prop
+  function buildGameLogs(prop) {
+    if (prop?.game_logs_last_10?.length > 0) {
+      return prop.game_logs_last_10.map(g => ({
+        date: g.isHome ? 'vs' : '@',
+        opp: g.opp,
+      }));
+    }
+    // Fallback: no opponent data available
+    return (prop?.last_10_games || []).map((_, i) => ({
+      date: '',
+      opp: `G${i + 1}`,
+    }));
+  }
 
   const searchResults = useMemo(() => {
     if (!search.trim()) return [];
@@ -246,7 +251,7 @@ export default function Trends() {
               games={prop.last_10_games || []}
               line={prop.line}
               propType={prop.prop_type}
-              gameLogs={gameLogs}
+              gameLogs={buildGameLogs(prop)}
             />
 
             <div className="grid grid-cols-4 gap-3 mt-4">
