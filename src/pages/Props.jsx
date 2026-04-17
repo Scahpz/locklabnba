@@ -241,7 +241,7 @@ export default function Props() {
           {/* Ranked props list */}
           <div>
             <p className="text-xs text-muted-foreground mb-3">{filteredAndRanked.length} props · ranked by {SORT_OPTIONS.find(o => o.value === sortBy)?.label}</p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredAndRanked.map((prop, i) => {
                 const key = `${prop.player_name}__${prop.prop_type}__${prop.line}`;
                 return (
