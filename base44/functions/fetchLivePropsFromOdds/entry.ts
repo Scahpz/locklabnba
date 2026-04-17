@@ -195,9 +195,7 @@ Deno.serve(async (req) => {
       );
       allRawProps.forEach((p, i) => {
         const playerTeam = teamResults[i];
-        if (playerTeam) {
-          p.player_team = playerTeam;
-        }
+        p.player_team = playerTeam || null;
       });
     }
     
