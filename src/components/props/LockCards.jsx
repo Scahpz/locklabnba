@@ -31,7 +31,7 @@ function LockCard({ prop, aiVerdict, aiLoading }) {
         </div>
       </div>
 
-      <VerdictBadge verdict={aiVerdict?.verdict} ai_confidence={aiVerdict?.ai_confidence} loading={aiLoading && !aiVerdict} />
+      <VerdictBadge verdict={aiVerdict?.verdict} ai_confidence={aiVerdict?.ai_confidence} loading={aiLoading && !aiVerdict} isPickOfDay={true} />
       {aiVerdict?.reason && (
         <p className="text-xs text-muted-foreground leading-snug">{aiVerdict.reason}</p>
       )}
