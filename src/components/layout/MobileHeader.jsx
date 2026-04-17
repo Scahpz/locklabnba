@@ -75,7 +75,7 @@ export default function MobileHeader() {
               to={item.path}
               onClick={() => setMenuOpen(false)}
               className={cn(
-                "flex items-center justify-center w-14 h-14 rounded-full transition-all shadow-lg",
+                "flex items-center justify-center w-12 h-12 rounded-full transition-all shadow-lg opacity-95",
                 isActive
                   ? "bg-primary text-primary-foreground shadow-[0_0_20px_hsl(142,71%,45%,0.4)]"
                   : "bg-secondary text-muted-foreground hover:text-foreground hover:shadow-[0_0_15px_hsl(142,71%,45%,0.2)]"
