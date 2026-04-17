@@ -39,9 +39,6 @@ export default function Props() {
 
   const loadData = async (forceRefresh = false) => {
     setLoading(true);
-    if (forceRefresh) {
-      clearLiveCache();
-    }
     try {
       const data = await fetchLiveProps();
       if (data?.props?.length > 0) {
