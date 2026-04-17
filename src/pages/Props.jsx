@@ -48,9 +48,10 @@ export default function Props() {
         setGamesSummary(data.games_summary || []);
         setIsLive(true);
 
-        // Kick off AI verdicts in background
+        // Kick off AI verdicts for top props only (faster)
         setAiLoading(true);
-        getAIVerdicts(realProps).then(v => {
+        const topProps = realProps.slice(0, 50); // Only analyze top 50
+        getAIVerdicts(topProps).then(v => {
           setVerdicts(v);
           setAiLoading(false);
         }).catch(() => setAiLoading(false));
