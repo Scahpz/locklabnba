@@ -99,11 +99,18 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
 
         {/* AI Verdict */}
         <div className="mb-3">
-          <VerdictBadge
-            verdict={aiVerdict?.verdict}
-            ai_confidence={gradeConfidence}
-            loading={aiLoading && !aiVerdict}
-          />
+          {(() => {
+            const verdict = gradeConfidence >= 60
+              ? (isPositiveEdge ? 'OVER' : 'UNDER')
+              : 'UNSAFE';
+            return (
+              <VerdictBadge
+                verdict={verdict}
+                ai_confidence={gradeConfidence}
+                loading={aiLoading && !aiVerdict}
+              />
+            );
+          })()}
           {aiVerdict?.reason && (
             <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">{aiVerdict.reason}</p>
           )}
