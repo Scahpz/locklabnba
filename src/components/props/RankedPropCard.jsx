@@ -4,7 +4,6 @@ import { cn } from '@/lib/utils';
 import { Lock, AlertTriangle, Award, Zap, ChevronDown, ChevronUp, Check, TrendingUp, TrendingDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import TeamLogo from '@/components/common/TeamLogo';
-import PlayerAvatar from '@/components/common/PlayerAvatar';
 import { useParlay } from '@/lib/ParlayContext';
 import VerdictBadge from '@/components/props/VerdictBadge';
 import PropGradeChecklist from '@/components/props/PropGradeChecklist';
@@ -80,7 +79,7 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
             <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold border flex-shrink-0", rankColor)}>
               #{rank}
             </div>
-            <PlayerAvatar playerName={prop.player_name} photoUrl={prop.photo_url} className="w-10 h-10" />
+            <TeamLogo team={prop.team} className="w-9 h-9" />
             <div>
               <Link to={`/trends?player=${encodeURIComponent(prop.player_name)}`} className="font-semibold text-sm text-foreground hover:text-primary transition-colors">
                 {prop.player_name}
