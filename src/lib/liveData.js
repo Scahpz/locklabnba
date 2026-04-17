@@ -1,5 +1,13 @@
-const CACHE_KEY = 'locklab_live_props_v21';
-const CACHE_DATE_KEY = 'locklab_live_props_date_v21';
+const CACHE_KEY = 'locklab_live_props_v23';
+const CACHE_DATE_KEY = 'locklab_live_props_date_v23';
+
+// Clear any old versioned cache keys on load
+(function purgeOldCaches() {
+  for (let i = 1; i <= 22; i++) {
+    localStorage.removeItem(`locklab_live_props_v${i}`);
+    localStorage.removeItem(`locklab_live_props_date_v${i}`);
+  }
+})();
 const API_KEY_STORAGE = 'locklab_odds_api_key';
 
 const ODDS_API_BASE = 'https://api.the-odds-api.com/v4';
