@@ -14,11 +14,11 @@ function LockCard({ prop, aiVerdict, aiLoading }) {
   const { addLeg } = useParlay();
 
   return (
-    <div className="rounded-xl border border-chart-4/40 bg-gradient-to-br from-chart-4/10 via-card to-card p-4 shadow-[0_0_30px_hsl(43,74%,66%,0.2)] flex flex-col gap-3">
+    <div className="rounded-xl border border-primary/40 bg-gradient-to-br from-primary/10 via-card to-card p-4 shadow-[0_0_30px_hsl(142,71%,45%,0.2)] flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Lock className="w-4 h-4 text-chart-4" />
-          <span className="text-xs font-bold text-chart-4 uppercase tracking-wider">Pick of the Day</span>
+          <Lock className="w-4 h-4 text-primary" />
+          <span className="text-xs font-bold text-primary uppercase tracking-wider">Pick of the Day</span>
         </div>
         <span className="text-[10px] text-muted-foreground bg-secondary rounded-md px-2 py-0.5">{prop.confidence_score}/10 confidence</span>
       </div>
@@ -86,7 +86,7 @@ export default function LockCards({ locks, verdicts, aiLoading }) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <Lock className="w-4 h-4 text-chart-4" />
+        <Lock className="w-4 h-4 text-primary" />
         <h2 className="text-sm font-bold text-foreground uppercase tracking-wider">Pick{locks.length > 1 ? 's' : ''} of the Day</h2>
       </div>
       <div className={cn("grid gap-4", locks.length > 1 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3")}>
