@@ -22,21 +22,19 @@ export default function LiveOdds() {
       const res = await base44.functions.invoke('fetchLivePropsFromOdds', {});
       const data = res.data;
       
-      // Convert props format to games format for display
-      const gamesByMatch = {};
-      (data.rawProps || []).forEach(prop => {
-        const key = `${prop.away}@${prop.home}`;
-        if (!gamesByMatch[key]) {
-          gamesByMatch[key] = {
-            id: key,
-            away_team: prop.away,
-            home_team: prop.home,
-            commence_time: new Date().toISOString(),
-          };
-        }
-      });
+      // Convert games_summary to games format for display
+      const convertedGames = (data.games_summary || []).map((game, i) => ({
+        id: `${game.away}@${game.home}`,
+        awayAbv: game.away,
+        homeAbv: game.home,
+        away_team: game.away,
+        home_team: game.home,
+        commence_time: new Date().toISOString(),
+        moneyline: { bookmaker: 'DraftKings' },
+        allBooks: [],
+      }));
       
-      setGames(Object.values(gamesByMatch));
+      setGames(convertedGames);
       setLastUpdated(new Date());
       setError(null);
     } catch (e) {
