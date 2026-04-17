@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { User, Star, Trophy, Layers, CheckCircle2, XCircle, Clock, Trash2, Pencil, Check, Search, X } from 'lucide-react';
+import { User, Star, Trophy, Layers, CheckCircle2, XCircle, Clock, Trash2, Pencil, Check, Search, X, LogOut } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useLivePlayers } from '@/lib/useLivePlayers';
@@ -193,12 +193,21 @@ export default function Profile() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
-          <User className="w-7 h-7 text-muted-foreground" />
-          My Profile
-        </h1>
-        {user && (
-        <div className="flex items-center gap-2 mt-1">
+         <div className="flex items-center justify-between mb-4">
+           <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
+             <User className="w-7 h-7 text-muted-foreground" />
+             My Profile
+           </h1>
+           <button
+             onClick={() => base44.auth.logout()}
+             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive text-xs font-medium transition-all"
+           >
+             <LogOut className="w-4 h-4" />
+             Log Out
+           </button>
+         </div>
+         {user && (
+         <div className="flex items-center gap-2 mt-1">
           {editingName ? (
             <div className="flex items-center gap-2">
               <Input
