@@ -101,7 +101,7 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
         <div className="mb-3">
           <VerdictBadge
             verdict={aiVerdict?.verdict}
-            ai_confidence={aiVerdict?.ai_confidence}
+            ai_confidence={gradeConfidence}
             loading={aiLoading && !aiVerdict}
           />
           {aiVerdict?.reason && (
