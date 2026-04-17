@@ -1,9 +1,9 @@
-const CACHE_KEY = 'locklab_live_props_v25';
-const CACHE_DATE_KEY = 'locklab_live_props_date_v25';
+const CACHE_KEY = 'locklab_live_props_v26';
+const CACHE_DATE_KEY = 'locklab_live_props_date_v26';
 
 // Clear any old versioned cache keys on load
 (function purgeOldCaches() {
-  for (let i = 1; i <= 24; i++) {
+  for (let i = 1; i <= 25; i++) {
     localStorage.removeItem(`locklab_live_props_v${i}`);
     localStorage.removeItem(`locklab_live_props_date_v${i}`);
   }
@@ -242,7 +242,12 @@ export async function fetchLiveProps() {
         hit_rate_last_10: Math.round((hits / 10) * 100),
         last_5_games: g5,
         last_10_games: games10,
-        projection: parseFloat((avg5 * 1.02).toFixed(1)),
+        game_logs_last_10: games10.map((value, idx) => ({
+          value,
+          opp: prop.away,
+          isHome: idx % 2 === 0,
+        })),
+        projection: Math.round(avg5 * 1.02),
         edge: parseFloat((((avg5 * 1.02 - prop.line) / prop.line) * 100).toFixed(1)),
         streak_info: hits >= 7 ? `Hit over in ${hits} of last 10` : hits <= 3 ? `Hit under in ${10 - hits} of last 10` : `Split ${hits}-${10 - hits} last 10`,
         confidence_score: Math.min(10, Math.max(3, hits >= 8 ? 9 : hits >= 6 ? 7 : hits >= 4 ? 5 : 3)),
