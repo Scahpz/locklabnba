@@ -143,11 +143,18 @@ Deno.serve(async (req) => {
 
     // Fetch props for all today's games in parallel
     const propResults = await Promise.all(
-      todayEvents.map(event =>
-        fetch(
-          `${ODDS_API_BASE}/sports/${SPORT}/events/${event.id}/odds?apiKey=${apiKey}&regions=us&markets=${PROP_MARKETS}&oddsFormat=american`
-        ).then(r => r.ok ? r.json() : null).catch(() => null)
-      )
+      todayEvents.map(async event => {
+        const url = `${ODDS_API_BASE}/sports/${SPORT}/events/${event.id}/odds?apiKey=${apiKey}&regions=us&markets=${PROP_MARKETS}&oddsFormat=american`;
+        try {
+          const r = await fetch(url);
+          const json = await r.json();
+          console.log(`Event ${event.home_team} vs ${event.away_team}: status=${r.status}, bookmakers=${json.bookmakers?.length ?? 0}, error=${json.message ?? json.error_code ?? 'none'}`);
+          return r.ok ? json : null;
+        } catch (e) {
+          console.log(`Event ${event.home_team} fetch error: ${e.message}`);
+          return null;
+        }
+      })
     );
 
     // Build games summary
