@@ -95,21 +95,29 @@ export default function LiveOdds() {
       }
 
       if (!data || !data.games_summary?.length) {
-        // Priority 2: PrizePicks (free, real lines, no key)
+        // Priority 2: Underdog Fantasy (free, works from cloud)
         try {
-          const res = await fetch(`${NBA_API}/api/prizepicks/props`);
+          const res = await fetch(`${NBA_API}/api/underdog/props`);
           if (res.ok) {
-            const pp = await res.json();
-            if (pp.games_summary?.length || pp.rawProps?.length) {
-              data = pp;
-              source = 'prizepicks';
-            }
+            const ud = await res.json();
+            if (ud.games_summary?.length || ud.rawProps?.length) { data = ud; source = 'underdog'; }
           }
         } catch {}
       }
 
       if (!data || !data.games_summary?.length) {
-        // Priority 3: Season averages from NBA.com
+        // Priority 3: PrizePicks (free, may be blocked from some servers)
+        try {
+          const res = await fetch(`${NBA_API}/api/prizepicks/props`);
+          if (res.ok) {
+            const pp = await res.json();
+            if (pp.games_summary?.length || pp.rawProps?.length) { data = pp; source = 'prizepicks'; }
+          }
+        } catch {}
+      }
+
+      if (!data || !data.games_summary?.length) {
+        // Priority 4: Season averages from NBA.com
         const res = await fetch(`${NBA_API}/api/live-props`);
         data = await res.json();
         source = 'season_avg';
@@ -325,6 +333,11 @@ export default function LiveOdds() {
         <p className="text-center text-[11px] text-muted-foreground flex items-center justify-center gap-2">
           Last updated: {lastUpdated.toLocaleTimeString()}
           {oddsSource === 'odds_api' && <span className="text-primary font-medium">· Live sportsbook odds</span>}
+          {oddsSource === 'underdog' && (
+            <span className="flex items-center gap-1 text-chart-3 font-medium">
+              <Zap className="w-3 h-3" />· Powered by Underdog Fantasy (free live lines)
+            </span>
+          )}
           {oddsSource === 'prizepicks' && (
             <span className="flex items-center gap-1 text-chart-3 font-medium">
               <Zap className="w-3 h-3" />· Powered by PrizePicks (free live lines)

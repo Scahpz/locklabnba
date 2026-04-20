@@ -33,3 +33,4 @@ dist-ssr
 # Backend secrets
 backend/settings.json
 backend/parlays.json
+.vercel

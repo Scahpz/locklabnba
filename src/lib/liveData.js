@@ -91,7 +91,18 @@ export async function fetchLiveProps() {
     } catch {}
   }
 
-  // Priority 2: PrizePicks — free, no key, real live lines
+  // Priority 2: Underdog Fantasy — free, no key, works from cloud servers
+  if (!oddsData || !oddsData.rawProps?.length) {
+    try {
+      const res = await fetch(`${NBA_API}/api/underdog/props`);
+      if (res.ok) {
+        const ud = await res.json();
+        if (ud.rawProps?.length) oddsData = ud;
+      }
+    } catch {}
+  }
+
+  // Priority 3: PrizePicks — free, no key (may be blocked from some servers)
   if (!oddsData || !oddsData.rawProps?.length) {
     try {
       const res = await fetch(`${NBA_API}/api/prizepicks/props`);
@@ -102,7 +113,7 @@ export async function fetchLiveProps() {
     } catch {}
   }
 
-  // Priority 3: Season-average projections from NBA.com (always available)
+  // Priority 4: Season-average projections from NBA.com (always available)
   if (!oddsData || !oddsData.rawProps?.length) {
     try {
       const res = await fetch(`${NBA_API}/api/live-props`);
