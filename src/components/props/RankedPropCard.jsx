@@ -32,7 +32,7 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
 
   const grade = gradeProp(prop);
   const tier = tierConfig[prop.has_analytics ? prop.confidence_tier : 'C'] || tierConfig.C;
-  const isPositiveEdge = prop.edge > 0;
+  const isOverFavorable = grade.verdict === 'OVER';
   const hasBooks = prop.all_books?.length > 1;
 
   const activeBook = selectedBook ? prop.all_books?.find(b => b.key === selectedBook) : null;
@@ -113,13 +113,13 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
                 "flex flex-col items-center border rounded-lg px-3 py-1.5 transition-all",
                 isSelected(prop.player_name, prop.prop_type, 'over')
                   ? "bg-primary border-primary text-primary-foreground"
-                  : isPositiveEdge
+                  : isOverFavorable
                   ? "bg-primary/10 hover:bg-primary/20 border-primary/20"
                   : "bg-secondary hover:bg-secondary/80 border-border"
               )}
             >
-              <span className={cn("text-[10px] font-medium", isSelected(prop.player_name, prop.prop_type, 'over') ? 'text-primary-foreground' : isPositiveEdge ? 'text-primary' : 'text-muted-foreground')}>OVER</span>
-              <span className={cn("text-sm font-bold", isSelected(prop.player_name, prop.prop_type, 'over') ? 'text-primary-foreground' : isPositiveEdge ? 'text-primary' : 'text-muted-foreground')}>{fmtOdds(displayOverOdds)}</span>
+              <span className={cn("text-[10px] font-medium", isSelected(prop.player_name, prop.prop_type, 'over') ? 'text-primary-foreground' : isOverFavorable ? 'text-primary' : 'text-muted-foreground')}>OVER</span>
+              <span className={cn("text-sm font-bold", isSelected(prop.player_name, prop.prop_type, 'over') ? 'text-primary-foreground' : isOverFavorable ? 'text-primary' : 'text-muted-foreground')}>{fmtOdds(displayOverOdds)}</span>
             </button>
             <button
               onClick={() => handlePick('under')}
@@ -127,13 +127,13 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
                 "flex flex-col items-center border rounded-lg px-3 py-1.5 transition-all",
                 isSelected(prop.player_name, prop.prop_type, 'under')
                   ? "bg-destructive border-destructive text-destructive-foreground"
-                  : !isPositiveEdge
+                  : !isOverFavorable
                   ? "bg-destructive/10 hover:bg-destructive/20 border-destructive/20"
                   : "bg-secondary hover:bg-secondary/80 border-border"
               )}
             >
-              <span className={cn("text-[10px] font-medium", isSelected(prop.player_name, prop.prop_type, 'under') ? 'text-destructive-foreground' : !isPositiveEdge ? 'text-destructive' : 'text-muted-foreground')}>UNDER</span>
-              <span className={cn("text-sm font-bold", isSelected(prop.player_name, prop.prop_type, 'under') ? 'text-destructive-foreground' : !isPositiveEdge ? 'text-destructive' : 'text-muted-foreground')}>{fmtOdds(displayUnderOdds)}</span>
+              <span className={cn("text-[10px] font-medium", isSelected(prop.player_name, prop.prop_type, 'under') ? 'text-destructive-foreground' : !isOverFavorable ? 'text-destructive' : 'text-muted-foreground')}>UNDER</span>
+              <span className={cn("text-sm font-bold", isSelected(prop.player_name, prop.prop_type, 'under') ? 'text-destructive-foreground' : !isOverFavorable ? 'text-destructive' : 'text-muted-foreground')}>{fmtOdds(displayUnderOdds)}</span>
             </button>
           </div>
         </div>
@@ -147,9 +147,9 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
         </div>
         <div>
           <p className="text-[10px] text-muted-foreground uppercase">Edge</p>
-          <p className={cn("text-sm font-semibold flex items-center gap-0.5", isPositiveEdge ? 'text-primary' : 'text-destructive')}>
-            {isPositiveEdge ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            {prop.edge > 0 ? '+' : ''}{prop.edge}%
+          <p className={cn("text-sm font-semibold flex items-center gap-0.5", isOverFavorable ? 'text-primary' : 'text-destructive')}>
+            {isOverFavorable ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+            {prop.edge != null ? `${prop.edge > 0 ? '+' : ''}${prop.edge}%` : '—'}
           </p>
         </div>
         <div>

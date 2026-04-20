@@ -26,12 +26,18 @@ NBA_STATS_HEADERS = {
     "Host": "stats.nba.com",
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
     "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "en-US,en;q=0.5",
+    "Accept-Language": "en-US,en;q=0.9",
     "Accept-Encoding": "gzip, deflate, br",
     "Connection": "keep-alive",
+    "Origin": "https://www.nba.com",
     "Referer": "https://www.nba.com/",
+    "x-nba-stats-origin": "statsconsumer",
+    "x-nba-stats-token": "true",
     "Pragma": "no-cache",
     "Cache-Control": "no-cache",
+    "Sec-Fetch-Site": "same-site",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Dest": "empty",
 }
 
 NBA_LIVE_HEADERS = {
@@ -208,9 +214,36 @@ class StatsRequest(BaseModel):
 
 def find_player(name: str):
     from nba_api.stats.static import players as ps
+    # Exact match first
     matches = ps.find_players_by_full_name(name)
     active = [p for p in matches if p.get("is_active")]
-    return active[0] if active else (matches[0] if matches else None)
+    if active:
+        return active[0]
+    if matches:
+        return matches[0]
+    # Fuzzy fallback: normalize (remove periods, Jr/Sr/III, extra spaces)
+    import re
+    def normalize(n):
+        n = re.sub(r'\b(jr|sr|ii|iii|iv)\b\.?', '', n.lower())
+        n = re.sub(r'[^a-z\s]', '', n)
+        return ' '.join(n.split())
+    target = normalize(name)
+    all_players = ps.get_players()
+    for p in all_players:
+        if normalize(p["full_name"]) == target and p.get("is_active"):
+            return p
+    for p in all_players:
+        if normalize(p["full_name"]) == target:
+            return p
+    # Partial match on last name
+    parts = target.split()
+    if parts:
+        last = parts[-1]
+        candidates = [p for p in all_players if last in normalize(p["full_name"]).split()]
+        active_c = [p for p in candidates if p.get("is_active")]
+        if active_c:
+            return active_c[0]
+    return None
 
 def fetch_game_logs(player_id: int) -> list:
     data = nba_stats_get("playergamelog", {

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Check, X, Clock, ChevronDown, ChevronUp } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { gradeProp } from '@/lib/grading';
 
@@ -62,14 +61,9 @@ export default function PropGradeChecklist({ prop }) {
           ))}
 
           {dataQuality === 'market' && (
-            <div className="pt-1 border-t border-border/50">
-              <Link
-                to={`/trends?player=${encodeURIComponent(prop.player_name)}`}
-                className="text-[10px] text-primary underline"
-              >
-                Load game logs in Trends to unlock full grade
-              </Link>
-            </div>
+            <p className="text-[9px] text-muted-foreground pt-1 border-t border-border/50 italic">
+              Analytics loading in background…
+            </p>
           )}
         </div>
       )}

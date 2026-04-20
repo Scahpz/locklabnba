@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { fetchLiveProps, clearLiveCache } from '@/lib/liveData';
 import { getAIVerdicts } from '@/lib/aiVerdicts';
 import LockCards from '@/components/props/LockCards';
@@ -6,6 +6,7 @@ import RankedPropCard from '@/components/props/RankedPropCard';
 import { RefreshCw, Wifi, WifiOff, Zap, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { rankScore } from '@/lib/grading';
+import { NBA_API } from '@/lib/config';
 
 const PROP_TYPES = ['all', 'points', 'rebounds', 'assists', 'PRA', '3PM', 'steals', 'blocks'];
 const SORT_OPTIONS = [
@@ -34,9 +35,15 @@ export default function Props() {
   const [sortBy, setSortBy] = useState('ai_rank');
   const [verdicts, setVerdicts] = useState({});
   const [aiLoading, setAiLoading] = useState(false);
+  const [playerAnalytics, setPlayerAnalytics] = useState({});
+  const fetchedPlayers = useRef(new Set());
 
   const loadData = async (forceRefresh = false) => {
     setLoading(true);
+    if (forceRefresh) {
+      setPlayerAnalytics({});
+      fetchedPlayers.current = new Set();
+    }
     try {
       const data = await fetchLiveProps();
       if (data?.props?.length > 0) {
@@ -46,9 +53,8 @@ export default function Props() {
         setGamesSummary(data.games_summary || []);
         setIsLive(true);
 
-        // Kick off AI verdicts for top props only (faster)
         setAiLoading(true);
-        const topProps = realProps.slice(0, 50); // Only analyze top 50
+        const topProps = realProps.slice(0, 50);
         getAIVerdicts(topProps).then(v => {
           setVerdicts(v);
           setAiLoading(false);
@@ -61,6 +67,64 @@ export default function Props() {
     }
     setLoading(false);
   };
+
+  // Auto-fetch game logs for every player in the background (5 at a time)
+  useEffect(() => {
+    if (!rawProps.length) return;
+    const names = [...new Set(rawProps.map(p => p.player_name))];
+    const pending = names.filter(n => !fetchedPlayers.current.has(n));
+    if (!pending.length) return;
+
+    const batchSize = 5;
+    let i = 0;
+    function fetchBatch() {
+      const batch = pending.slice(i, i + batchSize);
+      i += batchSize;
+      if (!batch.length) return;
+      Promise.all(batch.map(async name => {
+        fetchedPlayers.current.add(name);
+        try {
+          const res = await fetch(`${NBA_API}/api/player-gamelogs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ playerName: name }),
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data.analytics) {
+            setPlayerAnalytics(prev => ({ ...prev, [name]: data.analytics }));
+          }
+        } catch {}
+      })).then(() => fetchBatch());
+    }
+    fetchBatch();
+  }, [rawProps]);
+
+  // Merge real analytics into raw props as they load
+  const enrichedProps = useMemo(() => {
+    return rawProps.map(prop => {
+      const analytics = playerAnalytics[prop.player_name]?.[prop.prop_type];
+      if (!analytics) return prop;
+      const cs = analytics.confidence_score || 5;
+      return {
+        ...prop,
+        has_analytics: true,
+        avg_last_5: analytics.avg_last_5,
+        avg_last_10: analytics.avg_last_10,
+        hit_rate_last_10: analytics.hit_rate_last_10,
+        projection: analytics.projection,
+        edge: analytics.edge,
+        confidence_score: cs,
+        streak_info: analytics.streak_info,
+        last_10_games: analytics.last_10_games,
+        last_5_games: analytics.last_5_games,
+        game_logs_last_10: analytics.game_logs_last_10,
+        confidence_tier: cs >= 8 ? 'A' : cs >= 6 ? 'B' : 'C',
+        is_lock: cs === 10,
+        best_value: (analytics.edge || 0) > 8,
+      };
+    });
+  }, [rawProps, playerAnalytics]);
 
   useEffect(() => { loadData(); }, []);
 
@@ -82,15 +146,11 @@ export default function Props() {
       return passCount * 20;
     };
 
-    return [...rawProps]
+    return [...enrichedProps]
       .filter(p => calculateGradeConfidence(p) === 100)
-      .sort((a, b) => {
-        const ka = `${a.player_name}__${a.prop_type}__${a.line}`;
-        const kb = `${b.player_name}__${b.prop_type}__${b.line}`;
-        return compositeScore(b, verdicts[kb]) - compositeScore(a, verdicts[ka]);
-      })
+      .sort((a, b) => rankScore(b) - rankScore(a))
       .slice(0, 2);
-  }, [rawProps, verdicts]);
+  }, [enrichedProps]);
 
   const sortedGames = useMemo(() => {
     return [...gamesSummary].sort((a, b) => {
@@ -101,9 +161,8 @@ export default function Props() {
   }, [gamesSummary]);
 
   const filteredAndRanked = useMemo(() => {
-    let result = rawProps;
+    let result = enrichedProps;
 
-    // Game filter — show all props if no games selected
     if (selectedGames.length > 0) {
       result = result.filter(p => {
         const pTeam = (p.team || '').toUpperCase();
@@ -115,12 +174,10 @@ export default function Props() {
       });
     }
 
-    // Prop type filter
     if (selectedType !== 'all') {
       result = result.filter(p => p.prop_type === selectedType);
     }
 
-    // Sort
     result = [...result].sort((a, b) => {
       if (sortBy === 'ai_rank') return rankScore(b) - rankScore(a);
       if (sortBy === 'confidence') return (b.confidence_score || 0) - (a.confidence_score || 0);
@@ -130,7 +187,7 @@ export default function Props() {
     });
 
     return result;
-  }, [rawProps, selectedGames, selectedType, sortBy]);
+  }, [enrichedProps, selectedGames, selectedType, sortBy]);
 
   if (loading) {
     return (
@@ -198,7 +255,7 @@ export default function Props() {
       )}
 
       {/* Empty state */}
-      {rawProps.length === 0 && (
+      {enrichedProps.length === 0 && (
         <div className="text-center py-20 text-muted-foreground">
           <Zap className="w-12 h-12 mx-auto mb-3 opacity-20" />
           <p className="text-lg font-medium">No props available today</p>
@@ -206,7 +263,7 @@ export default function Props() {
         </div>
       )}
 
-      {rawProps.length > 0 && (
+      {enrichedProps.length > 0 && (
         <>
           {/* Locks of the Day */}
           <LockCards locks={locks} verdicts={verdicts} aiLoading={aiLoading} />

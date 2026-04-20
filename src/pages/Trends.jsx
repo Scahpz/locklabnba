@@ -234,10 +234,12 @@ export default function Trends() {
             <p className="text-sm text-muted-foreground">{player.team} · {player.position}</p>
             {logsLoading && (
               <p className="text-xs text-primary flex items-center gap-1 mt-1">
-                <Loader2 className="w-3 h-3 animate-spin" /> Loading real game data…
+                <Loader2 className="w-3 h-3 animate-spin" /> Loading game data…
               </p>
             )}
-            {logsError && <p className="text-xs text-destructive mt-1">Could not load game logs: {logsError}</p>}
+            {logsError && !logsLoading && (
+              <p className="text-xs text-muted-foreground mt-1">Using season averages (live logs unavailable)</p>
+            )}
           </div>
         </div>
 
@@ -292,8 +294,7 @@ export default function Trends() {
               ) : (
                 <div className="h-48 flex flex-col items-center justify-center text-muted-foreground gap-2">
                   <Activity className="w-8 h-8 opacity-30" />
-                  <p className="text-sm">No game log data yet</p>
-                  <p className="text-xs opacity-70">Select this player to load their last 10 games</p>
+                  <p className="text-sm">No game log data available</p>
                 </div>
               )}
 

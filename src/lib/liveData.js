@@ -1,8 +1,8 @@
-const CACHE_KEY = 'locklab_live_props_v31';
-const CACHE_DATE_KEY = 'locklab_live_props_date_v31';
+const CACHE_KEY = 'locklab_live_props_v32';
+const CACHE_DATE_KEY = 'locklab_live_props_date_v32';
 
 (function purgeOldCaches() {
-  for (let i = 1; i <= 30; i++) {
+  for (let i = 1; i <= 31; i++) {
     localStorage.removeItem(`locklab_live_props_v${i}`);
     localStorage.removeItem(`locklab_live_props_date_v${i}`);
   }
