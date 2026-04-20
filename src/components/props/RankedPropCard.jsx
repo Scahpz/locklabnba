@@ -110,7 +110,7 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
             <button
               onClick={() => handlePick('over')}
               className={cn(
-                "flex flex-col items-center border rounded-lg px-3 py-1.5 transition-all",
+                "flex flex-col items-center border rounded-lg px-4 py-2.5 transition-all min-w-[60px]",
                 isSelected(prop.player_name, prop.prop_type, 'over')
                   ? "bg-primary border-primary text-primary-foreground"
                   : isOverFavorable
@@ -124,7 +124,7 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
             <button
               onClick={() => handlePick('under')}
               className={cn(
-                "flex flex-col items-center border rounded-lg px-3 py-1.5 transition-all",
+                "flex flex-col items-center border rounded-lg px-4 py-2.5 transition-all min-w-[60px]",
                 isSelected(prop.player_name, prop.prop_type, 'under')
                   ? "bg-destructive border-destructive text-destructive-foreground"
                   : !isOverFavorable

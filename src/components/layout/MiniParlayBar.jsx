@@ -17,7 +17,7 @@ export default function MiniParlayBar() {
   }
 
   return (
-    <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-40 transition-all duration-300">
+    <div className="fixed bottom-[60px] md:bottom-0 left-0 right-0 z-40 transition-all duration-300" style={{ '--safe': 'env(safe-area-inset-bottom, 0px)' }}>
       {/* Expanded legs list */}
       {expanded && (
         <div className="bg-card border-t border-x border-border mx-2 md:mx-0 rounded-t-xl overflow-hidden shadow-2xl">

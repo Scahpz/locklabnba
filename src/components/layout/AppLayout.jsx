@@ -21,7 +21,7 @@ export default function AppLayout() {
 
       {/* Main Content */}
       <main className={cn(
-        "transition-all duration-300 pb-20 md:pb-6 pt-14 md:pt-0",
+        "transition-all duration-300 pb-28 md:pb-6 pt-14 md:pt-0",
         collapsed ? "md:ml-16" : "md:ml-60"
       )}>
         <div className="p-4 md:p-6 max-w-7xl mx-auto">

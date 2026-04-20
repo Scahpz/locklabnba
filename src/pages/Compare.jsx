@@ -4,6 +4,7 @@ import { GitCompare, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import PlayerSelector from '@/components/compare/PlayerSelector';
 import CompareColumn from '@/components/compare/CompareColumn';
 import ComparePropRow from '@/components/compare/ComparePropRow';
+import { cn } from '@/lib/utils';
 
 const MAX_PLAYERS = 3;
 
@@ -65,7 +66,12 @@ export default function Compare() {
       </div>
 
       {/* Player Selector Row */}
-      <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${selectedIds.length}, minmax(0, 1fr))` }}>
+      <div className={cn(
+        "grid gap-4",
+        selectedIds.length === 1 ? "grid-cols-1" :
+        selectedIds.length === 2 ? "grid-cols-1 sm:grid-cols-2" :
+        "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+      )}>
         {selectedIds.map((id, slot) => (
           <PlayerSelector
             key={slot}
@@ -80,7 +86,7 @@ export default function Compare() {
         {selectedIds.length < MAX_PLAYERS && (
           <button
             onClick={handleAdd}
-            className="rounded-xl border-2 border-dashed border-border hover:border-accent/50 bg-card/50 hover:bg-accent/5 transition-all flex flex-col items-center justify-center gap-2 p-8 text-muted-foreground hover:text-accent min-h-[120px]"
+            className="rounded-xl border-2 border-dashed border-border hover:border-accent/50 bg-card/50 hover:bg-accent/5 transition-all flex flex-col items-center justify-center gap-2 p-8 text-muted-foreground hover:text-accent min-h-[100px]"
           >
             <span className="text-3xl font-light">+</span>
             <span className="text-xs font-medium">Add Player</span>
@@ -90,7 +96,12 @@ export default function Compare() {
 
       {/* Stats Overview Row */}
       {selected.length > 0 && (
-        <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${selected.length}, minmax(0, 1fr))` }}>
+        <div className={cn(
+          "grid gap-4",
+          selected.length === 1 ? "grid-cols-1" :
+          selected.length === 2 ? "grid-cols-1 sm:grid-cols-2" :
+          "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+        )}>
           {selected.map(player => (
             <CompareColumn key={player.id} player={player} />
           ))}

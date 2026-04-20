@@ -227,7 +227,7 @@ export default function Props() {
 
       {/* Game filter */}
       {sortedGames.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap scrollbar-none">
           {sortedGames.map((g, i) => {
             const key = `${(g.away || '').toUpperCase()}@${(g.home || '').toUpperCase()}`;
             const active = selectedGames.includes(key);
@@ -237,7 +237,7 @@ export default function Props() {
                 key={i}
                 onClick={() => toggleGame(g)}
                 className={cn(
-                  "flex items-center gap-2 border rounded-lg px-3 py-1.5 text-xs transition-all",
+                  "flex items-center gap-2 border rounded-lg px-3 py-2 text-xs transition-all flex-shrink-0 whitespace-nowrap",
                   active ? "bg-primary/15 border-primary/50 text-foreground" : "bg-secondary/60 border-border text-foreground hover:border-primary/30"
                 )}
               >
@@ -247,7 +247,7 @@ export default function Props() {
             );
           })}
           {selectedGames.length > 0 && (
-            <button onClick={() => setSelectedGames([])} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1.5 transition-colors">
+            <button onClick={() => setSelectedGames([])} className="text-xs text-muted-foreground hover:text-foreground px-2 py-2 flex-shrink-0 transition-colors">
               Clear
             </button>
           )}
@@ -269,15 +269,15 @@ export default function Props() {
           <LockCards locks={locks} verdicts={verdicts} aiLoading={aiLoading} />
 
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-1.5 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap pb-1 scrollbar-none">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 self-center" />
               {PROP_TYPES.map(t => (
                 <button
                   key={t}
                   onClick={() => setSelectedType(t)}
                   className={cn(
-                    "text-xs px-3 py-1.5 rounded-lg border transition-all capitalize",
+                    "text-xs px-3 py-2 rounded-lg border transition-all flex-shrink-0 whitespace-nowrap",
                     selectedType === t
                       ? "bg-primary/20 border-primary/40 text-primary font-medium"
                       : "bg-secondary/60 border-border text-muted-foreground hover:text-foreground"
@@ -287,7 +287,7 @@ export default function Props() {
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-2 ml-auto">
+            <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Sort:</span>
               <select
                 value={sortBy}
