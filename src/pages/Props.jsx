@@ -5,6 +5,7 @@ import LockCards from '@/components/props/LockCards';
 import RankedPropCard from '@/components/props/RankedPropCard';
 import { RefreshCw, Wifi, WifiOff, Zap, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { rankScore } from '@/lib/grading';
 
 const PROP_TYPES = ['all', 'points', 'rebounds', 'assists', 'PRA', '3PM', 'steals', 'blocks'];
 const SORT_OPTIONS = [
@@ -14,15 +15,12 @@ const SORT_OPTIONS = [
   { value: 'hit_rate', label: 'Hit Rate' },
 ];
 
-/**
- * Composite rank score: weights confidence, hit rate, edge, and AI confidence together.
- */
-function compositeScore(prop, verdict) {
-  const confScore = (prop.confidence_score || 0) * 8;
-  const hitScore = (prop.hit_rate_last_10 || 0) * 0.4;
-  const edgeScore = Math.min(Math.max(prop.edge || 0, -20), 20) * 1.5;
-  const aiBoost = verdict && verdict.verdict !== 'UNSAFE' ? (verdict.ai_confidence || 0) * 0.3 : 0;
-  return confScore + hitScore + edgeScore + aiBoost;
+function fmtTipoff(scheduledAt) {
+  if (!scheduledAt) return null;
+  try {
+    const d = new Date(scheduledAt);
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+  } catch { return null; }
 }
 
 export default function Props() {
@@ -94,6 +92,14 @@ export default function Props() {
       .slice(0, 2);
   }, [rawProps, verdicts]);
 
+  const sortedGames = useMemo(() => {
+    return [...gamesSummary].sort((a, b) => {
+      const ta = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity;
+      const tb = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity;
+      return ta - tb;
+    });
+  }, [gamesSummary]);
+
   const filteredAndRanked = useMemo(() => {
     let result = rawProps;
 
@@ -116,19 +122,15 @@ export default function Props() {
 
     // Sort
     result = [...result].sort((a, b) => {
-      if (sortBy === 'ai_rank') {
-        const ka = `${a.player_name}__${a.prop_type}__${a.line}`;
-        const kb = `${b.player_name}__${b.prop_type}__${b.line}`;
-        return compositeScore(b, verdicts[kb]) - compositeScore(a, verdicts[ka]);
-      }
-      if (sortBy === 'confidence') return b.confidence_score - a.confidence_score;
-      if (sortBy === 'edge') return b.edge - a.edge;
-      if (sortBy === 'hit_rate') return b.hit_rate_last_10 - a.hit_rate_last_10;
+      if (sortBy === 'ai_rank') return rankScore(b) - rankScore(a);
+      if (sortBy === 'confidence') return (b.confidence_score || 0) - (a.confidence_score || 0);
+      if (sortBy === 'edge') return (b.edge || 0) - (a.edge || 0);
+      if (sortBy === 'hit_rate') return (b.hit_rate_last_10 || 0) - (a.hit_rate_last_10 || 0);
       return 0;
     });
 
     return result;
-  }, [rawProps, selectedGames, selectedType, sortBy, verdicts]);
+  }, [rawProps, selectedGames, selectedType, sortBy]);
 
   if (loading) {
     return (
@@ -167,11 +169,12 @@ export default function Props() {
       </div>
 
       {/* Game filter */}
-      {gamesSummary.length > 0 && (
+      {sortedGames.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {gamesSummary.map((g, i) => {
+          {sortedGames.map((g, i) => {
             const key = `${(g.away || '').toUpperCase()}@${(g.home || '').toUpperCase()}`;
             const active = selectedGames.includes(key);
+            const tipoff = fmtTipoff(g.scheduled_at) || g.tipoff;
             return (
               <button
                 key={i}
@@ -182,7 +185,7 @@ export default function Props() {
                 )}
               >
                 <span className="font-bold">{g.away} @ {g.home}</span>
-                {g.tipoff && <span className="text-muted-foreground">{g.tipoff}</span>}
+                {tipoff && <span className="text-muted-foreground">{tipoff}</span>}
               </button>
             );
           })}

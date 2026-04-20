@@ -1,42 +1,13 @@
 import React, { useState } from 'react';
-import { Check, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, X, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-
-function buildCriteria(prop) {
-  if (!prop.has_analytics) return null; // no real data yet
-
-  const l10Pass  = prop.avg_last_10 != null && prop.avg_last_10 > prop.line;
-  const l5Pass   = prop.avg_last_5  != null && prop.avg_last_5  > prop.line;
-  const hitPass  = prop.hit_rate_last_10 != null && prop.hit_rate_last_10 >= 60;
-  const projPass = prop.projection  != null && prop.projection  > prop.line;
-  const edgePass = prop.edge != null && prop.edge > 0;
-
-  return [
-    { label: `L10 Avg — ${prop.avg_last_10 ?? '—'} vs line ${prop.line}`, pass: l10Pass },
-    { label: `L5 Avg — ${prop.avg_last_5 ?? '—'} vs line ${prop.line}`, pass: l5Pass },
-    { label: `Hit Rate (L10) — ${prop.hit_rate_last_10 != null ? prop.hit_rate_last_10 + '%' : '—'} (need ≥60%)`, pass: hitPass },
-    { label: `Projection — ${prop.projection ?? '—'} vs line ${prop.line}`, pass: projPass },
-    { label: `Edge — ${prop.edge != null ? (prop.edge > 0 ? '+' : '') + prop.edge : '—'}`, pass: edgePass },
-  ];
-}
+import { gradeProp } from '@/lib/grading';
 
 export default function PropGradeChecklist({ prop }) {
   const [open, setOpen] = useState(false);
-  const criteria = buildCriteria(prop);
-
-  // No analytics loaded yet — show a prompt instead
-  if (!criteria) {
-    return (
-      <div className="px-4 pb-3">
-        <p className="text-[11px] text-muted-foreground italic">
-          Open <Link to={`/trends?player=${encodeURIComponent(prop.player_name)}`} className="text-primary underline">Trends</Link> to load game history and see grade criteria.
-        </p>
-      </div>
-    );
-  }
-
-  const passCount = criteria.filter(c => c.pass).length;
+  const { criteria, passCount, totalCriteria, dataQuality } = gradeProp(prop);
+  const availableCount = criteria.filter(c => c.available).length;
 
   return (
     <div className="px-4 pb-3">
@@ -52,33 +23,54 @@ export default function PropGradeChecklist({ prop }) {
             passCount >= 2 ? "bg-chart-4/20 text-chart-4" :
             "bg-destructive/20 text-destructive"
           )}>
-            {passCount}/{criteria.length}
+            {passCount}/{availableCount}
           </span>
+          {dataQuality === 'market' && (
+            <span className="text-[9px] text-muted-foreground italic">market only</span>
+          )}
         </span>
         {open ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
       </button>
 
       {open && (
-        <div className="bg-secondary/30 rounded-lg p-2.5 space-y-1.5 mt-1">
+        <div className="bg-secondary/30 rounded-lg p-2.5 space-y-2 mt-1">
           {criteria.map((c, i) => (
-            <div key={i} className="flex items-center gap-2">
+            <div key={i} className="flex items-start gap-2">
               <div className={cn(
-                "w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0",
-                c.pass ? "bg-primary/20" : "bg-destructive/20"
+                "w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5",
+                c.pending  ? "bg-secondary border border-border" :
+                c.pass     ? "bg-primary/20" : "bg-destructive/20"
               )}>
-                {c.pass
-                  ? <Check className="w-2.5 h-2.5 text-primary" />
-                  : <X className="w-2.5 h-2.5 text-destructive" />
+                {c.pending
+                  ? <Clock className="w-2.5 h-2.5 text-muted-foreground" />
+                  : c.pass
+                    ? <Check className="w-2.5 h-2.5 text-primary" />
+                    : <X className="w-2.5 h-2.5 text-destructive" />
                 }
               </div>
-              <span className={cn(
-                "text-[11px] leading-tight",
-                c.pass ? "text-foreground" : "text-muted-foreground line-through"
-              )}>
-                {c.label}
-              </span>
+              <div className="flex-1 min-w-0">
+                <p className={cn(
+                  "text-[11px] font-medium leading-tight",
+                  c.pending  ? "text-muted-foreground" :
+                  c.pass     ? "text-foreground" : "text-muted-foreground"
+                )}>
+                  {c.label}
+                </p>
+                <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{c.detail}</p>
+              </div>
             </div>
           ))}
+
+          {dataQuality === 'market' && (
+            <div className="pt-1 border-t border-border/50">
+              <Link
+                to={`/trends?player=${encodeURIComponent(prop.player_name)}`}
+                className="text-[10px] text-primary underline"
+              >
+                Load game logs in Trends to unlock full grade
+              </Link>
+            </div>
+          )}
         </div>
       )}
     </div>

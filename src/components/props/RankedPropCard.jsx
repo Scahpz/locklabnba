@@ -7,6 +7,7 @@ import TeamLogo from '@/components/common/TeamLogo';
 import { useParlay } from '@/lib/ParlayContext';
 import VerdictBadge from '@/components/props/VerdictBadge';
 import PropGradeChecklist from '@/components/props/PropGradeChecklist';
+import { gradeProp } from '@/lib/grading';
 
 function fmtOdds(n) {
   if (n == null) return '—';
@@ -29,20 +30,8 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
   const [showBooks, setShowBooks] = useState(false);
   const [selectedBook, setSelectedBook] = useState(null);
 
-  // Grade confidence — only meaningful when real game-log analytics are loaded
-  function calculateGradeConfidence(p) {
-    if (!p.has_analytics) return null; // no data yet
-    const l10Pass   = p.avg_last_10 != null && p.avg_last_10 > p.line;
-    const l5Pass    = p.avg_last_5  != null && p.avg_last_5  > p.line;
-    const hitPass   = p.hit_rate_last_10 != null && p.hit_rate_last_10 >= 60;
-    const projPass  = p.projection  != null && p.projection  > p.line;
-    const edgePass  = p.edge != null && p.edge > 0;
-    const passCount = [l10Pass, l5Pass, hitPass, projPass, edgePass].filter(Boolean).length;
-    return passCount * 20;
-  }
-
-  const gradeConfidence = calculateGradeConfidence(prop);
-  const tier = tierConfig[prop.confidence_tier] || tierConfig.C;
+  const grade = gradeProp(prop);
+  const tier = tierConfig[prop.has_analytics ? prop.confidence_tier : 'C'] || tierConfig.C;
   const isPositiveEdge = prop.edge > 0;
   const hasBooks = prop.all_books?.length > 1;
 
@@ -98,24 +87,15 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
           </div>
         </div>
 
-        {/* AI Verdict */}
+        {/* Grade Verdict — always shows OVER or UNDER */}
         <div className="mb-3">
-          {gradeConfidence === null ? (
-            <Link
-              to={`/trends?player=${encodeURIComponent(prop.player_name)}`}
-              className="flex items-center gap-1.5 bg-secondary/60 rounded-lg px-3 py-1.5 text-xs text-muted-foreground hover:text-primary transition-colors w-fit"
-            >
-              <TrendingUp className="w-3.5 h-3.5" />
-              Click to load game history &amp; grade
-            </Link>
-          ) : (
-            <VerdictBadge
-              verdict={gradeConfidence >= 60 ? (prop.edge > 0 ? 'OVER' : 'UNDER') : gradeConfidence >= 40 ? 'UNSAFE' : 'UNDER'}
-              ai_confidence={gradeConfidence}
-              loading={aiLoading && !aiVerdict}
-            />
-          )}
-          {aiVerdict?.reason && (
+          <VerdictBadge
+            verdict={grade.verdict}
+            ai_confidence={grade.confidence}
+            dataQuality={grade.dataQuality}
+            loading={false}
+          />
+          {grade.dataQuality === 'full' && aiVerdict?.reason && (
             <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">{aiVerdict.reason}</p>
           )}
         </div>
