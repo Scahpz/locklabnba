@@ -962,6 +962,135 @@ async def get_scoreboard():
     except Exception as e:
         raise HTTPException(500, str(e))
 
+@app.get("/api/odds/games")
+async def get_game_odds(bookmakers: str = "draftkings,fanduel,betmgm,caesars,pointsbetus"):
+    """Game moneyline, spread, and totals. Uses Odds API if key set, else returns game list only."""
+    settings = load_settings()
+    api_key = settings.get("odds_api_key", "")
+
+    # Build base game list from Underdog so we always have games even without a key
+    games_map = {}
+    try:
+        ud_res = requests.get(
+            "https://api.underdogfantasy.com/beta/v5/over_under_lines",
+            headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"},
+            timeout=15,
+        )
+        if ud_res.ok:
+            ud = ud_res.json()
+            for game in (ud.get("games") or []):
+                home_id = game.get("home_team_id") or game.get("home_team", {}).get("id")
+                away_id = game.get("away_team_id") or game.get("away_team", {}).get("id")
+                appearances = ud.get("appearances") or []
+                team_id_to_abbr = {}
+                for app in appearances:
+                    tid = app.get("team_id")
+                    abbr = app.get("team", {}).get("abbr") or app.get("team", {}).get("abbreviation")
+                    if tid and abbr:
+                        team_id_to_abbr[tid] = abbr.upper()
+                home_abbr = team_id_to_abbr.get(home_id, "")
+                away_abbr = team_id_to_abbr.get(away_id, "")
+                sched = game.get("scheduled_at") or game.get("start_time") or ""
+                if home_abbr and away_abbr:
+                    gid = f"{away_abbr}@{home_abbr}"
+                    games_map[gid] = {
+                        "id": gid, "awayAbv": away_abbr, "homeAbv": home_abbr,
+                        "commence_time": sched, "allBooks": [],
+                    }
+    except Exception:
+        pass
+
+    if not api_key:
+        return list(games_map.values())
+
+    # Fetch real h2h/spreads/totals from The Odds API
+    try:
+        r = requests.get(
+            "https://api.the-odds-api.com/v4/sports/basketball_nba/odds",
+            params={
+                "apiKey": api_key,
+                "regions": "us",
+                "markets": "h2h,spreads,totals",
+                "oddsFormat": "american",
+                "bookmakers": bookmakers,
+            },
+            timeout=20,
+        )
+        if r.status_code == 401:
+            raise HTTPException(401, "Invalid Odds API key")
+        r.raise_for_status()
+        events = r.json()
+    except HTTPException:
+        raise
+    except Exception as e:
+        return list(games_map.values())  # fallback to no-odds list
+
+    result = []
+    for event in events:
+        home_abv = TEAM_NAME_TO_ABV.get(event.get("home_team", ""), event.get("home_team", "")[:3].upper())
+        away_abv = TEAM_NAME_TO_ABV.get(event.get("away_team", ""), event.get("away_team", "")[:3].upper())
+        gid = f"{away_abv}@{home_abv}"
+
+        all_books = []
+        for bm in event.get("bookmakers", []):
+            book_entry = {
+                "key": bm["key"], "title": bm["title"],
+                "ml_away": None, "ml_home": None,
+                "spread_away": None, "spread_away_odds": None,
+                "spread_home": None, "spread_home_odds": None,
+                "total_line": None, "total_over_odds": None, "total_under_odds": None,
+            }
+            for market in bm.get("markets", []):
+                mk = market["key"]
+                for outcome in market.get("outcomes", []):
+                    name = outcome.get("name", "")
+                    price = outcome.get("price")
+                    point = outcome.get("point")
+                    if mk == "h2h":
+                        if name == event.get("away_team"):
+                            book_entry["ml_away"] = price
+                        elif name == event.get("home_team"):
+                            book_entry["ml_home"] = price
+                    elif mk == "spreads":
+                        if name == event.get("away_team"):
+                            book_entry["spread_away"] = point
+                            book_entry["spread_away_odds"] = price
+                        elif name == event.get("home_team"):
+                            book_entry["spread_home"] = point
+                            book_entry["spread_home_odds"] = price
+                    elif mk == "totals":
+                        if name == "Over":
+                            book_entry["total_line"] = point
+                            book_entry["total_over_odds"] = price
+                        elif name == "Under":
+                            book_entry["total_under_odds"] = price
+            all_books.append(book_entry)
+
+        # Primary odds = first book
+        primary = all_books[0] if all_books else {}
+        result.append({
+            "id": gid,
+            "awayAbv": away_abv, "homeAbv": home_abv,
+            "commence_time": event.get("commence_time", ""),
+            "moneyline": {"away": primary.get("ml_away"), "home": primary.get("ml_home"), "bookmaker": primary.get("title")},
+            "spread": {
+                "away": primary.get("spread_away"), "awayOdds": primary.get("spread_away_odds"),
+                "home": primary.get("spread_home"), "homeOdds": primary.get("spread_home_odds"),
+            },
+            "total": {"line": primary.get("total_line"), "overOdds": primary.get("total_over_odds"), "underOdds": primary.get("total_under_odds")},
+            "allBooks": all_books,
+        })
+
+    # Fill in any games from Underdog not in Odds API
+    result_ids = {g["id"] for g in result}
+    for gid, g in games_map.items():
+        if gid not in result_ids:
+            result.append(g)
+
+    result.sort(key=lambda g: g.get("commence_time") or "")
+    return result
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}

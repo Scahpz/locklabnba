@@ -78,62 +78,17 @@ export default function LiveOdds() {
     try {
       const s = await fetch(`${NBA_API}/api/settings`).then(r => r.json()).catch(() => ({}));
       const books = s.bookmakers || selectedBooks.join(',');
+      const hasKey = !!s.odds_api_key;
 
-      let data = null;
-      let source = 'season_avg';
-
-      if (s.odds_api_key) {
-        // Priority 1: The Odds API (real sportsbook lines)
-        const res = await fetch(`${NBA_API}/api/odds/props?bookmakers=${encodeURIComponent(books)}`);
-        if (res.ok) {
-          data = await res.json();
-          source = 'odds_api';
-        } else {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.detail || 'Failed to fetch odds');
-        }
+      const res = await fetch(`${NBA_API}/api/odds/games?bookmakers=${encodeURIComponent(books)}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to fetch');
       }
+      const gamesData = await res.json();
 
-      if (!data || !data.games_summary?.length) {
-        // Priority 2: Underdog Fantasy (free, works from cloud)
-        try {
-          const res = await fetch(`${NBA_API}/api/underdog/props`);
-          if (res.ok) {
-            const ud = await res.json();
-            if (ud.games_summary?.length || ud.rawProps?.length) { data = ud; source = 'underdog'; }
-          }
-        } catch {}
-      }
-
-      if (!data || !data.games_summary?.length) {
-        // Priority 3: PrizePicks (free, may be blocked from some servers)
-        try {
-          const res = await fetch(`${NBA_API}/api/prizepicks/props`);
-          if (res.ok) {
-            const pp = await res.json();
-            if (pp.games_summary?.length || pp.rawProps?.length) { data = pp; source = 'prizepicks'; }
-          }
-        } catch {}
-      }
-
-      if (!data || !data.games_summary?.length) {
-        // Priority 4: Season averages from NBA.com
-        const res = await fetch(`${NBA_API}/api/live-props`);
-        data = await res.json();
-        source = 'season_avg';
-      }
-
-      setOddsSource(source);
-      const converted = (data.games_summary || []).map(game => ({
-        id: `${game.away}@${game.home}`,
-        awayAbv: game.away, homeAbv: game.home,
-        away_team: game.away, home_team: game.home,
-        commence_time: game.scheduled_at || new Date().toISOString(),
-        allBooks: [],
-      }));
-      // Sort by tip-off time ascending
-      converted.sort((a, b) => new Date(a.commence_time) - new Date(b.commence_time));
-      setGames(converted);
+      setOddsSource(hasKey ? 'odds_api' : 'underdog');
+      setGames(Array.isArray(gamesData) ? gamesData : []);
       setLastUpdated(new Date());
     } catch (e) {
       setError(e.message || 'Failed to fetch');
