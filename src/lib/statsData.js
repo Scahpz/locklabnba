@@ -1,23 +1,23 @@
-import { base44 } from '@/api/base44Client';
-
-
+import { NBA_API as NBA_API_BASE } from './config';
 
 /**
- * Get real analytics for a player prop using BallDontLie backend function.
- * Returns { avg_last_5, avg_last_10, hit_rate_last_10, last_5_games, last_10_games,
- *           game_logs_last_10, projection, edge, streak_info, confidence_score, data_source }
+ * Get real analytics for a player prop using local nba_api backend.
+ * Returns { avg_last_5, avg_last_10, hit_rate_last_10, game_logs_last_10,
+ *           projection, edge, streak_info, confidence_score, data_source }
  */
 export async function getRealPlayerAnalytics(playerName, propType, line) {
   try {
-    const response = await base44.functions.invoke('getPlayerStats', {
-      playerName,
-      propType,
-      line,
+    const res = await fetch(`${NBA_API_BASE}/api/player-stats`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerName, propType, line }),
     });
 
-    return response.data?.analytics || null;
+    if (!res.ok) throw new Error(`Backend returned ${res.status}`);
+    const data = await res.json();
+    return data.analytics || null;
   } catch (e) {
-    console.warn(`BallDontLie fetch failed for ${playerName}:`, e.message);
+    console.warn(`nba_api fetch failed for ${playerName}:`, e.message);
     return null;
   }
 }
