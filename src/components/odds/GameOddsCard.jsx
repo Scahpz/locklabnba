@@ -158,14 +158,16 @@ export default function GameOddsCard({ game }) {
   const [showBooks, setShowBooks] = useState(false);
   const [activeBookKey, setActiveBookKey] = useState(game.allBooks?.[0]?.key ?? null);
 
-  const tipoff = new Date(game.commence_time).toLocaleTimeString('en-US', {
+  const gameDate = new Date(game.commence_time);
+  const tipoff = gameDate.toLocaleTimeString('en-US', {
     hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York'
   }) + ' ET';
-  const dateStr = new Date(game.commence_time).toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', timeZone: 'America/New_York'
+  const dateStr = gameDate.toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/New_York'
   });
 
-  const isToday = new Date(game.commence_time).toLocaleDateString() === new Date().toLocaleDateString();
+  const isToday = gameDate.toLocaleDateString() === new Date().toLocaleDateString();
+  const isTomorrow = gameDate.toLocaleDateString() === new Date(Date.now() + 86400000).toLocaleDateString();
 
   // Resolve odds from selected book (or default primary)
   const activeBook = game.allBooks?.find(b => b.key === activeBookKey);
@@ -184,8 +186,12 @@ export default function GameOddsCard({ game }) {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 bg-secondary/30 border-b border-border">
         <div className="flex items-center gap-2">
-          <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full", isToday ? "bg-primary/20 text-primary" : "bg-secondary text-muted-foreground")}>
-            {isToday ? 'TODAY' : dateStr}
+          <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full",
+            isToday ? "bg-primary/20 text-primary" :
+            isTomorrow ? "bg-chart-3/20 text-chart-3" :
+            "bg-secondary text-muted-foreground"
+          )}>
+            {isToday ? 'TODAY' : isTomorrow ? 'TOMORROW' : dateStr}
           </span>
           <span className="text-xs text-muted-foreground">{tipoff}</span>
         </div>

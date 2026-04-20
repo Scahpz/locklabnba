@@ -128,9 +128,11 @@ export default function LiveOdds() {
         id: `${game.away}@${game.home}`,
         awayAbv: game.away, homeAbv: game.home,
         away_team: game.away, home_team: game.home,
-        commence_time: new Date().toISOString(),
+        commence_time: game.scheduled_at || new Date().toISOString(),
         allBooks: [],
       }));
+      // Sort by tip-off time ascending
+      converted.sort((a, b) => new Date(a.commence_time) - new Date(b.commence_time));
       setGames(converted);
       setLastUpdated(new Date());
     } catch (e) {

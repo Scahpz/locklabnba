@@ -299,9 +299,10 @@ def fetch_today_games():
     for game in games:
         home = game["homeTeam"]["teamTricode"]
         away = game["awayTeam"]["teamTricode"]
-        today_teams[home] = {"opponent": away, "home": home, "away": away}
-        today_teams[away] = {"opponent": home, "home": home, "away": away}
-        games_summary.append({"home": home, "away": away})
+        game_time = game.get("gameTimeUTC")  # ISO string e.g. "2026-04-20T23:00:00Z"
+        today_teams[home] = {"opponent": away, "home": home, "away": away, "scheduled_at": game_time}
+        today_teams[away] = {"opponent": home, "home": home, "away": away, "scheduled_at": game_time}
+        games_summary.append({"home": home, "away": away, "scheduled_at": game_time})
     return today_teams, games_summary
 
 @app.get("/api/live-props")
@@ -705,7 +706,7 @@ async def get_underdog_props():
         title = g.get("abbreviated_title", "")  # "POR @ SAS"
         parts = title.split(" @ ")
         if len(parts) == 2:
-            games_by_id[g["id"]] = {"away": parts[0].strip(), "home": parts[1].strip()}
+            games_by_id[g["id"]] = {"away": parts[0].strip(), "home": parts[1].strip(), "scheduled_at": g.get("scheduled_at")}
 
     raw_props = []
     seen: set = set()
@@ -758,7 +759,7 @@ async def get_underdog_props():
         if match_id and match_id not in seen_games:
             seen_games.add(match_id)
             if home and away:
-                games_summary_set.append({"home": home, "away": away})
+                games_summary_set.append({"home": home, "away": away, "scheduled_at": game.get("scheduled_at")})
 
         # Get odds from options
         over_odds, under_odds = -110, -110
