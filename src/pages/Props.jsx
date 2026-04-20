@@ -71,15 +71,16 @@ export default function Props() {
     setSelectedGames(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
   };
 
-  // Picks of the day: top 2 ranked picks with 100% grade confidence
+  // Picks of the day: top 2 ranked picks with 100% grade confidence (requires real analytics)
   const locks = useMemo(() => {
     const calculateGradeConfidence = (p) => {
-      const dvpPass = p.matchup_rating != null && ['elite', 'favorable', 'neutral'].includes(p.matchup_rating);
-      const usagePass = p.usage_rate != null && p.usage_rate >= 20;
-      const l10Pass = p.avg_last_10 != null && p.avg_last_10 > p.line;
-      const seasonPass = p.avg_last_10 != null && p.avg_last_10 > p.line;
-      const lineActualPass = p.projection != null && p.projection > p.line;
-      const passCount = [dvpPass, usagePass, l10Pass, seasonPass, lineActualPass].filter(Boolean).length;
+      if (!p.has_analytics) return 0;
+      const l10Pass  = p.avg_last_10 != null && p.avg_last_10 > p.line;
+      const l5Pass   = p.avg_last_5  != null && p.avg_last_5  > p.line;
+      const hitPass  = p.hit_rate_last_10 != null && p.hit_rate_last_10 >= 60;
+      const projPass = p.projection  != null && p.projection  > p.line;
+      const edgePass = p.edge != null && p.edge > 0;
+      const passCount = [l10Pass, l5Pass, hitPass, projPass, edgePass].filter(Boolean).length;
       return passCount * 20;
     };
 

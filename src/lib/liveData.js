@@ -1,8 +1,8 @@
-const CACHE_KEY = 'locklab_live_props_v30';
-const CACHE_DATE_KEY = 'locklab_live_props_date_v30';
+const CACHE_KEY = 'locklab_live_props_v31';
+const CACHE_DATE_KEY = 'locklab_live_props_date_v31';
 
 (function purgeOldCaches() {
-  for (let i = 1; i <= 29; i++) {
+  for (let i = 1; i <= 30; i++) {
     localStorage.removeItem(`locklab_live_props_v${i}`);
     localStorage.removeItem(`locklab_live_props_date_v${i}`);
   }
@@ -32,9 +32,17 @@ export function setStoredApiKey() {}
  */
 function enrichProp(prop, index) {
   const team = prop.player_team || prop.home || '';
+  // Determine opponent: if player_team is known and differs from home, opponent is home; else away
   const opponent = (prop.player_team && prop.player_team !== prop.home) ? prop.home : prop.away;
-  const confidence_score = prop.confidence_score ?? 5;
-  const edge = prop.edge ?? 0;
+
+  // Only use analytics values if they are real (not null) — never fake them with line value
+  const hasRealAnalytics = prop.avg_last_10 != null && prop.hit_rate_last_10 != null;
+  const avg_last_10 = prop.avg_last_10 ?? null;
+  const avg_last_5  = prop.avg_last_5  ?? null;
+  const hit_rate    = prop.hit_rate_last_10 ?? null;
+  const projection  = prop.projection ?? null;
+  const edge        = hasRealAnalytics ? (prop.edge ?? 0) : null;
+  const confidence_score = hasRealAnalytics ? (prop.confidence_score ?? 5) : 5;
 
   return {
     ...prop,
@@ -42,31 +50,34 @@ function enrichProp(prop, index) {
     opponent,
     player_id: `live_${index}`,
     photo_url: null,
-    position: 'G',
+    position: prop.position || 'G',
     is_starter: true,
     injury_status: 'healthy',
     confidence_score,
     edge,
-    avg_last_10: prop.avg_last_10 ?? prop.line,
-    avg_last_5:  prop.avg_last_5  ?? prop.line,
-    hit_rate_last_10: prop.hit_rate_last_10 ?? 50,
-    projection: prop.projection ?? prop.line,
+    avg_last_10,
+    avg_last_5,
+    hit_rate_last_10: hit_rate,
+    projection,
     streak_info: prop.streak_info ?? null,
     last_10_games: prop.last_10_games ?? null,
     last_5_games:  prop.last_5_games  ?? null,
     game_logs_last_10: prop.game_logs_last_10 ?? null,
-    minutes_avg: 30,
+    minutes_avg: null,
     minutes_last_5: null,
-    usage_rate: 25,
-    def_rank_vs_pos: 15,
-    matchup_rating: 'neutral',
-    pace_rating: 100,
-    game_total: 220,
-    is_top_pick: confidence_score >= 8,
-    is_lock: confidence_score === 10,
-    best_value: edge > 8,
+    usage_rate: null,          // null = unknown, not hardcoded 25
+    def_rank_vs_pos: null,
+    matchup_rating: null,      // null = unknown, not hardcoded 'neutral'
+    pace_rating: null,
+    game_total: null,
+    has_analytics: hasRealAnalytics,
+    is_top_pick: hasRealAnalytics && confidence_score >= 8,
+    is_lock: hasRealAnalytics && confidence_score === 10,
+    best_value: hasRealAnalytics && (edge ?? 0) > 8,
     trap_warning: false,
-    confidence_tier: confidence_score >= 8 ? 'A' : confidence_score >= 6 ? 'B' : 'C',
+    confidence_tier: hasRealAnalytics
+      ? (confidence_score >= 8 ? 'A' : confidence_score >= 6 ? 'B' : 'C')
+      : 'C',
   };
 }
 

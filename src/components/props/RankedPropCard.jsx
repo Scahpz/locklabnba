@@ -29,15 +29,16 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
   const [showBooks, setShowBooks] = useState(false);
   const [selectedBook, setSelectedBook] = useState(null);
 
-  // Calculate AI confidence from grade criteria
+  // Grade confidence — only meaningful when real game-log analytics are loaded
   function calculateGradeConfidence(p) {
-    const dvpPass = p.matchup_rating != null && ['elite', 'favorable', 'neutral'].includes(p.matchup_rating);
-    const usagePass = p.usage_rate != null && p.usage_rate >= 20;
-    const l10Pass = p.avg_last_10 != null && p.avg_last_10 > p.line;
-    const seasonPass = p.avg_last_10 != null && p.avg_last_10 > p.line;
-    const lineActualPass = p.projection != null && p.projection > p.line;
-    const passCount = [dvpPass, usagePass, l10Pass, seasonPass, lineActualPass].filter(Boolean).length;
-    return passCount * 20; // 0-5 passes = 0-100%
+    if (!p.has_analytics) return null; // no data yet
+    const l10Pass   = p.avg_last_10 != null && p.avg_last_10 > p.line;
+    const l5Pass    = p.avg_last_5  != null && p.avg_last_5  > p.line;
+    const hitPass   = p.hit_rate_last_10 != null && p.hit_rate_last_10 >= 60;
+    const projPass  = p.projection  != null && p.projection  > p.line;
+    const edgePass  = p.edge != null && p.edge > 0;
+    const passCount = [l10Pass, l5Pass, hitPass, projPass, edgePass].filter(Boolean).length;
+    return passCount * 20;
   }
 
   const gradeConfidence = calculateGradeConfidence(prop);
@@ -99,18 +100,21 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
 
         {/* AI Verdict */}
         <div className="mb-3">
-          {(() => {
-            const verdict = gradeConfidence >= 60
-              ? (isPositiveEdge ? 'OVER' : 'UNDER')
-              : 'UNSAFE';
-            return (
-              <VerdictBadge
-                verdict={verdict}
-                ai_confidence={gradeConfidence}
-                loading={aiLoading && !aiVerdict}
-              />
-            );
-          })()}
+          {gradeConfidence === null ? (
+            <Link
+              to={`/trends?player=${encodeURIComponent(prop.player_name)}`}
+              className="flex items-center gap-1.5 bg-secondary/60 rounded-lg px-3 py-1.5 text-xs text-muted-foreground hover:text-primary transition-colors w-fit"
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              Click to load game history &amp; grade
+            </Link>
+          ) : (
+            <VerdictBadge
+              verdict={gradeConfidence >= 60 ? (prop.edge > 0 ? 'OVER' : 'UNDER') : gradeConfidence >= 40 ? 'UNSAFE' : 'UNDER'}
+              ai_confidence={gradeConfidence}
+              loading={aiLoading && !aiVerdict}
+            />
+          )}
           {aiVerdict?.reason && (
             <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">{aiVerdict.reason}</p>
           )}

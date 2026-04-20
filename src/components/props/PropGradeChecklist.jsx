@@ -1,43 +1,41 @@
 import React, { useState } from 'react';
 import { Check, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
 function buildCriteria(prop) {
-  // DVP Matchup: favorable/elite = pass, tough/elite_defense = fail
-  const dvpPass = prop.matchup_rating != null && ['elite', 'favorable', 'neutral'].includes(prop.matchup_rating);
-  const dvpLabel = prop.matchup_rating
-    ? `DVP Matchup — ${prop.matchup_rating}`
-    : 'DVP Matchup — unknown';
+  if (!prop.has_analytics) return null; // no real data yet
 
-  // Usage Rate: >= 20%
-  const usagePass = prop.usage_rate != null && prop.usage_rate >= 20;
-  const usageLabel = `Usage Rate — ${prop.usage_rate != null ? prop.usage_rate + '%' : '—'}`;
-
-  // L10 Average vs line
-  const l10Pass = prop.avg_last_10 != null && prop.avg_last_10 > prop.line;
-  const l10Label = `L10 Avg — ${prop.avg_last_10 ?? '—'} vs line ${prop.line}`;
-
-  // Season Average (use projection as proxy for season avg since we don't store it separately)
-  const seasonAvg = prop.avg_last_10; // best available approximation
-  const seasonPass = seasonAvg != null && seasonAvg > prop.line;
-  const seasonLabel = `Season Avg — ${seasonAvg ?? '—'} vs line ${prop.line}`;
-
-  // Line vs Actual (projection vs line)
-  const lineActualPass = prop.projection != null && prop.projection > prop.line;
-  const lineActualLabel = `Line vs Actual — proj ${prop.projection ?? '—'} vs ${prop.line}`;
+  const l10Pass  = prop.avg_last_10 != null && prop.avg_last_10 > prop.line;
+  const l5Pass   = prop.avg_last_5  != null && prop.avg_last_5  > prop.line;
+  const hitPass  = prop.hit_rate_last_10 != null && prop.hit_rate_last_10 >= 60;
+  const projPass = prop.projection  != null && prop.projection  > prop.line;
+  const edgePass = prop.edge != null && prop.edge > 0;
 
   return [
-    { label: dvpLabel, pass: dvpPass },
-    { label: usageLabel, pass: usagePass },
-    { label: l10Label, pass: l10Pass },
-    { label: seasonLabel, pass: seasonPass },
-    { label: lineActualLabel, pass: lineActualPass },
+    { label: `L10 Avg — ${prop.avg_last_10 ?? '—'} vs line ${prop.line}`, pass: l10Pass },
+    { label: `L5 Avg — ${prop.avg_last_5 ?? '—'} vs line ${prop.line}`, pass: l5Pass },
+    { label: `Hit Rate (L10) — ${prop.hit_rate_last_10 != null ? prop.hit_rate_last_10 + '%' : '—'} (need ≥60%)`, pass: hitPass },
+    { label: `Projection — ${prop.projection ?? '—'} vs line ${prop.line}`, pass: projPass },
+    { label: `Edge — ${prop.edge != null ? (prop.edge > 0 ? '+' : '') + prop.edge : '—'}`, pass: edgePass },
   ];
 }
 
 export default function PropGradeChecklist({ prop }) {
   const [open, setOpen] = useState(false);
   const criteria = buildCriteria(prop);
+
+  // No analytics loaded yet — show a prompt instead
+  if (!criteria) {
+    return (
+      <div className="px-4 pb-3">
+        <p className="text-[11px] text-muted-foreground italic">
+          Open <Link to={`/trends?player=${encodeURIComponent(prop.player_name)}`} className="text-primary underline">Trends</Link> to load game history and see grade criteria.
+        </p>
+      </div>
+    );
+  }
+
   const passCount = criteria.filter(c => c.pass).length;
 
   return (

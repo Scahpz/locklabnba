@@ -698,15 +698,23 @@ async def get_underdog_props():
     players_by_id = {p["id"]: p for p in body.get("players", [])}
     appearances_by_id = {a["id"]: a for a in body.get("appearances", [])}
 
-    # Parse game titles for home/away (e.g. "POR @ SAS")
+    # Parse game titles for home/away AND build team_id → abbreviation map
     games_by_id = {}
+    team_id_to_abbr: dict = {}
     for g in body.get("games", []):
         if g.get("sport_id") != "NBA":
             continue
         title = g.get("abbreviated_title", "")  # "POR @ SAS"
         parts = title.split(" @ ")
         if len(parts) == 2:
-            games_by_id[g["id"]] = {"away": parts[0].strip(), "home": parts[1].strip(), "scheduled_at": g.get("scheduled_at")}
+            away_abv = parts[0].strip()
+            home_abv = parts[1].strip()
+            games_by_id[g["id"]] = {"away": away_abv, "home": home_abv, "scheduled_at": g.get("scheduled_at"),
+                                    "home_team_id": g.get("home_team_id"), "away_team_id": g.get("away_team_id")}
+            if g.get("home_team_id"):
+                team_id_to_abbr[g["home_team_id"]] = home_abv
+            if g.get("away_team_id"):
+                team_id_to_abbr[g["away_team_id"]] = away_abv
 
     raw_props = []
     seen: set = set()
@@ -756,6 +764,10 @@ async def get_underdog_props():
         home = game.get("home", "")
         away = game.get("away", "")
 
+        # Determine which team the player is actually on using team_id lookup
+        player_team_id = appearance.get("team_id", "")
+        player_team = team_id_to_abbr.get(player_team_id, home)  # fallback to home if unknown
+
         if match_id and match_id not in seen_games:
             seen_games.add(match_id)
             if home and away:
@@ -779,7 +791,7 @@ async def get_underdog_props():
             "line": line_val,
             "home": home,
             "away": away,
-            "player_team": home,   # will be enriched below
+            "player_team": player_team,
             "position": position,
             "over_odds": over_odds,
             "under_odds": under_odds,
