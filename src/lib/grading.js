@@ -41,7 +41,6 @@ function gradeWithContext(prop) {
   const oppPace   = prop.opponent_pace;
   const teamPace  = prop.player_team_pace;
   const spread    = prop.spread;                // from player team's perspective (+= favored)
-  const isHome    = prop.is_home;
   const isB2B     = prop.is_back_to_back ?? false;
   const injNote   = prop.injury_context;        // e.g. "LeBron James (Out)"
   const edge      = prop.edge;
@@ -183,21 +182,11 @@ function gradeWithContext(prop) {
   });
 
   criteria.push({
-    label: isB2B
-      ? '😴 Back-to-Back: Fatigue risk'
-      : isHome === true
-        ? '🏠 Home game advantage'
-        : isHome === false
-          ? '✈ Away game'
-          : 'Schedule context',
+    label: isB2B ? '😴 Back-to-Back: Fatigue risk' : 'Rest: Normal schedule',
     detail: isB2B
       ? 'Second game in two nights — shooting %, energy, and minutes typically drop on back-to-backs'
-      : isHome === true
-        ? 'Home court — familiar environment, better rest, crowd advantage'
-        : isHome === false
-          ? 'Road game — travel and time-zone shift can slightly reduce performance'
-          : 'No back-to-back detected — normal rest',
-    pass:      !isB2B && isHome !== false,
+      : 'Normal rest — no schedule fatigue concerns',
+    pass:      !isB2B,
     weight:    10,
     available: true,
     category:  'rest',
