@@ -44,10 +44,13 @@ function enrichProp(prop, index) {
   const edge        = hasRealAnalytics ? (prop.edge ?? 0) : null;
   const confidence_score = hasRealAnalytics ? (prop.confidence_score ?? 5) : 5;
 
+  const isHome = team === prop.home;
+
   return {
     ...prop,
     team,
     opponent,
+    is_home: isHome,
     player_id: `live_${index}`,
     photo_url: null,
     position: prop.position || 'G',

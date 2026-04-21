@@ -36,12 +36,14 @@ export default function Props() {
   const [verdicts, setVerdicts] = useState({});
   const [aiLoading, setAiLoading] = useState(false);
   const [playerAnalytics, setPlayerAnalytics] = useState({});
+  const [teamContext, setTeamContext] = useState(null);
   const fetchedPlayers = useRef(new Set());
 
   const loadData = async (forceRefresh = false) => {
     setLoading(true);
     if (forceRefresh) {
       setPlayerAnalytics({});
+      setTeamContext(null);
       fetchedPlayers.current = new Set();
     }
     try {
@@ -54,8 +56,7 @@ export default function Props() {
         setIsLive(true);
 
         setAiLoading(true);
-        const topProps = realProps.slice(0, 50);
-        getAIVerdicts(topProps).then(v => {
+        getAIVerdicts(realProps.slice(0, 50)).then(v => {
           setVerdicts(v);
           setAiLoading(false);
         }).catch(() => setAiLoading(false));
@@ -68,7 +69,16 @@ export default function Props() {
     setLoading(false);
   };
 
-  // Auto-fetch game logs for every player in the background (5 at a time)
+  // Fetch team context (pace, def rating, injuries, back-to-back, spreads) once
+  useEffect(() => {
+    if (!rawProps.length || teamContext) return;
+    fetch(`${NBA_API}/api/team-context`)
+      .then(r => r.ok ? r.json() : null)
+      .then(ctx => { if (ctx) setTeamContext(ctx); })
+      .catch(() => {});
+  }, [rawProps, teamContext]);
+
+  // Auto-fetch game logs for every player in background (5 at a time)
   useEffect(() => {
     if (!rawProps.length) return;
     const names = [...new Set(rawProps.map(p => p.player_name))];
@@ -91,40 +101,76 @@ export default function Props() {
           });
           if (!res.ok) return;
           const data = await res.json();
-          if (data.analytics) {
-            setPlayerAnalytics(prev => ({ ...prev, [name]: data.analytics }));
-          }
+          if (data.analytics) setPlayerAnalytics(prev => ({ ...prev, [name]: data.analytics }));
         } catch {}
       })).then(() => fetchBatch());
     }
     fetchBatch();
   }, [rawProps]);
 
-  // Merge real analytics into raw props as they load
+  // Merge game logs + team context + injury data into each prop
   const enrichedProps = useMemo(() => {
+    const ctx = teamContext || {};
+    const teams     = ctx.teams      || {};
+    const injuries  = ctx.injuries   || {};
+    const b2b       = new Set(ctx.back_to_back || []);
+    const spreads   = ctx.game_spreads || {};
+
     return rawProps.map(prop => {
+      // 1. Game log analytics
       const analytics = playerAnalytics[prop.player_name]?.[prop.prop_type];
-      if (!analytics) return prop;
-      const cs = analytics.confidence_score || 5;
-      return {
+      const cs = analytics?.confidence_score || prop.confidence_score || 5;
+      const base = analytics ? {
         ...prop,
         has_analytics: true,
-        avg_last_5: analytics.avg_last_5,
-        avg_last_10: analytics.avg_last_10,
-        hit_rate_last_10: analytics.hit_rate_last_10,
-        projection: analytics.projection,
-        edge: analytics.edge,
-        confidence_score: cs,
-        streak_info: analytics.streak_info,
-        last_10_games: analytics.last_10_games,
-        last_5_games: analytics.last_5_games,
+        avg_last_5:        analytics.avg_last_5,
+        avg_last_10:       analytics.avg_last_10,
+        hit_rate_last_10:  analytics.hit_rate_last_10,
+        projection:        analytics.projection,
+        edge:              analytics.edge,
+        confidence_score:  cs,
+        streak_info:       analytics.streak_info,
+        last_10_games:     analytics.last_10_games,
+        last_5_games:      analytics.last_5_games,
         game_logs_last_10: analytics.game_logs_last_10,
-        confidence_tier: cs >= 8 ? 'A' : cs >= 6 ? 'B' : 'C',
-        is_lock: cs === 10,
-        best_value: (analytics.edge || 0) > 8,
+        confidence_tier:   cs >= 8 ? 'A' : cs >= 6 ? 'B' : 'C',
+        is_lock:           cs === 10,
+        best_value:        (analytics.edge || 0) > 8,
+      } : prop;
+
+      // 2. Team context
+      const team    = prop.player_team || '';
+      const opp     = prop.opponent    || '';
+      const oppData = teams[opp]  || {};
+      const tmData  = teams[team] || {};
+      const isHome  = team === prop.home;
+      const gameId  = `${prop.away || ''}@${prop.home || ''}`;
+      const homeSpread = spreads[gameId]; // home team's spread
+      // Convert to player's perspective: if player is home, use homeSpread as-is; else negate
+      const playerSpread = homeSpread != null
+        ? (isHome ? homeSpread : -homeSpread)
+        : null;
+
+      // 3. Injury context — find injured teammates (same team, not the player themselves)
+      const injuredTeammates = Object.entries(injuries)
+        .filter(([name, info]) => info.team === team && name !== prop.player_name)
+        .map(([name]) => name);
+      const injuryContext = injuredTeammates.length > 0
+        ? injuredTeammates.slice(0, 2).join(', ') + (injuredTeammates.length > 2 ? ` +${injuredTeammates.length - 2} more` : '') + ' (Out)'
+        : null;
+
+      return {
+        ...base,
+        opponent_def_rating:  oppData.def_rating   ?? null,
+        opponent_pace:        oppData.pace          ?? null,
+        player_team_pace:     tmData.pace           ?? null,
+        is_home:              isHome,
+        is_back_to_back:      b2b.has(team),
+        spread:               playerSpread,
+        injury_context:       injuryContext,
       };
     });
-  }, [rawProps, playerAnalytics]);
+  }, [rawProps, playerAnalytics, teamContext]);
 
   useEffect(() => { loadData(); }, []);
 

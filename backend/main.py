@@ -1091,6 +1091,117 @@ async def get_game_odds(bookmakers: str = "draftkings,fanduel,betmgm,caesars,poi
     return result
 
 
+@app.get("/api/team-context")
+async def get_team_context():
+    """
+    Returns team pace, defensive rating, today's injuries, back-to-back teams,
+    and (if Odds API key is set) game spreads — everything the grading engine needs.
+    """
+    cached = cache_get("team_context", ttl=1800)
+    if cached:
+        return cached
+
+    result = {"teams": {}, "injuries": {}, "back_to_back": [], "game_spreads": {}}
+
+    # ── Team advanced stats (pace + defensive rating) ──────────────────────────
+    try:
+        data = nba_stats_get("leaguedashteamstats", {
+            "PerMode": "PerGame", "Season": current_season(),
+            "SeasonType": "Regular Season", "LeagueID": "00",
+            "MeasureType": "Advanced",
+            "PaceAdjust": "N", "PlusMinus": "N", "Rank": "N",
+            "Outcome": "", "Location": "", "Month": "0", "SeasonSegment": "",
+            "DateFrom": "", "DateTo": "", "OpponentTeamID": "0",
+            "VsConference": "", "VsDivision": "", "GameSegment": "",
+            "Period": "0", "LastNGames": "0",
+        })
+        for t in parse_result_set(data, "LeagueDashTeamStats"):
+            abbr = t.get("TEAM_ABBREVIATION", "")
+            if abbr:
+                result["teams"][abbr] = {
+                    "pace":       round(float(t.get("PACE")       or 0), 1),
+                    "def_rating": round(float(t.get("DEF_RATING") or 0), 1),
+                    "off_rating": round(float(t.get("OFF_RATING") or 0), 1),
+                }
+    except Exception:
+        pass
+
+    # ── NBA CDN injury report ──────────────────────────────────────────────────
+    for url in [
+        "https://cdn.nba.com/static/json/staticData/injuries.json",
+        "https://cdn.nba.com/static/json/liveData/injuries/injuries.json",
+    ]:
+        try:
+            r = requests.get(url, headers=NBA_LIVE_HEADERS, timeout=10)
+            if not r.ok:
+                continue
+            data = r.json()
+            # Two possible shapes: list under "data" or dict under "injuryData"
+            entries = data.get("data") or data.get("injuryData") or []
+            for item in entries:
+                # Shape A: { teamAbbreviation, players: [{playerName, status, comment}] }
+                team_abbr = item.get("teamAbbreviation", "")
+                for p in item.get("players") or []:
+                    name   = p.get("playerName") or p.get("name") or ""
+                    status = (p.get("status") or p.get("injuryStatus") or "").lower()
+                    if name and ("out" in status or "doubtful" in status):
+                        result["injuries"][name] = {
+                            "status": status,
+                            "team": team_abbr,
+                            "reason": p.get("comment") or p.get("description") or "",
+                        }
+            if result["injuries"] or entries:
+                break
+        except Exception:
+            continue
+
+    # ── Back-to-back detection (teams playing yesterday) ──────────────────────
+    try:
+        yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
+        r = requests.get(
+            f"https://cdn.nba.com/static/json/liveData/scoreboard/scoreboard_{yesterday}_00.json",
+            headers=NBA_LIVE_HEADERS, timeout=10,
+        )
+        if r.ok:
+            for g in r.json().get("scoreboard", {}).get("games", []):
+                result["back_to_back"].append(g.get("homeTeam", {}).get("teamTricode", ""))
+                result["back_to_back"].append(g.get("awayTeam", {}).get("teamTricode", ""))
+            result["back_to_back"] = [t for t in result["back_to_back"] if t]
+    except Exception:
+        pass
+
+    # ── Game spreads from Odds API (if key is set) ─────────────────────────────
+    try:
+        settings = load_settings()
+        api_key  = settings.get("odds_api_key", "")
+        if api_key:
+            r = requests.get(
+                "https://api.the-odds-api.com/v4/sports/basketball_nba/odds",
+                params={"apiKey": api_key, "regions": "us", "markets": "spreads",
+                        "oddsFormat": "american"},
+                timeout=15,
+            )
+            if r.ok:
+                for event in r.json():
+                    home_abv = TEAM_NAME_TO_ABV.get(event.get("home_team", ""),
+                               event.get("home_team", "")[:3].upper())
+                    away_abv = TEAM_NAME_TO_ABV.get(event.get("away_team", ""),
+                               event.get("away_team", "")[:3].upper())
+                    gid = f"{away_abv}@{home_abv}"
+                    for bm in event.get("bookmakers", [])[:1]:
+                        for market in bm.get("markets", []):
+                            if market["key"] != "spreads":
+                                continue
+                            for outcome in market.get("outcomes", []):
+                                if outcome.get("name") == event.get("home_team"):
+                                    result["game_spreads"][gid] = outcome.get("point", 0)
+    except Exception:
+        pass
+
+    cache_set("team_context", result)
+    return result
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
