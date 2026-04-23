@@ -541,10 +541,11 @@ def _espn_player_event_ids(espn_id: int) -> list:
     season_year = datetime.now().year if datetime.now().month >= 10 else datetime.now().year - 1
     season = season_year + 1
     try:
+        # Use limit=100 so we get the full season, not just the first 20 (oldest) games
         data = _espn_get(
             f"https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba"
             f"/seasons/{season}/athletes/{espn_id}/eventlog",
-            {"limit": 20},
+            {"limit": 100},
         )
     except Exception as e:
         logging.warning(f"ESPN eventlog failed for {espn_id}: {e}")
@@ -557,6 +558,10 @@ def _espn_player_event_ids(espn_id: int) -> list:
         m = re.search(r"/events/(\d+)", ref)
         if m:
             event_ids.append(m.group(1))
+
+    # ESPN returns events oldest-first; sort descending (higher ID = more recent game)
+    event_ids.sort(key=lambda eid: int(eid), reverse=True)
+    logging.info(f"ESPN eventlog for {espn_id}: {len(event_ids)} events, most recent={event_ids[0] if event_ids else 'none'}")
 
     if event_ids:
         cache_set(cache_key, event_ids)
@@ -583,7 +588,7 @@ def fetch_game_logs(player_name: str) -> list:
         return []
 
     logs = []
-    for event_id in event_ids[:20]:          # scan up to 20 events to get 15 played games
+    for event_id in event_ids[:25]:          # scan up to 25 events (some may be DNP) to get 15 played games
         box_index = _espn_boxscore_index(event_id)
         entry = box_index.get(player_name)
         if entry and entry.get("PTS") is not None:
@@ -591,6 +596,10 @@ def fetch_game_logs(player_name: str) -> list:
         if len(logs) >= 15:
             break
         time.sleep(0.05)
+
+    # Sort most-recent first so calculate_analytics slices [:10] / [:5] correctly
+    logs.sort(key=lambda g: g.get("GAME_DATE", ""), reverse=True)
+    logging.info(f"fetch_game_logs {player_name}: {len(logs)} games, dates={[g.get('GAME_DATE') for g in logs[:3]]}")
 
     if logs:
         cache_set(cache_key, logs)
