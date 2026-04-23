@@ -24,9 +24,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PARLAYS_FILE = Path(__file__).parent / "parlays.json"
-SETTINGS_FILE = Path(__file__).parent / "settings.json"
-USERS_FILE = Path(__file__).parent / "users.json"
+# Use DATA_DIR env var for persistent storage (Railway volume at /data, or any writable path)
+_data_dir = Path(os.environ.get("DATA_DIR", str(Path(__file__).parent)))
+_data_dir.mkdir(parents=True, exist_ok=True)
+
+PARLAYS_FILE = _data_dir / "parlays.json"
+SETTINGS_FILE = _data_dir / "settings.json"
+USERS_FILE    = _data_dir / "users.json"
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "locklab-dev-secret-key-2025-nba")
 
