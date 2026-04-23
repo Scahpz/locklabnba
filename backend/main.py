@@ -2,14 +2,18 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import time
+import traceback
 import uuid
 import requests
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
+
+logging.basicConfig(level=logging.INFO)
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -212,12 +216,24 @@ async def update_settings(data: dict):
 
 
 # ── NBA.com helpers ───────────────────────────────────────────────────────────
-def nba_stats_get(endpoint: str, params: dict) -> dict:
+def nba_stats_get(endpoint: str, params: dict, retries: int = 2) -> dict:
     url = f"https://stats.nba.com/stats/{endpoint}"
-    time.sleep(0.6)
-    r = requests.get(url, headers=NBA_STATS_HEADERS, params=params, timeout=30)
-    r.raise_for_status()
-    return r.json()
+    for attempt in range(retries + 1):
+        time.sleep(0.8 + attempt * 1.0)
+        try:
+            r = requests.get(url, headers=NBA_STATS_HEADERS, params=params, timeout=15)
+            r.raise_for_status()
+            return r.json()
+        except requests.exceptions.HTTPError as e:
+            logging.error(f"NBA stats HTTP error {e.response.status_code} on {endpoint}: {e.response.text[:200]}")
+            if attempt < retries and e.response.status_code in (429, 503):
+                continue
+            raise
+        except requests.exceptions.RequestException as e:
+            logging.error(f"NBA stats request error on {endpoint}: {e}")
+            if attempt < retries:
+                continue
+            raise
 
 def parse_result_set(data: dict, set_name: str) -> list:
     for rs in data.get("resultSets", []):
@@ -430,11 +446,11 @@ async def get_player_gamelogs(req: PlayerNameRequest):
     try:
         player = find_player(req.playerName)
         if not player:
-            raise HTTPException(404, f"Player '{req.playerName}' not found")
+            return {"player_name": req.playerName, "analytics": {}, "error": "player_not_found"}
 
         logs = fetch_game_logs(player["id"])
         if not logs:
-            raise HTTPException(404, "No game logs found")
+            return {"player_name": req.playerName, "analytics": {}, "error": "no_logs"}
 
         result = {}
         for prop_type in ["points", "rebounds", "assists", "3PM", "steals", "blocks", "PRA", "P+R", "P+A", "A+R"]:
@@ -448,10 +464,9 @@ async def get_player_gamelogs(req: PlayerNameRequest):
             result[prop_type] = calculate_analytics(logs, prop_type, line)
 
         return {"player_name": req.playerName, "analytics": result}
-    except HTTPException:
-        raise
     except Exception as e:
-        raise HTTPException(500, str(e))
+        logging.error(f"player-gamelogs error for {req.playerName}: {traceback.format_exc()}")
+        return {"player_name": req.playerName, "analytics": {}, "error": str(e)}
 
 
 # ── season stats (cached) ─────────────────────────────────────────────────────
