@@ -387,6 +387,21 @@ def _parse_game_date(s: str):
     return datetime.min
 
 
+def _fetch_logs_via_nba_api(player_id: int, season: str, season_type: str) -> list:
+    """Use nba_api package directly — handles headers/connection differently than raw requests."""
+    from nba_api.stats.endpoints.playergamelog import PlayerGameLog
+    gl = PlayerGameLog(
+        player_id=str(player_id),
+        season=season,
+        season_type_all_star=season_type,
+        timeout=60,
+    )
+    df = gl.get_data_frames()[0]
+    if df.empty:
+        return []
+    return df.to_dict("records")
+
+
 def fetch_game_logs(player_id: int) -> list:
     season = current_season()
     key = f"gamelogs_{player_id}_{season}_v2"
@@ -394,24 +409,18 @@ def fetch_game_logs(player_id: int) -> list:
     if cached is not None:
         return cached
 
-    reg_logs = []
-    po_logs = []
+    reg_logs, po_logs = [], []
 
-    reg_data = nba_stats_get("playergamelog", {
-        "PlayerID": player_id, "Season": season,
-        "SeasonType": "Regular Season", "LeagueID": "00",
-    })
-    reg_logs = parse_result_set(reg_data, "PlayerGameLog") or []
-
-    # Also fetch playoff games — may be empty for eliminated teams or early in season
     try:
-        po_data = nba_stats_get("playergamelog", {
-            "PlayerID": player_id, "Season": season,
-            "SeasonType": "Playoffs", "LeagueID": "00",
-        })
-        po_logs = parse_result_set(po_data, "PlayerGameLog") or []
-    except Exception:
-        po_logs = []
+        reg_logs = _fetch_logs_via_nba_api(player_id, season, "Regular Season")
+        time.sleep(0.8)
+    except Exception as e:
+        logging.error(f"Regular season logs failed for {player_id}: {e}")
+
+    try:
+        po_logs = _fetch_logs_via_nba_api(player_id, season, "Playoffs")
+    except Exception as e:
+        logging.warning(f"Playoff logs not available for {player_id}: {e}")
 
     # Combine and sort most-recent-first
     combined = po_logs + reg_logs
