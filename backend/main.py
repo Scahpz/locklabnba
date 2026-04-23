@@ -476,7 +476,7 @@ def _espn_boxscore_index(event_id: str) -> dict:
                 }
                 if espn_id:
                     # Side-effect: cache ESPN ID
-                    cache_set(f"espn_id_{name}", int(espn_id), ttl=86400)
+                    cache_set(f"espn_id_{name}", int(espn_id))
 
     if players_map:
         cache_set(cache_key, players_map)
