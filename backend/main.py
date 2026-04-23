@@ -531,18 +531,18 @@ def _espn_get_player_id(player_name: str) -> int | None:
     return None
 
 
-def _scoreboard_event_ids_recent(days: int = 21) -> list:
+def _scoreboard_event_ids_recent(days: int = 40) -> list:
     """
-    Scan ESPN scoreboard for the last N days and return event IDs (newest first).
-    This reliably captures recent games including playoffs.
-    Cached per day so all players share one scan.
+    Scan ESPN scoreboards for the last N days, return event IDs newest-first.
+    Cached per-day so every player request shares one scan.
+    Covers regular season tail + full first round of playoffs.
     """
-    cache_key = f"espn_scoreboard_recent_{datetime.now().strftime('%Y%m%d')}"
+    cache_key = f"espn_scoreboard_{days}d_{datetime.now().strftime('%Y%m%d')}"
     cached = cache_get(cache_key, ttl=3600)
     if cached is not None:
         return cached
 
-    event_ids = []
+    event_ids: list = []
     seen: set = set()
     for days_ago in range(days):
         date_str = (datetime.now() - timedelta(days=days_ago)).strftime("%Y%m%d")
@@ -557,99 +557,40 @@ def _scoreboard_event_ids_recent(days: int = 21) -> list:
                     event_ids.append(eid)
                     seen.add(eid)
         except Exception as e:
-            logging.warning(f"Scoreboard scan day -{days_ago} ({date_str}): {e}")
+            logging.warning(f"Scoreboard {date_str}: {e}")
 
-    logging.info(f"Scoreboard scan {days}d: {len(event_ids)} events, newest={event_ids[:3]}")
+    logging.info(f"Scoreboard scan {days}d → {len(event_ids)} events, newest={event_ids[:3]}")
     if event_ids:
         cache_set(cache_key, event_ids)
-    return event_ids  # already newest-first (days_ago=0 iterated first)
-
-
-def _espn_player_event_ids(espn_id: int) -> list:
-    """
-    Return event IDs for the player (newest first) via paginated eventlog.
-    Queries BOTH regular season (type 2) and playoffs (type 3).
-    ESPN caps pageSize at ~25, so we paginate through all pages.
-    """
-    import re
-    cache_key = f"espn_events_v3_{espn_id}_{datetime.now().strftime('%Y%m%d')}"
-    cached = cache_get(cache_key, ttl=3600)
-    if cached is not None:
-        return cached
-
-    season_year = datetime.now().year if datetime.now().month >= 10 else datetime.now().year - 1
-    season = season_year + 1
-    event_ids: list = []
-    seen: set = set()
-
-    for season_type in [3, 2]:  # 3=playoffs, 2=regular season
-        base_url = (
-            f"https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba"
-            f"/seasons/{season}/types/{season_type}/athletes/{espn_id}/eventlog"
-        )
-        page = 1
-        while True:
-            try:
-                data = _espn_get(base_url, {"limit": 100, "page": page})
-                items = data.get("events", {}).get("items", [])
-                for item in items:
-                    ref = item.get("event", {}).get("$ref", "")
-                    m = re.search(r"/events/(\d+)", ref)
-                    if m:
-                        eid = m.group(1)
-                        if eid not in seen:
-                            event_ids.append(eid)
-                            seen.add(eid)
-                page_count = data.get("pageCount", 1)
-                if page >= page_count or not items:
-                    break
-                page += 1
-            except Exception as e:
-                logging.warning(f"ESPN eventlog type={season_type} page={page} for {espn_id}: {e}")
-                break
-
-    # Sort descending so highest (most recent) event ID comes first
-    event_ids.sort(key=lambda eid: int(eid), reverse=True)
-    logging.info(f"ESPN eventlog ESPN ID {espn_id}: {len(event_ids)} events, newest={event_ids[:3] if event_ids else 'none'}")
-
-    if event_ids:
-        cache_set(cache_key, event_ids)
-    return event_ids
+    return event_ids  # newest-first: days_ago=0 (today) appended first
 
 
 def fetch_game_logs(player_name: str) -> list:
     """
-    Fetch the last 15 played games for a player via ESPN.
-    Strategy:
-      1. Scoreboard scan (last 21 days) — captures recent regular season + playoff games
-      2. Paginated eventlog (types 2 & 3) — fills in older regular season games
-    Sort by GAME_DATE descending so calculate_analytics L10/L5 slices are always newest.
+    Fetch the last 15 played games for a player by scanning recent ESPN boxscores.
+
+    Approach: iterate the last 40 days of actual NBA games (newest first), load
+    each boxscore, look for the player by displayName.  No eventlog, no player-ID
+    lookup — those were both unreliable sources of old October data.
+
+    The 40-day window covers the regular-season tail AND the first two rounds of
+    playoffs, so it always returns current-season games regardless of season type.
     """
     if not player_name:
         return []
 
-    cache_key = f"espn_gamelogs_v3_{player_name}_{datetime.now().strftime('%Y%m%d')}"
+    cache_key = f"espn_gamelogs_v4_{player_name}_{datetime.now().strftime('%Y%m%d')}"
     cached = cache_get(cache_key, ttl=3600)
     if cached is not None:
         return cached
 
-    espn_id = _espn_get_player_id(player_name)
-    if not espn_id:
-        logging.warning(f"ESPN ID not found for {player_name}")
+    event_ids = _scoreboard_event_ids_recent(days=40)
+    if not event_ids:
+        logging.warning(f"fetch_game_logs: scoreboard returned no events")
         return []
 
-    # Combine scoreboard (recent) + eventlog (full season), newest first
-    recent_ids = _scoreboard_event_ids_recent(days=21)
-    all_ids    = _espn_player_event_ids(espn_id)
-    seen: set  = set()
-    combined: list = []
-    for eid in recent_ids + all_ids:
-        if eid not in seen:
-            combined.append(eid)
-            seen.add(eid)
-
     logs: list = []
-    for event_id in combined[:40]:  # scan up to 40 events to find 15 played games
+    for event_id in event_ids:
         box_index = _espn_boxscore_index(event_id)
         entry = box_index.get(player_name)
         if entry and entry.get("PTS") is not None:
@@ -658,9 +599,8 @@ def fetch_game_logs(player_name: str) -> list:
             break
         time.sleep(0.05)
 
-    # Final sort by actual date — authoritative regardless of ID ordering
     logs.sort(key=lambda g: g.get("GAME_DATE", ""), reverse=True)
-    logging.info(f"fetch_game_logs '{player_name}': {len(logs)} games | dates={[g.get('GAME_DATE') for g in logs[:5]]}")
+    logging.info(f"fetch_game_logs '{player_name}': {len(logs)} games | {[g.get('GAME_DATE') for g in logs[:5]]}")
 
     if logs:
         cache_set(cache_key, logs)
