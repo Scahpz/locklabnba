@@ -1,5 +1,5 @@
 import React from 'react';
-import { Flame, TrendingUp, Zap, AlertTriangle, ChevronRight } from 'lucide-react';
+import { Flame, TrendingUp, Zap, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TeamLogo from '@/components/common/TeamLogo';
 import { useParlay } from '@/lib/ParlayContext';
@@ -20,7 +20,7 @@ export default function DemonPickCard({ pick, onOpenDetail }) {
   const { addLeg, isSelected } = useParlay();
   if (!pick) return null;
 
-  const { prop, reason, streakGames, seasonAvg, dueScore } = pick;
+  const { prop, reason, streakGames, seasonAvg, boomLine, boomScore } = pick;
   const label = propTypeLabels[prop.prop_type] || prop.prop_type.toUpperCase();
   const picked = isSelected(prop.player_name, prop.prop_type, 'over');
 
@@ -38,12 +38,12 @@ export default function DemonPickCard({ pick, onOpenDetail }) {
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-orange-400">Demon Pick</p>
-              <p className="text-[9px] text-muted-foreground">Statistically Due</p>
+              <p className="text-[9px] text-muted-foreground">Explosion Alert</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
-            <AlertTriangle className="w-3 h-3 text-orange-400/70" />
-            <span className="text-[10px] text-orange-400/80 font-medium">HIGH RISK</span>
+            <TrendingUp className="w-3 h-3 text-orange-400/70" />
+            <span className="text-[10px] text-orange-400/80 font-medium">HIGH UPSIDE</span>
           </div>
         </div>
 
@@ -59,38 +59,46 @@ export default function DemonPickCard({ pick, onOpenDetail }) {
             </Link>
             <p className="text-[10px] text-muted-foreground">{prop.team} vs {prop.opponent} · {prop.position}</p>
           </div>
-          {/* Due score badge */}
+          {/* Boom score badge */}
           <div className="flex flex-col items-center justify-center w-12 h-12 rounded-xl bg-orange-500/10 border border-orange-500/25">
-            <p className="text-base font-black text-orange-400">{dueScore}</p>
-            <p className="text-[8px] text-orange-400/70 uppercase leading-none">Due</p>
+            <p className="text-base font-black text-orange-400">{boomScore}</p>
+            <p className="text-[8px] text-orange-400/70 uppercase leading-none">Boom</p>
           </div>
         </div>
 
-        {/* Prop line */}
-        <div className="flex items-center justify-between bg-orange-500/5 border border-orange-500/20 rounded-lg p-3 mb-3">
-          <div>
-            <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{label}</p>
-            <p className="text-2xl font-bold text-foreground mt-0.5">{prop.line}</p>
+        {/* Projection + bet line */}
+        <div className="bg-orange-500/5 border border-orange-500/20 rounded-lg p-3 mb-3">
+          {/* Projected explosion number */}
+          <div className="flex items-end justify-between mb-2">
+            <div>
+              <p className="text-[9px] text-orange-400/80 font-bold uppercase tracking-wider mb-0.5">Projected {label}</p>
+              <p className="text-3xl font-black text-orange-400 leading-none">{boomLine}+</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[9px] text-muted-foreground uppercase mb-0.5">Sportsbook Line</p>
+              <p className="text-lg font-bold text-foreground">{prop.line}</p>
+            </div>
           </div>
+          {/* OVER button spanning full width */}
           <button
             onClick={() => addLeg({ ...prop }, 'over')}
             className={cn(
-              "flex flex-col items-center border rounded-lg px-5 py-2.5 transition-all",
+              "w-full flex items-center justify-center gap-2 border rounded-lg py-2 transition-all",
               picked
                 ? "bg-orange-500 border-orange-500 text-white"
                 : "bg-orange-500/15 hover:bg-orange-500/25 border-orange-500/30 text-orange-400"
             )}
           >
-            <span className="text-[10px] font-bold">OVER</span>
+            <span className="text-xs font-bold">OVER {prop.line}</span>
             <span className="text-sm font-black">{fmtOdds(prop.over_odds)}</span>
           </button>
         </div>
 
-        {/* Why it's due */}
+        {/* Why they'll explode */}
         <div className="bg-secondary/50 rounded-lg p-3 mb-3 space-y-1.5">
           <div className="flex items-center gap-1.5 mb-1">
             <Zap className="w-3 h-3 text-orange-400" />
-            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-400">Why It's Due</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-400">Why They'll Explode</p>
           </div>
           <p className="text-xs text-foreground leading-snug">{reason}</p>
         </div>
@@ -110,8 +118,8 @@ export default function DemonPickCard({ pick, onOpenDetail }) {
             </p>
           </div>
           <div className="text-center bg-orange-500/10 border border-orange-500/20 rounded-lg py-2">
-            <p className="text-[9px] text-orange-400/80 uppercase">Cold Streak</p>
-            <p className="text-sm font-bold text-orange-400">{streakGames}G Under</p>
+            <p className="text-[9px] text-orange-400/80 uppercase">Hot Streak</p>
+            <p className="text-sm font-bold text-orange-400">{streakGames}G Over</p>
           </div>
         </div>
 

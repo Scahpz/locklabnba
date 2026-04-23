@@ -319,34 +319,44 @@ export default function Props() {
       .slice(0, 2);
   }, [enrichedProps, todayTeams]);
 
-  // Demon Pick: player on a cold under-streak but season/L10 data says they're due to break out
+  // Demon Pick: player on a hot over-streak projected to explode well above their line tonight
   const demonPick = useMemo(() => {
     const candidates = enrichedProps
-      .filter(p => p.has_analytics && isTodayProp(p) && p.season_avg != null)
+      .filter(p => p.has_analytics && isTodayProp(p) && p.avg_last_10 != null)
       .filter(p => {
-        // Must be on an under streak of 3+ games
-        const streak = p.streak_info || '';
-        const underStreakMatch = streak.match(/^(\d+) game under streak/i);
-        if (!underStreakMatch) return false;
-        const streakLen = parseInt(underStreakMatch[1], 10);
-        if (streakLen < 3) return false;
-        // Season average must beat the line by ≥5% — player CAN do it
-        if (!p.season_avg || p.season_avg <= p.line * 1.05) return false;
-        // L10 or L5 must also be above the line
-        const l10Above = p.avg_last_10 != null && p.avg_last_10 > p.line;
-        const l5Above  = p.avg_last_5  != null && p.avg_last_5  > p.line;
-        return l10Above || l5Above;
+        // Must be on an over-streak of 3+ games
+        const overMatch = (p.streak_info || '').match(/^(\d+) game over streak/i);
+        if (!overMatch) return false;
+        if (parseInt(overMatch[1], 10) < 3) return false;
+        // L10 avg must be at least 8% above the line — genuinely outperforming
+        return p.avg_last_10 >= p.line * 1.08;
       })
       .map(p => {
-        const streak = p.streak_info.match(/^(\d+)/)[1];
-        const streakLen = parseInt(streak, 10);
-        // Due score: longer streak + bigger season avg gap = more "due"
-        const seasonGap = ((p.season_avg - p.line) / p.line * 100);
-        const dueScore = Math.min(99, Math.round(50 + streakLen * 8 + seasonGap * 0.8));
-        const reason = `${p.player_name} is on a ${streakLen}-game under streak for ${(propTypeLabels[p.prop_type] || p.prop_type).toUpperCase()} but averages ${p.season_avg} this season vs the ${p.line} line — ${streakLen >= 5 ? 'significantly' : 'statistically'} due for a breakout.`;
-        return { prop: p, streakGames: streakLen, seasonAvg: p.season_avg, dueScore, reason };
+        const streakLen = parseInt(p.streak_info.match(/^(\d+)/)[1], 10);
+        // Boom line: use best of L5/L10, nudge up 10%, round to nearest 0.5
+        const bestAvg = Math.max(p.avg_last_5 ?? p.avg_last_10, p.avg_last_10);
+        const boomLine = Math.round(bestAvg * 1.1 * 2) / 2;
+        const gap = +(p.avg_last_10 - p.line).toFixed(1);
+        const boomScore = Math.min(99, Math.round(50 + streakLen * 7 + (gap / p.line) * 60));
+        const label = (propTypeLabels[p.prop_type] || p.prop_type).toUpperCase();
+
+        let reason = `${p.player_name} is averaging ${p.avg_last_10} ${label} over the last 10 games — ${gap} above the ${p.line} line.`;
+        if (streakLen >= 6) {
+          reason += ` On a ${streakLen}-game over streak — the hottest player at this line right now.`;
+        } else {
+          reason += ` Has cleared this line ${streakLen} straight with no signs of slowing down.`;
+        }
+        if (p.avg_last_5 != null && p.avg_last_5 > p.avg_last_10) {
+          reason += ` L5 avg of ${p.avg_last_5} is trending even higher.`;
+        }
+        if (p.hit_rate_last_10 != null && p.hit_rate_last_10 >= 80) {
+          reason += ` ${p.hit_rate_last_10}% hit rate over last 10 — elite consistency.`;
+        }
+        reason += ` Projecting a ${boomLine}+ ${label} explosion tonight vs ${p.opponent}.`;
+
+        return { prop: p, streakGames: streakLen, seasonAvg: p.season_avg, boomLine, boomScore, reason };
       })
-      .sort((a, b) => b.dueScore - a.dueScore);
+      .sort((a, b) => b.boomScore - a.boomScore);
 
     return candidates[0] || null;
   }, [enrichedProps, todayTeams]);
