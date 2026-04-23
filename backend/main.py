@@ -145,6 +145,13 @@ NBA_LIVE_HEADERS = {
     "Referer": "https://www.nba.com/",
 }
 
+ESPN_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "application/json",
+    "Origin": "https://www.espn.com",
+    "Referer": "https://www.espn.com/",
+}
+
 TEAM_NAME_TO_ABV = {
     "Atlanta Hawks": "ATL", "Boston Celtics": "BOS", "Brooklyn Nets": "BKN",
     "Charlotte Hornets": "CHA", "Chicago Bulls": "CHI", "Cleveland Cavaliers": "CLE",
@@ -387,48 +394,183 @@ def _parse_game_date(s: str):
     return datetime.min
 
 
-def _fetch_logs_via_nba_api(player_id: int, season: str, season_type: str) -> list:
-    """Use nba_api package directly — handles headers/connection differently than raw requests."""
-    from nba_api.stats.endpoints.playergamelog import PlayerGameLog
-    gl = PlayerGameLog(
-        player_id=str(player_id),
-        season=season,
-        season_type_all_star=season_type,
-        timeout=60,
-    )
-    df = gl.get_data_frames()[0]
-    if df.empty:
-        return []
-    return df.to_dict("records")
+def _espn_get(url: str, params: dict = None, timeout: int = 10) -> dict:
+    r = requests.get(url, params=params or {}, headers=ESPN_HEADERS, timeout=timeout)
+    r.raise_for_status()
+    return r.json()
 
 
-def fetch_game_logs(player_id: int) -> list:
-    season = current_season()
-    key = f"gamelogs_{player_id}_{season}_v2"
-    cached = cache_get(key, ttl=3600)
+def _espn_parse_stat(val: str) -> float:
+    """Parse ESPN stat value: '19' → 19.0, '7-13' → 7.0 (makes only)."""
+    if not val or val in ("--", ""):
+        return 0.0
+    try:
+        if "-" in str(val):
+            return float(str(val).split("-")[0])
+        return float(val)
+    except Exception:
+        return 0.0
+
+
+def _espn_boxscore_index(event_id: str) -> dict:
+    """
+    Fetch ESPN game summary and return {player_name: game_dict} for all players.
+    Cached per event so multiple players from the same game share one HTTP call.
+    """
+    cache_key = f"espn_box_{event_id}"
+    cached = cache_get(cache_key, ttl=86400)
     if cached is not None:
         return cached
 
-    reg_logs, po_logs = [], []
-
     try:
-        reg_logs = _fetch_logs_via_nba_api(player_id, season, "Regular Season")
-        time.sleep(0.8)
+        summary = _espn_get(
+            "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary",
+            {"event": event_id},
+        )
     except Exception as e:
-        logging.error(f"Regular season logs failed for {player_id}: {e}")
+        logging.warning(f"ESPN boxscore fetch failed for event {event_id}: {e}")
+        return {}
 
+    # Grab game date and team info
+    header_comps = summary.get("header", {}).get("competitions", [{}])[0]
+    game_date_iso = header_comps.get("date", "")
+    game_date = game_date_iso[:10] if game_date_iso else ""
+    competitors = header_comps.get("competitors", [])
+    home_abbr = next(
+        (c.get("team", {}).get("abbreviation") for c in competitors if c.get("homeAway") == "home"),
+        None
+    )
+
+    players_map = {}
+    for team_data in summary.get("boxscore", {}).get("players", []):
+        team_abbr = team_data.get("team", {}).get("abbreviation", "")
+        is_home = team_abbr == home_abbr
+        opp_abbr = next(
+            (c.get("team", {}).get("abbreviation") for c in competitors if c.get("team", {}).get("abbreviation") != team_abbr),
+            "OPP"
+        )
+        for stat_group in team_data.get("statistics", []):
+            labels = stat_group.get("labels", [])
+            for athlete_entry in stat_group.get("athletes", []):
+                a = athlete_entry.get("athlete", {})
+                name = a.get("displayName", "")
+                espn_id = a.get("id")
+                stats = athlete_entry.get("stats", [])
+                if not name or not stats:
+                    continue
+                sd = dict(zip(labels, stats))
+                # Skip DNP rows (MIN is "--" or "0")
+                if sd.get("MIN", "0") in ("--", "0", ""):
+                    continue
+                players_map[name] = {
+                    "GAME_DATE": game_date,
+                    "MATCHUP": f"vs. {opp_abbr}" if is_home else f"@ {opp_abbr}",
+                    "MIN": sd.get("MIN", "0"),
+                    "PTS":  _espn_parse_stat(sd.get("PTS",  "0")),
+                    "REB":  _espn_parse_stat(sd.get("REB",  "0")),
+                    "AST":  _espn_parse_stat(sd.get("AST",  "0")),
+                    "STL":  _espn_parse_stat(sd.get("STL",  "0")),
+                    "BLK":  _espn_parse_stat(sd.get("BLK",  "0")),
+                    "FG3M": _espn_parse_stat(sd.get("3PT",  "0")),  # "2-5" → 2
+                    "_espn_id": int(espn_id) if espn_id else None,
+                }
+                if espn_id:
+                    # Side-effect: cache ESPN ID
+                    cache_set(f"espn_id_{name}", int(espn_id), ttl=86400)
+
+    if players_map:
+        cache_set(cache_key, players_map)
+    return players_map
+
+
+def _espn_get_player_id(player_name: str) -> int | None:
+    """Find ESPN athlete ID, building from recent game boxscores if needed."""
+    cached = cache_get(f"espn_id_{player_name}", ttl=86400)
+    if cached:
+        return cached
+
+    # Scan last 4 days of games to build the player→ESPN-ID cache
+    for days_ago in range(4):
+        date_str = (datetime.now() - timedelta(days=days_ago)).strftime("%Y%m%d")
+        try:
+            sb = _espn_get(
+                "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard",
+                {"dates": date_str, "limit": 20},
+            )
+            for event in sb.get("events", []):
+                _espn_boxscore_index(event["id"])   # side-effect: caches player IDs
+                eid = cache_get(f"espn_id_{player_name}", ttl=86400)
+                if eid:
+                    return eid
+        except Exception:
+            pass
+    return None
+
+
+def _espn_player_event_ids(espn_id: int) -> list:
+    """Return recent ESPN event IDs (most-recent first) for the player."""
+    cache_key = f"espn_events_{espn_id}_{datetime.now().strftime('%Y%m%d')}"
+    cached = cache_get(cache_key, ttl=3600)
+    if cached is not None:
+        return cached
+
+    season_year = datetime.now().year if datetime.now().month >= 10 else datetime.now().year - 1
+    season = season_year + 1
     try:
-        po_logs = _fetch_logs_via_nba_api(player_id, season, "Playoffs")
+        data = _espn_get(
+            f"https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba"
+            f"/seasons/{season}/athletes/{espn_id}/eventlog",
+            {"limit": 20},
+        )
     except Exception as e:
-        logging.warning(f"Playoff logs not available for {player_id}: {e}")
+        logging.warning(f"ESPN eventlog failed for {espn_id}: {e}")
+        return []
 
-    # Combine and sort most-recent-first
-    combined = po_logs + reg_logs
-    combined.sort(key=lambda g: _parse_game_date(g.get("GAME_DATE", "")), reverse=True)
+    import re
+    event_ids = []
+    for item in data.get("events", {}).get("items", []):
+        ref = item.get("event", {}).get("$ref", "")
+        m = re.search(r"/events/(\d+)", ref)
+        if m:
+            event_ids.append(m.group(1))
 
-    if combined:
-        cache_set(key, combined)
-    return combined
+    if event_ids:
+        cache_set(cache_key, event_ids)
+    return event_ids
+
+
+def fetch_game_logs(player_id: int, player_name: str = "") -> list:
+    """Fetch game logs via ESPN (stats.nba.com is blocked on Railway)."""
+    if not player_name:
+        return []
+
+    cache_key = f"espn_gamelogs_{player_name}_{datetime.now().strftime('%Y%m%d')}"
+    cached = cache_get(cache_key, ttl=3600)
+    if cached is not None:
+        return cached
+
+    espn_id = _espn_get_player_id(player_name)
+    if not espn_id:
+        logging.warning(f"ESPN ID not found for {player_name}")
+        return []
+
+    event_ids = _espn_player_event_ids(espn_id)
+    if not event_ids:
+        return []
+
+    logs = []
+    for event_id in event_ids[:20]:          # scan up to 20 events to get 15 played games
+        box_index = _espn_boxscore_index(event_id)
+        entry = box_index.get(player_name)
+        if entry and entry.get("PTS") is not None:
+            logs.append(entry)
+        if len(logs) >= 15:
+            break
+        time.sleep(0.05)
+
+    if logs:
+        cache_set(cache_key, logs)
+    return logs
 
 @app.post("/api/player-stats")
 async def get_player_stats(req: StatsRequest):
@@ -436,7 +578,7 @@ async def get_player_stats(req: StatsRequest):
         player = find_player(req.playerName)
         if not player:
             raise HTTPException(404, f"Player '{req.playerName}' not found")
-        logs = fetch_game_logs(player["id"])
+        logs = fetch_game_logs(player["id"], req.playerName)
         if not logs:
             raise HTTPException(404, f"No game logs for '{req.playerName}'")
         return {"analytics": calculate_analytics(logs, req.propType, req.line)}
@@ -457,7 +599,7 @@ async def get_player_gamelogs(req: PlayerNameRequest):
         if not player:
             return {"player_name": req.playerName, "analytics": {}, "error": "player_not_found"}
 
-        logs = fetch_game_logs(player["id"])
+        logs = fetch_game_logs(player["id"], req.playerName)
         if not logs:
             return {"player_name": req.playerName, "analytics": {}, "error": "no_logs"}
 
