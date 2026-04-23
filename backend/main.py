@@ -80,16 +80,25 @@ def get_token_user_id(request: Request) -> str:
 
 
 # ── Password helpers ───────────────────────────────────────────────────────────
+_PBKDF2_ITERS = 10000  # low enough for Railway's shared CPU (~50ms vs 10s at 260k)
+
 def hash_password(password: str) -> str:
     salt = secrets.token_hex(16)
-    h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 260000)
-    return f"{salt}${h.hex()}"
+    h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), _PBKDF2_ITERS)
+    return f"{salt}${_PBKDF2_ITERS}${h.hex()}"
 
 
 def verify_password(password: str, stored: str) -> bool:
     try:
-        salt, hashed = stored.split("$", 1)
-        h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 260000)
+        parts = stored.split("$")
+        if len(parts) == 3:
+            salt, iters, hashed = parts
+            iters = int(iters)
+        else:
+            # Legacy format stored without iteration count (260k)
+            salt, hashed = parts
+            iters = 260000
+        h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), iters)
         return hmac.compare_digest(h.hex(), hashed)
     except Exception:
         return False
