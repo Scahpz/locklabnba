@@ -67,20 +67,29 @@ function gradeWithContext(prop) {
     category:  'matchup',
   });
 
-  const weakDef  = oppDef != null ? oppDef > AVG_DEF_RATING : null;
+  const posCategory  = prop.pos_category || null;   // 'G', 'F', or 'C'
+  const posDefRating = prop.pos_def_rating ?? oppDef; // position-specific, falls back to overall
+  const hasPosData   = prop.pos_def_rating != null;
+  const posLabel     = posCategory === 'G' ? 'Guards' : posCategory === 'F' ? 'Forwards' : posCategory === 'C' ? 'Centers' : 'Position';
+
+  const weakDef  = posDefRating != null ? posDefRating > AVG_DEF_RATING : null;
   criteria.push({
-    label: oppDef != null
-      ? `Defense: ${oppDef.toFixed(1)} pts/100 — ${weakDef ? 'weak defense ✓' : 'elite defense ✗'}`
+    label: posDefRating != null
+      ? `Def vs ${posLabel}: ${posDefRating.toFixed(1)} pts/100 — ${weakDef ? 'weak ✓' : 'elite ✗'}`
       : 'Opponent Defense — loading…',
-    detail: oppDef != null
+    detail: posDefRating != null
       ? weakDef
-        ? `Opponent allows ${oppDef.toFixed(1)} pts/100 (league avg ${AVG_DEF_RATING}) — favorable matchup`
-        : `Opponent holds teams to ${oppDef.toFixed(1)} pts/100 — elite defense, tough matchup`
-      : 'Fetching defensive efficiency from NBA.com',
+        ? hasPosData
+          ? `Opponent allows ${posDefRating.toFixed(1)} pts/100 to ${posLabel.toLowerCase()} (avg ${AVG_DEF_RATING}) — favorable positional matchup`
+          : `Opponent allows ${posDefRating.toFixed(1)} pts/100 (league avg ${AVG_DEF_RATING}) — favorable matchup`
+        : hasPosData
+          ? `Opponent holds ${posLabel.toLowerCase()} to ${posDefRating.toFixed(1)} pts/100 — elite positional defense, tough matchup`
+          : `Opponent holds teams to ${posDefRating.toFixed(1)} pts/100 — elite defense, tough matchup`
+      : 'Fetching position-specific defensive efficiency from NBA.com',
     pass:      weakDef === true,
     weight:    15,
-    available: oppDef != null,
-    pending:   oppDef == null,
+    available: posDefRating != null,
+    pending:   posDefRating == null,
     category:  'matchup',
   });
 
@@ -133,7 +142,28 @@ function gradeWithContext(prop) {
     category:  'form',
   });
 
-  // ── 3. INJURY / USAGE CONTEXT (25%) ──────────────────────────────────────
+  // ── 3b. SEASON STATS (lighter factor) ────────────────────────────────────
+  const seasonAvg     = prop.season_avg;
+  const seasonGames   = prop.season_games;
+  const seasonHitRate = prop.season_hit_rate;
+
+  criteria.push({
+    label: seasonAvg != null
+      ? `Season Avg: ${seasonAvg} vs Line ${line} (${seasonGames}G)`
+      : 'Season Stats — loading…',
+    detail: seasonAvg != null
+      ? seasonAvg > line
+        ? `Season average ${seasonAvg} over ${seasonGames} games clears the line — ${seasonHitRate}% season hit rate`
+        : `Season average ${seasonAvg} over ${seasonGames} games is below the line — ${seasonHitRate}% season hit rate`
+      : 'Season average loading',
+    pass:      seasonAvg != null && seasonAvg > line,
+    weight:    8,
+    available: seasonAvg != null,
+    pending:   seasonAvg == null,
+    category:  'season',
+  });
+
+  // ── 4. INJURY / USAGE CONTEXT (25%) ──────────────────────────────────────
   if (injNote) {
     criteria.push({
       label: `Usage Boost: ${injNote}`,
@@ -231,6 +261,7 @@ function gradeFromMarket(prop) {
     { label: 'Game Pace — loading team data…',         detail: 'Fetching pace from NBA.com',           pass: false, weight: 0, available: false, pending: true, category: 'matchup' },
     { label: 'Opponent Defense — loading…',            detail: 'Fetching defensive ratings',           pass: false, weight: 0, available: false, pending: true, category: 'matchup' },
     { label: 'L10 / L5 Game Averages — loading…',     detail: 'Game log data loading in background',  pass: false, weight: 0, available: false, pending: true, category: 'form' },
+    { label: 'Season Stats — loading…',                detail: 'Season average loading',               pass: false, weight: 0, available: false, pending: true, category: 'season' },
     { label: 'Injury / Usage Context — loading…',     detail: 'Checking today\'s injury report',      pass: false, weight: 0, available: false, pending: true, category: 'usage' },
     { label: 'Blowout Risk / Rest — loading…',        detail: 'Fetching spread and schedule data',    pass: false, weight: 0, available: false, pending: true, category: 'rest' },
   ];

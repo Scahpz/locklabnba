@@ -3,12 +3,56 @@ import { fetchLiveProps, clearLiveCache } from '@/lib/liveData';
 import { getAIVerdicts } from '@/lib/aiVerdicts';
 import LockCards from '@/components/props/LockCards';
 import RankedPropCard from '@/components/props/RankedPropCard';
-import { RefreshCw, Wifi, WifiOff, Zap, SlidersHorizontal } from 'lucide-react';
+import DemonPickCard from '@/components/props/DemonPickCard';
+import { RefreshCw, Wifi, WifiOff, Zap, SlidersHorizontal, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { rankScore } from '@/lib/grading';
 import { NBA_API } from '@/lib/config';
+import { TEAM_STATS } from '@/lib/teamStats';
+import PropDetailModal from '@/components/props/PropDetailModal';
 
-const PROP_TYPES = ['all', 'points', 'rebounds', 'assists', 'PRA', '3PM', 'steals', 'blocks'];
+// ── Game-log localStorage cache ───────────────────────────────────────────────
+const GL_CACHE_DATE_KEY = 'locklab_gl_date_v3';
+const GL_CACHE_PREFIX   = 'locklab_gl_v3_';
+const today = new Date().toISOString().split('T')[0];
+// Clear any old v2 keys
+Object.keys(localStorage).filter(k => k.startsWith('locklab_gl_v2_') || k === 'locklab_gl_date_v2').forEach(k => localStorage.removeItem(k));
+if (localStorage.getItem(GL_CACHE_DATE_KEY) !== today) {
+  Object.keys(localStorage).filter(k => k.startsWith(GL_CACHE_PREFIX)).forEach(k => localStorage.removeItem(k));
+  localStorage.setItem(GL_CACHE_DATE_KEY, today);
+}
+function glCacheGet(name) {
+  try { return JSON.parse(localStorage.getItem(GL_CACHE_PREFIX + name)); } catch { return null; }
+}
+function glCacheSet(name, data) {
+  try { localStorage.setItem(GL_CACHE_PREFIX + name, JSON.stringify(data)); } catch {}
+}
+async function fetchGameLogsWithCache(name) {
+  const cached = glCacheGet(name);
+  if (cached) return cached;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const res = await fetch(`${NBA_API}/api/player-gamelogs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playerName: name }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data?.analytics) glCacheSet(name, data);
+    return data;
+  } catch { return null; }
+  finally { clearTimeout(timer); }
+}
+
+const propTypeLabels = {
+  points: 'PTS', rebounds: 'REB', assists: 'AST', PRA: 'PRA',
+  '3PM': '3PM', steals: 'STL', blocks: 'BLK', 'P+R': 'P+R', 'P+A': 'P+A', 'A+R': 'A+R',
+};
+
+const PROP_TYPES = ['all', 'points', 'rebounds', 'assists', 'P+R', 'P+A', 'A+R', 'PRA', '3PM', 'steals', 'blocks'];
 const SORT_OPTIONS = [
   { value: 'ai_rank', label: 'AI Rank' },
   { value: 'confidence', label: 'Confidence' },
@@ -24,6 +68,14 @@ function fmtTipoff(scheduledAt) {
   } catch { return null; }
 }
 
+function localDateStr(utcIso) {
+  if (!utcIso) return null;
+  return new Date(utcIso).toLocaleDateString('en-CA'); // YYYY-MM-DD in local tz
+}
+
+const todayLocalStr    = new Date().toLocaleDateString('en-CA');
+const tomorrowLocalStr = new Date(Date.now() + 86400000).toLocaleDateString('en-CA');
+
 export default function Props() {
   const [rawProps, setRawProps] = useState([]);
   const [gameDate, setGameDate] = useState(null);
@@ -36,14 +88,21 @@ export default function Props() {
   const [verdicts, setVerdicts] = useState({});
   const [aiLoading, setAiLoading] = useState(false);
   const [playerAnalytics, setPlayerAnalytics] = useState({});
-  const [teamContext, setTeamContext] = useState(null);
+  const [playerSearch, setPlayerSearch] = useState('');
+  const [showPlayerDrop, setShowPlayerDrop] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [detailProp, setDetailProp] = useState(null);
+  const [detailDemon, setDetailDemon] = useState(false);
+  const searchRef = useRef(null);
+  // Pre-seed with hardcoded stats so pace/defense show immediately
+  const [teamContext, setTeamContext] = useState({ teams: TEAM_STATS, injuries: {}, back_to_back: [], game_spreads: {} });
   const fetchedPlayers = useRef(new Set());
 
   const loadData = async (forceRefresh = false) => {
     setLoading(true);
     if (forceRefresh) {
       setPlayerAnalytics({});
-      setTeamContext(null);
+      setTeamContext({ teams: TEAM_STATS, injuries: {}, back_to_back: [], game_spreads: {} });
       fetchedPlayers.current = new Set();
     }
     try {
@@ -69,40 +128,53 @@ export default function Props() {
     setLoading(false);
   };
 
-  // Fetch team context (pace, def rating, injuries, back-to-back, spreads) once
+  // Fetch live team context (injuries, back-to-back, spreads) — merges on top of hardcoded stats
   useEffect(() => {
-    if (!rawProps.length || teamContext) return;
-    fetch(`${NBA_API}/api/team-context`)
+    if (!rawProps.length) return;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 10000);
+    fetch(`${NBA_API}/api/team-context`, { signal: ctrl.signal })
       .then(r => r.ok ? r.json() : null)
-      .then(ctx => { if (ctx) setTeamContext(ctx); })
-      .catch(() => {});
-  }, [rawProps, teamContext]);
+      .then(ctx => {
+        if (!ctx) return;
+        setTeamContext(prev => ({
+          teams:        { ...TEAM_STATS, ...ctx.teams },   // live data wins, fallback fills gaps
+          injuries:     ctx.injuries    || {},
+          back_to_back: ctx.back_to_back || [],
+          game_spreads: ctx.game_spreads || {},
+        }));
+      })
+      .catch(() => {})
+      .finally(() => clearTimeout(timer));
+    return () => ctrl.abort();
+  }, [rawProps.length]);
 
-  // Auto-fetch game logs for every player in background (5 at a time)
+  // Auto-fetch game logs for every player (cached in localStorage, 5 at a time)
   useEffect(() => {
     if (!rawProps.length) return;
     const names = [...new Set(rawProps.map(p => p.player_name))];
     const pending = names.filter(n => !fetchedPlayers.current.has(n));
     if (!pending.length) return;
 
+    // Players with cached data → apply immediately without any fetch
+    const withCache = pending.filter(n => glCacheGet(n));
+    if (withCache.length) {
+      const updates = {};
+      withCache.forEach(n => { updates[n] = glCacheGet(n).analytics; fetchedPlayers.current.add(n); });
+      setPlayerAnalytics(prev => ({ ...prev, ...updates }));
+    }
+
+    const needsFetch = pending.filter(n => !glCacheGet(n));
     const batchSize = 5;
     let i = 0;
     function fetchBatch() {
-      const batch = pending.slice(i, i + batchSize);
+      const batch = needsFetch.slice(i, i + batchSize);
       i += batchSize;
       if (!batch.length) return;
       Promise.all(batch.map(async name => {
         fetchedPlayers.current.add(name);
-        try {
-          const res = await fetch(`${NBA_API}/api/player-gamelogs`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ playerName: name }),
-          });
-          if (!res.ok) return;
-          const data = await res.json();
-          if (data.analytics) setPlayerAnalytics(prev => ({ ...prev, [name]: data.analytics }));
-        } catch {}
+        const data = await fetchGameLogsWithCache(name);
+        if (data?.analytics) setPlayerAnalytics(prev => ({ ...prev, [name]: data.analytics }));
       })).then(() => fetchBatch());
     }
     fetchBatch();
@@ -129,6 +201,9 @@ export default function Props() {
         projection:        analytics.projection,
         edge:              analytics.edge,
         confidence_score:  cs,
+        season_avg:        analytics.season_avg,
+        season_games:      analytics.season_games,
+        season_hit_rate:   analytics.season_hit_rate,
         streak_info:       analytics.streak_info,
         last_10_games:     analytics.last_10_games,
         last_5_games:      analytics.last_5_games,
@@ -145,11 +220,17 @@ export default function Props() {
       const tmData  = teams[team] || {};
       const isHome  = team === prop.home;
       const gameId  = `${prop.away || ''}@${prop.home || ''}`;
-      const homeSpread = spreads[gameId]; // home team's spread
-      // Convert to player's perspective: if player is home, use homeSpread as-is; else negate
+      const homeSpread = spreads[gameId];
       const playerSpread = homeSpread != null
         ? (isHome ? homeSpread : -homeSpread)
         : null;
+
+      // Map player position to G/F/C category for position-specific def rating
+      const rawPos = (prop.position || base.position || '').toUpperCase();
+      const posCategory = rawPos === 'C' ? 'C'
+        : (rawPos === 'PG' || rawPos === 'SG' || rawPos === 'G') ? 'G'
+        : 'F'; // SF, PF, F, or unknown default to F
+      const posDefRating = oppData.pos_def?.[posCategory] ?? oppData.def_rating ?? null;
 
       // 3. Injury context — find injured teammates (same team, not the player themselves)
       const injuredTeammates = Object.entries(injuries)
@@ -162,6 +243,8 @@ export default function Props() {
       return {
         ...base,
         opponent_def_rating:  oppData.def_rating   ?? null,
+        pos_def_rating:       posDefRating,
+        pos_category:         posCategory,
         opponent_pace:        oppData.pace          ?? null,
         player_team_pace:     tmData.pace           ?? null,
         is_home:              isHome,
@@ -179,24 +262,86 @@ export default function Props() {
     setSelectedGames(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
   };
 
-  // Picks of the day: top 2 ranked picks with 100% grade confidence (requires real analytics)
+  const isTodayProp = (p) => {
+    if (!todayTeams) return true; // no tomorrow split → all are today
+    const team = (p.team || p.player_team || '').toUpperCase();
+    return todayTeams.has(team);
+  };
+
+  // Picks of the day: top 2 ranked picks with 100% grade confidence — TODAY only
   const locks = useMemo(() => {
-    const calculateGradeConfidence = (p) => {
+    const gradeConfidence = (p) => {
       if (!p.has_analytics) return 0;
-      const l10Pass  = p.avg_last_10 != null && p.avg_last_10 > p.line;
-      const l5Pass   = p.avg_last_5  != null && p.avg_last_5  > p.line;
-      const hitPass  = p.hit_rate_last_10 != null && p.hit_rate_last_10 >= 60;
-      const projPass = p.projection  != null && p.projection  > p.line;
-      const edgePass = p.edge != null && p.edge > 0;
-      const passCount = [l10Pass, l5Pass, hitPass, projPass, edgePass].filter(Boolean).length;
-      return passCount * 20;
+      return [
+        p.avg_last_10 != null && p.avg_last_10 > p.line,
+        p.avg_last_5  != null && p.avg_last_5  > p.line,
+        p.hit_rate_last_10 != null && p.hit_rate_last_10 >= 60,
+        p.projection  != null && p.projection  > p.line,
+        p.edge        != null && p.edge > 0,
+      ].filter(Boolean).length * 20;
     };
 
     return [...enrichedProps]
-      .filter(p => calculateGradeConfidence(p) === 100)
+      .filter(p => gradeConfidence(p) === 100 && isTodayProp(p))
       .sort((a, b) => rankScore(b) - rankScore(a))
       .slice(0, 2);
+  }, [enrichedProps, todayTeams]);
+
+  // Demon Pick: player on a cold under-streak but season/L10 data says they're due to break out
+  const demonPick = useMemo(() => {
+    const candidates = enrichedProps
+      .filter(p => p.has_analytics && isTodayProp(p) && p.season_avg != null)
+      .filter(p => {
+        // Must be on an under streak of 3+ games
+        const streak = p.streak_info || '';
+        const underStreakMatch = streak.match(/^(\d+) game under streak/i);
+        if (!underStreakMatch) return false;
+        const streakLen = parseInt(underStreakMatch[1], 10);
+        if (streakLen < 3) return false;
+        // Season average must beat the line by ≥5% — player CAN do it
+        if (!p.season_avg || p.season_avg <= p.line * 1.05) return false;
+        // L10 or L5 must also be above the line
+        const l10Above = p.avg_last_10 != null && p.avg_last_10 > p.line;
+        const l5Above  = p.avg_last_5  != null && p.avg_last_5  > p.line;
+        return l10Above || l5Above;
+      })
+      .map(p => {
+        const streak = p.streak_info.match(/^(\d+)/)[1];
+        const streakLen = parseInt(streak, 10);
+        // Due score: longer streak + bigger season avg gap = more "due"
+        const seasonGap = ((p.season_avg - p.line) / p.line * 100);
+        const dueScore = Math.min(99, Math.round(50 + streakLen * 8 + seasonGap * 0.8));
+        const reason = `${p.player_name} is on a ${streakLen}-game under streak for ${(propTypeLabels[p.prop_type] || p.prop_type).toUpperCase()} but averages ${p.season_avg} this season vs the ${p.line} line — ${streakLen >= 5 ? 'significantly' : 'statistically'} due for a breakout.`;
+        return { prop: p, streakGames: streakLen, seasonAvg: p.season_avg, dueScore, reason };
+      })
+      .sort((a, b) => b.dueScore - a.dueScore);
+
+    return candidates[0] || null;
+  }, [enrichedProps, todayTeams]);
+
+  // Unique player names for search suggestions
+  const allPlayerNames = useMemo(() => {
+    const seen = new Set();
+    return enrichedProps
+      .map(p => p.player_name)
+      .filter(n => { if (seen.has(n)) return false; seen.add(n); return true; })
+      .sort();
   }, [enrichedProps]);
+
+  const playerSuggestions = useMemo(() => {
+    if (!playerSearch.trim()) return [];
+    const q = playerSearch.toLowerCase();
+    return allPlayerNames.filter(n => n.toLowerCase().includes(q)).slice(0, 8);
+  }, [playerSearch, allPlayerNames]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handle(e) {
+      if (searchRef.current && !searchRef.current.contains(e.target)) setShowPlayerDrop(false);
+    }
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, []);
 
   const sortedGames = useMemo(() => {
     return [...gamesSummary].sort((a, b) => {
@@ -206,8 +351,36 @@ export default function Props() {
     });
   }, [gamesSummary]);
 
+  // Split sorted games into today / tomorrow for the filter UI
+  const { todayGames, tomorrowGames } = useMemo(() => {
+    const today = [], tomorrow = [];
+    sortedGames.forEach(g => {
+      const d = localDateStr(g.scheduled_at);
+      if (!d || d === todayLocalStr)  today.push(g);
+      else if (d === tomorrowLocalStr) tomorrow.push(g);
+      else today.push(g); // unknown date → assume today
+    });
+    return { todayGames: today, tomorrowGames: tomorrow };
+  }, [sortedGames]);
+
+  // Team abbreviations playing TODAY (robust — avoids fragile game-key matching)
+  const todayTeams = useMemo(() => {
+    const s = new Set();
+    // If no tomorrow games exist, treat everything as today
+    if (tomorrowGames.length === 0) return null;
+    todayGames.forEach(g => {
+      if (g.away) s.add(g.away.toUpperCase());
+      if (g.home) s.add(g.home.toUpperCase());
+    });
+    return s;
+  }, [todayGames, tomorrowGames]);
+
   const filteredAndRanked = useMemo(() => {
     let result = enrichedProps;
+
+    if (selectedPlayer) {
+      result = result.filter(p => p.player_name === selectedPlayer);
+    }
 
     if (selectedGames.length > 0) {
       result = result.filter(p => {
@@ -233,7 +406,7 @@ export default function Props() {
     });
 
     return result;
-  }, [enrichedProps, selectedGames, selectedType, sortBy]);
+  }, [enrichedProps, selectedGames, selectedType, sortBy, selectedPlayer]);
 
   if (loading) {
     return (
@@ -245,6 +418,7 @@ export default function Props() {
   }
 
   return (
+    <>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -271,30 +445,106 @@ export default function Props() {
         </button>
       </div>
 
-      {/* Game filter */}
+      {/* Player search */}
+      <div className="relative" ref={searchRef}>
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+        <input
+          type="text"
+          placeholder="Search player…"
+          value={selectedPlayer ? selectedPlayer : playerSearch}
+          onChange={e => { setPlayerSearch(e.target.value); setSelectedPlayer(null); setShowPlayerDrop(true); }}
+          onFocus={() => setShowPlayerDrop(true)}
+          className="w-full sm:w-72 pl-9 pr-8 py-2 text-sm bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+        />
+        {(selectedPlayer || playerSearch) && (
+          <button
+            onClick={() => { setSelectedPlayer(null); setPlayerSearch(''); setShowPlayerDrop(false); }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+        {showPlayerDrop && playerSuggestions.length > 0 && (
+          <div className="absolute top-full mt-1 w-full sm:w-72 bg-popover border border-border rounded-lg shadow-xl z-50 overflow-hidden">
+            {playerSuggestions.map(name => {
+              const p = enrichedProps.find(ep => ep.player_name === name);
+              const propCount = enrichedProps.filter(ep => ep.player_name === name).length;
+              return (
+                <button
+                  key={name}
+                  onClick={() => { setSelectedPlayer(name); setPlayerSearch(''); setShowPlayerDrop(false); }}
+                  className="w-full flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-secondary transition-colors text-left"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{name}</p>
+                    <p className="text-[10px] text-muted-foreground">{p?.team} · {p?.position}</p>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">{propCount} prop{propCount !== 1 ? 's' : ''}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Game filter — split by Today / Tomorrow */}
       {sortedGames.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap scrollbar-none">
-          {sortedGames.map((g, i) => {
-            const key = `${(g.away || '').toUpperCase()}@${(g.home || '').toUpperCase()}`;
-            const active = selectedGames.includes(key);
-            const tipoff = fmtTipoff(g.scheduled_at) || g.tipoff;
-            return (
-              <button
-                key={i}
-                onClick={() => toggleGame(g)}
-                className={cn(
-                  "flex items-center gap-2 border rounded-lg px-3 py-2 text-xs transition-all flex-shrink-0 whitespace-nowrap",
-                  active ? "bg-primary/15 border-primary/50 text-foreground" : "bg-secondary/60 border-border text-foreground hover:border-primary/30"
-                )}
-              >
-                <span className="font-bold">{g.away} @ {g.home}</span>
-                {tipoff && <span className="text-muted-foreground">{tipoff}</span>}
-              </button>
-            );
-          })}
+        <div className="space-y-2">
+          {/* Today's games */}
+          {todayGames.length > 0 && (
+            <div>
+              {tomorrowGames.length > 0 && (
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Today</p>
+              )}
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap scrollbar-none">
+                {todayGames.map((g, i) => {
+                  const key = `${(g.away || '').toUpperCase()}@${(g.home || '').toUpperCase()}`;
+                  const active = selectedGames.includes(key);
+                  const tipoff = fmtTipoff(g.scheduled_at) || g.tipoff;
+                  return (
+                    <button key={i} onClick={() => toggleGame(g)}
+                      className={cn(
+                        "flex items-center gap-2 border rounded-lg px-3 py-2 text-xs transition-all flex-shrink-0 whitespace-nowrap",
+                        active ? "bg-primary/15 border-primary/50 text-foreground" : "bg-secondary/60 border-border text-foreground hover:border-primary/30"
+                      )}
+                    >
+                      <span className="font-bold">{g.away} @ {g.home}</span>
+                      {tipoff && <span className="text-muted-foreground">{tipoff}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Tomorrow's games */}
+          {tomorrowGames.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Tomorrow</p>
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap scrollbar-none">
+                {tomorrowGames.map((g, i) => {
+                  const key = `${(g.away || '').toUpperCase()}@${(g.home || '').toUpperCase()}`;
+                  const active = selectedGames.includes(key);
+                  const tipoff = fmtTipoff(g.scheduled_at) || g.tipoff;
+                  return (
+                    <button key={i} onClick={() => toggleGame(g)}
+                      className={cn(
+                        "flex items-center gap-2 border rounded-lg px-3 py-2 text-xs transition-all flex-shrink-0 whitespace-nowrap",
+                        active ? "bg-primary/15 border-primary/50 text-foreground" : "bg-secondary/60 border-border text-foreground hover:border-primary/30"
+                      )}
+                    >
+                      <span className="font-bold">{g.away} @ {g.home}</span>
+                      {tipoff && <span className="text-muted-foreground">{tipoff}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {selectedGames.length > 0 && (
-            <button onClick={() => setSelectedGames([])} className="text-xs text-muted-foreground hover:text-foreground px-2 py-2 flex-shrink-0 transition-colors">
-              Clear
+            <button onClick={() => setSelectedGames([])} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+              Clear filter
             </button>
           )}
         </div>
@@ -313,6 +563,14 @@ export default function Props() {
         <>
           {/* Locks of the Day */}
           <LockCards locks={locks} verdicts={verdicts} aiLoading={aiLoading} />
+
+          {/* Demon Pick */}
+          {demonPick && (
+            <DemonPickCard
+              pick={demonPick}
+              onOpenDetail={() => setDetailDemon(true)}
+            />
+          )}
 
           {/* Filters */}
           <div className="flex flex-col gap-2">
@@ -347,7 +605,17 @@ export default function Props() {
 
           {/* Ranked props list */}
           <div>
-            <p className="text-xs text-muted-foreground mb-3">{filteredAndRanked.length} props · ranked by {SORT_OPTIONS.find(o => o.value === sortBy)?.label}</p>
+            <div className="flex items-center gap-2 mb-3">
+              <p className="text-xs text-muted-foreground">{filteredAndRanked.length} props · ranked by {SORT_OPTIONS.find(o => o.value === sortBy)?.label}</p>
+              {selectedPlayer && (
+                <button
+                  onClick={() => setSelectedPlayer(null)}
+                  className="flex items-center gap-1 text-xs bg-primary/15 border border-primary/30 text-primary px-2 py-0.5 rounded-full hover:bg-primary/25 transition-colors"
+                >
+                  {selectedPlayer} <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredAndRanked.map((prop, i) => {
                 const key = `${prop.player_name}__${prop.prop_type}__${prop.line}`;
@@ -358,6 +626,7 @@ export default function Props() {
                     rank={i + 1}
                     aiVerdict={verdicts[key]}
                     aiLoading={aiLoading}
+                    onOpenDetail={() => setDetailProp(prop)}
                   />
                 );
               })}
@@ -366,5 +635,14 @@ export default function Props() {
         </>
       )}
     </div>
+
+    {/* Prop detail modal */}
+    {detailProp && (
+      <PropDetailModal prop={detailProp} onClose={() => setDetailProp(null)} />
+    )}
+    {detailDemon && demonPick && (
+      <PropDetailModal prop={demonPick.prop} onClose={() => setDetailDemon(false)} />
+    )}
+    </>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { User, Star, Trophy, Layers, CheckCircle2, XCircle, Clock, Trash2, Pencil, Check, Search, X, LogOut } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -94,6 +95,7 @@ function ParlayCard({ parlay, onStatusChange, onDelete }) {
 }
 
 export default function Profile() {
+  const { logout } = useAuth();
   const { players } = useLivePlayers();
   const navigate = useNavigate();
   const [favorites, setFavorites] = useState([]);
@@ -199,7 +201,7 @@ export default function Profile() {
              My Profile
            </h1>
            <button
-             onClick={() => base44.auth.logout()}
+             onClick={logout}
              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive text-xs font-medium transition-all"
            >
              <LogOut className="w-4 h-4" />

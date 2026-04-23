@@ -17,6 +17,7 @@ function fmtOdds(n) {
 const propTypeLabels = {
   points: 'PTS', rebounds: 'REB', assists: 'AST', PRA: 'PRA',
   '3PM': '3PM', steals: 'STL', blocks: 'BLK', turnovers: 'TO',
+  'P+R': 'P+R', 'P+A': 'P+A', 'A+R': 'A+R',
 };
 
 const tierConfig = {
@@ -25,7 +26,7 @@ const tierConfig = {
   C: { label: 'Tier C', color: 'bg-muted text-muted-foreground border-border' },
 };
 
-export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
+export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, onOpenDetail }) {
   const { addLeg, isSelected } = useParlay();
   const [showBooks, setShowBooks] = useState(false);
   const [selectedBook, setSelectedBook] = useState(null);
@@ -170,6 +171,16 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading }) {
 
       {/* Grade Checklist */}
       <PropGradeChecklist prop={prop} />
+
+      {/* Deep Dive button */}
+      <div className="px-4 pb-3">
+        <button
+          onClick={onOpenDetail}
+          className="w-full text-xs text-muted-foreground hover:text-primary border border-border hover:border-primary/40 rounded-lg py-2 transition-all bg-secondary/40 hover:bg-primary/5 font-medium"
+        >
+          Full Analysis + Line Adjuster →
+        </button>
+      </div>
 
       {/* Book comparison */}
       {hasBooks && (

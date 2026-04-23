@@ -1,12 +1,17 @@
+import base64
+import hashlib
+import hmac
 import json
 import os
+import secrets
 import time
 import uuid
 import requests
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -21,6 +26,83 @@ app.add_middleware(
 
 PARLAYS_FILE = Path(__file__).parent / "parlays.json"
 SETTINGS_FILE = Path(__file__).parent / "settings.json"
+USERS_FILE = Path(__file__).parent / "users.json"
+
+JWT_SECRET = os.environ.get("JWT_SECRET", "locklab-dev-secret-key-2025-nba")
+
+
+# ── JWT helpers ────────────────────────────────────────────────────────────────
+def _b64url_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+
+def _b64url_decode(s: str) -> bytes:
+    s += "=" * (-len(s) % 4)
+    return base64.urlsafe_b64decode(s)
+
+
+def create_token(user_id: str) -> str:
+    header = _b64url_encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
+    payload = _b64url_encode(json.dumps({"sub": user_id, "iat": int(time.time())}).encode())
+    msg = f"{header}.{payload}"
+    sig = _b64url_encode(hmac.new(JWT_SECRET.encode(), msg.encode(), hashlib.sha256).digest())
+    return f"{msg}.{sig}"
+
+
+def decode_token(token: str) -> Optional[dict]:
+    try:
+        parts = token.split(".")
+        if len(parts) != 3:
+            return None
+        header, payload, sig = parts
+        msg = f"{header}.{payload}"
+        expected = _b64url_encode(hmac.new(JWT_SECRET.encode(), msg.encode(), hashlib.sha256).digest())
+        if not hmac.compare_digest(sig, expected):
+            return None
+        return json.loads(_b64url_decode(payload))
+    except Exception:
+        return None
+
+
+def get_token_user_id(request: Request) -> str:
+    auth = request.headers.get("Authorization", "")
+    token = auth[7:] if auth.startswith("Bearer ") else ""
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    payload = decode_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    return payload["sub"]
+
+
+# ── Password helpers ───────────────────────────────────────────────────────────
+def hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 260000)
+    return f"{salt}${h.hex()}"
+
+
+def verify_password(password: str, stored: str) -> bool:
+    try:
+        salt, hashed = stored.split("$", 1)
+        h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 260000)
+        return hmac.compare_digest(h.hex(), hashed)
+    except Exception:
+        return False
+
+
+# ── User storage ───────────────────────────────────────────────────────────────
+def load_users() -> dict:
+    if not USERS_FILE.exists():
+        return {}
+    try:
+        return json.loads(USERS_FILE.read_text())
+    except Exception:
+        return {}
+
+
+def save_users(users: dict):
+    USERS_FILE.write_text(json.dumps(users, indent=2))
 
 NBA_STATS_HEADERS = {
     "Host": "stats.nba.com",
@@ -65,6 +147,9 @@ ODDS_MARKET_TO_PROP = {
     "player_assists": "assists",
     "player_threes": "3PM",
     "player_points_rebounds_assists": "PRA",
+    "player_points_rebounds": "P+R",
+    "player_points_assists": "P+A",
+    "player_assists_rebounds": "A+R",
     "player_steals": "steals",
     "player_blocks": "blocks",
 }
@@ -142,11 +227,17 @@ PROP_COLUMN_MAP = {
 PROP_MIN_AVG = {
     "points": 8.0, "rebounds": 2.5, "assists": 1.5,
     "3PM": 0.5, "steals": 0.3, "blocks": 0.3, "PRA": 15.0,
+    "P+R": 12.0, "P+A": 11.0, "A+R": 4.5,
 }
 
 def stat_value(game: dict, prop_type: str) -> float:
-    if prop_type == "PRA":
-        return float(game.get("PTS") or 0) + float(game.get("REB") or 0) + float(game.get("AST") or 0)
+    pts = float(game.get("PTS") or 0)
+    reb = float(game.get("REB") or 0)
+    ast = float(game.get("AST") or 0)
+    if prop_type == "PRA": return pts + reb + ast
+    if prop_type == "P+R": return pts + reb
+    if prop_type == "P+A": return pts + ast
+    if prop_type == "A+R": return ast + reb
     col = PROP_COLUMN_MAP.get(prop_type, "PTS")
     return float(game.get(col) or 0)
 
@@ -161,6 +252,7 @@ def parse_matchup(matchup: str):
     return False, matchup
 
 def calculate_analytics(logs: list, prop_type: str, line: float) -> dict:
+    # logs comes from NBA API in reverse-chronological order (most recent first)
     values = [stat_value(g, prop_type) for g in logs]
     last_10, last_5 = values[:10], values[:5]
 
@@ -169,6 +261,11 @@ def calculate_analytics(logs: list, prop_type: str, line: float) -> dict:
     hit_rate    = round(sum(1 for v in last_10 if v > line) / len(last_10) * 100, 1) if last_10 else 50.0
     projection  = round(avg_last_5 * 0.6 + avg_last_10 * 0.4, 1)
     edge        = round(projection - line, 2)
+
+    # Season-wide stats (all games fetched, not just last 10)
+    season_games    = len(values)
+    season_avg      = round(sum(values) / season_games, 1) if values else None
+    season_hit_rate = round(sum(1 for v in values if v > line) / season_games * 100, 1) if values else None
 
     raw_conf = (hit_rate / 100) * 5 + min(abs(edge) / line * 10, 5) if line > 0 else 5
     confidence_score = min(10, max(1, round(raw_conf)))
@@ -180,6 +277,10 @@ def calculate_analytics(logs: list, prop_type: str, line: float) -> dict:
         else:
             break
 
+    # Display arrays are reversed to chronological order (oldest first = left side of chart)
+    display_logs_10 = list(reversed(logs[:10]))
+    display_logs_5  = list(reversed(logs[:5]))
+
     return {
         "avg_last_5": avg_last_5,
         "avg_last_10": avg_last_10,
@@ -187,10 +288,13 @@ def calculate_analytics(logs: list, prop_type: str, line: float) -> dict:
         "projection": projection,
         "edge": edge,
         "confidence_score": confidence_score,
+        "season_avg": season_avg,
+        "season_games": season_games,
+        "season_hit_rate": season_hit_rate,
         "streak_info": (f"{streak_count} game {direction} streak" if streak_count >= 2 else None),
-        "last_10_games": values[:10],
-        "last_5_games":  values[:5],
-        "minutes_last_5": [float(g.get("MIN") or 0) for g in logs[:5]],
+        "last_10_games": list(reversed(values[:10])),
+        "last_5_games":  list(reversed(values[:5])),
+        "minutes_last_5": [float(g.get("MIN") or 0) for g in display_logs_5],
         "game_logs_last_10": [
             {
                 "date": g.get("GAME_DATE"),
@@ -200,7 +304,7 @@ def calculate_analytics(logs: list, prop_type: str, line: float) -> dict:
                 "isHome": parse_matchup(g.get("MATCHUP", ""))[0],
                 "opp":    parse_matchup(g.get("MATCHUP", ""))[1],
             }
-            for g in logs[:10]
+            for g in display_logs_10
         ],
         "data_source": "nba_api",
     }
@@ -245,12 +349,48 @@ def find_player(name: str):
             return active_c[0]
     return None
 
+def _parse_game_date(s: str):
+    for fmt in ("%b %d, %Y", "%Y-%m-%d", "%B %d, %Y"):
+        try:
+            return datetime.strptime(s, fmt)
+        except Exception:
+            continue
+    return datetime.min
+
+
 def fetch_game_logs(player_id: int) -> list:
-    data = nba_stats_get("playergamelog", {
-        "PlayerID": player_id, "Season": current_season(),
+    season = current_season()
+    key = f"gamelogs_{player_id}_{season}_v2"
+    cached = cache_get(key, ttl=3600)
+    if cached is not None:
+        return cached
+
+    reg_logs = []
+    po_logs = []
+
+    reg_data = nba_stats_get("playergamelog", {
+        "PlayerID": player_id, "Season": season,
         "SeasonType": "Regular Season", "LeagueID": "00",
     })
-    return parse_result_set(data, "PlayerGameLog")
+    reg_logs = parse_result_set(reg_data, "PlayerGameLog") or []
+
+    # Also fetch playoff games — may be empty for eliminated teams or early in season
+    try:
+        po_data = nba_stats_get("playergamelog", {
+            "PlayerID": player_id, "Season": season,
+            "SeasonType": "Playoffs", "LeagueID": "00",
+        })
+        po_logs = parse_result_set(po_data, "PlayerGameLog") or []
+    except Exception:
+        po_logs = []
+
+    # Combine and sort most-recent-first
+    combined = po_logs + reg_logs
+    combined.sort(key=lambda g: _parse_game_date(g.get("GAME_DATE", "")), reverse=True)
+
+    if combined:
+        cache_set(key, combined)
+    return combined
 
 @app.post("/api/player-stats")
 async def get_player_stats(req: StatsRequest):
@@ -284,7 +424,7 @@ async def get_player_gamelogs(req: PlayerNameRequest):
             raise HTTPException(404, "No game logs found")
 
         result = {}
-        for prop_type in ["points", "rebounds", "assists", "3PM", "steals", "blocks", "PRA"]:
+        for prop_type in ["points", "rebounds", "assists", "3PM", "steals", "blocks", "PRA", "P+R", "P+A", "A+R"]:
             values = [stat_value(g, prop_type) for g in logs[:20]]
             if not values:
                 continue
@@ -321,22 +461,43 @@ def fetch_all_player_stats():
 
 
 # ── /api/live-props (season-avg lines, fast) ──────────────────────────────────
+def fetch_games_for_date(date_str: str):
+    """Fetch NBA games for a specific date (YYYYMMDD). Returns (teams_dict, summary_list)."""
+    try:
+        r = requests.get(
+            f"https://cdn.nba.com/static/json/liveData/scoreboard/scoreboard_{date_str}_00.json",
+            headers=NBA_LIVE_HEADERS, timeout=10,
+        )
+        if not r.ok:
+            return {}, []
+        games = r.json().get("scoreboard", {}).get("games", [])
+        teams, summary = {}, []
+        for game in games:
+            home = game["homeTeam"]["teamTricode"]
+            away = game["awayTeam"]["teamTricode"]
+            game_time = game.get("gameTimeUTC")
+            teams[home] = {"opponent": away, "home": home, "away": away, "scheduled_at": game_time}
+            teams[away] = {"opponent": home, "home": home, "away": away, "scheduled_at": game_time}
+            summary.append({"home": home, "away": away, "scheduled_at": game_time})
+        return teams, summary
+    except Exception:
+        return {}, []
+
+
 def fetch_today_games():
-    r = requests.get(
-        "https://cdn.nba.com/static/json/liveData/scoreboard/todaysScoreboard_00.json",
-        headers=NBA_LIVE_HEADERS, timeout=15,
-    )
-    r.raise_for_status()
-    games = r.json().get("scoreboard", {}).get("games", [])
-    today_teams, games_summary = {}, []
-    for game in games:
-        home = game["homeTeam"]["teamTricode"]
-        away = game["awayTeam"]["teamTricode"]
-        game_time = game.get("gameTimeUTC")  # ISO string e.g. "2026-04-20T23:00:00Z"
-        today_teams[home] = {"opponent": away, "home": home, "away": away, "scheduled_at": game_time}
-        today_teams[away] = {"opponent": home, "home": home, "away": away, "scheduled_at": game_time}
-        games_summary.append({"home": home, "away": away, "scheduled_at": game_time})
-    return today_teams, games_summary
+    today_str = datetime.now().strftime("%Y%m%d")
+    return fetch_games_for_date(today_str)
+
+
+def fetch_upcoming_games():
+    """Returns (today_teams, all_teams, combined_summary) for today + tomorrow."""
+    today = datetime.now()
+    tomorrow = today + timedelta(days=1)
+    today_teams, today_summary = fetch_games_for_date(today.strftime("%Y%m%d"))
+    tmr_teams,   tmr_summary   = fetch_games_for_date(tomorrow.strftime("%Y%m%d"))
+    all_teams = {**tmr_teams, **today_teams}   # today takes priority for team lookups
+    combined  = today_summary + tmr_summary
+    return today_teams, all_teams, combined
 
 @app.get("/api/live-props")
 async def get_live_props():
@@ -442,23 +603,24 @@ async def get_odds_props(bookmakers: str = "draftkings,fanduel,betmgm,caesars,po
         raise HTTPException(502, f"Odds API error: {e}")
 
     events = r.json()
-    today = datetime.now().date().isoformat()
-    today_events = [e for e in events if e.get("commence_time", "")[:10] == today]
+    today     = datetime.now().date().isoformat()
+    tomorrow  = (datetime.now().date() + timedelta(days=1)).isoformat()
+    upcoming_events = [e for e in events if e.get("commence_time", "")[:10] in (today, tomorrow)]
 
-    if not today_events:
+    if not upcoming_events:
         return {"game_date": datetime.now().strftime("%A, %B %d"), "games_summary": [], "rawProps": []}
 
     games_summary = []
-    for e in today_events:
+    for e in upcoming_events:
         home_abv = TEAM_NAME_TO_ABV.get(e.get("home_team", ""), e.get("home_team", "")[:3].upper())
         away_abv = TEAM_NAME_TO_ABV.get(e.get("away_team", ""), e.get("away_team", "")[:3].upper())
-        games_summary.append({"home": home_abv, "away": away_abv})
+        games_summary.append({"home": home_abv, "away": away_abv, "scheduled_at": e.get("commence_time")})
 
     # Fetch props for each event
     raw_props = []
     selected_books = [b.strip() for b in bookmakers.split(",") if b.strip()]
 
-    for event in today_events:
+    for event in upcoming_events:
         event_id = event["id"]
         home_abv = TEAM_NAME_TO_ABV.get(event.get("home_team", ""), event.get("home_team", "")[:3].upper())
         away_abv = TEAM_NAME_TO_ABV.get(event.get("away_team", ""), event.get("away_team", "")[:3].upper())
@@ -564,8 +726,10 @@ PRIZEPICKS_STAT_MAP = {
     "Pts+Rebs+Asts": "PRA",
     "Blocked Shots": "blocks",
     "Steals": "steals",
-    "Pts+Asts": "points",   # approximate — map to closest
-    "Pts+Rebs": "points",
+    "Pts+Rebs": "P+R",
+    "Pts+Asts": "P+A",
+    "Ast+Rebs": "A+R",
+    "Rebs+Asts": "A+R",
 }
 
 PRIZEPICKS_HEADERS = {
@@ -662,11 +826,10 @@ async def get_prizepicks_props():
             "streak_info": None, "last_10_games": None, "game_logs_last_10": None,
         })
 
-    # Build games_summary from today's NBA scoreboard if possible
+    # Build games_summary from today + tomorrow NBA scoreboard
     games_summary = []
     try:
-        today_teams, games_summary = fetch_today_games()
-        # Patch home/away into props using scoreboard
+        _, _, games_summary = fetch_upcoming_games()
         team_game: dict = {}
         for gs in games_summary:
             team_game[gs["home"]] = gs
@@ -699,8 +862,10 @@ UNDERDOG_STAT_MAP = {
     "blocked_shots": "blocks",
     "blocks": "blocks",
     "steals": "steals",
-    "pts_rebs": "points",   # skip combo — not a standard prop
-    "pts_asts": "points",
+    "pts_rebs": "P+R",
+    "pts_asts": "P+A",
+    "ast_rebs": "A+R",
+    "rebs_asts": "A+R",
 }
 
 UNDERDOG_HEADERS = {
@@ -763,9 +928,6 @@ async def get_underdog_props():
         stat_raw = app_stat.get("stat", "")
         prop_type = UNDERDOG_STAT_MAP.get(stat_raw)
         if not prop_type:
-            continue
-        # Only keep clean single-stat props matching our standard set
-        if stat_raw not in ("points", "rebounds", "assists", "three_points_made", "pts_rebs_asts", "blocked_shots", "blocks", "steals"):
             continue
 
         stat_value_raw = line.get("stat_value")
@@ -919,33 +1081,38 @@ def save_parlays(parlays: list):
     PARLAYS_FILE.write_text(json.dumps(parlays, indent=2))
 
 @app.get("/api/parlays")
-async def list_parlays():
-    p = load_parlays()
+async def list_parlays(request: Request):
+    user_id = get_token_user_id(request)
+    p = [x for x in load_parlays() if x.get("user_id") == user_id]
     p.sort(key=lambda x: x.get("created_date", ""), reverse=True)
     return p
 
 @app.post("/api/parlays")
-async def create_parlay(parlay: dict):
+async def create_parlay(request: Request, parlay: dict):
+    user_id = get_token_user_id(request)
     parlays = load_parlays()
     parlay["id"] = str(uuid.uuid4())
+    parlay["user_id"] = user_id
     parlay["created_date"] = datetime.now().isoformat()
     parlays.append(parlay)
     save_parlays(parlays)
     return parlay
 
 @app.put("/api/parlays/{parlay_id}")
-async def update_parlay(parlay_id: str, data: dict):
+async def update_parlay(request: Request, parlay_id: str, data: dict):
+    owner_id = get_token_user_id(request)
     parlays = load_parlays()
     for i, p in enumerate(parlays):
-        if p["id"] == parlay_id:
+        if p["id"] == parlay_id and p.get("user_id") == owner_id:
             parlays[i] = {**p, **data}
             save_parlays(parlays)
             return parlays[i]
     raise HTTPException(404, "Parlay not found")
 
 @app.delete("/api/parlays/{parlay_id}")
-async def delete_parlay(parlay_id: str):
-    save_parlays([p for p in load_parlays() if p["id"] != parlay_id])
+async def delete_parlay(request: Request, parlay_id: str):
+    user_id = get_token_user_id(request)
+    save_parlays([p for p in load_parlays() if not (p["id"] == parlay_id and p.get("user_id") == user_id)])
     return {"ok": True}
 
 
@@ -1103,6 +1270,41 @@ async def get_team_context():
 
     result = {"teams": {}, "injuries": {}, "back_to_back": [], "game_spreads": {}}
 
+    # ── 2024-25 season fallback stats (used when NBA.com blocks cloud IPs) ───────
+    # pos_def: defensive rating allowed vs each position category (G=guards, F=forwards, C=centers)
+    TEAM_STATS_2025 = {
+        "ATL": {"pace": 99.8,  "def_rating": 114.2, "off_rating": 114.8, "pos_def": {"G": 113.5, "F": 114.8, "C": 114.3}},
+        "BOS": {"pace": 100.2, "def_rating": 109.1, "off_rating": 122.2, "pos_def": {"G": 108.9, "F": 109.4, "C": 109.2}},
+        "BKN": {"pace": 97.8,  "def_rating": 116.8, "off_rating": 108.4, "pos_def": {"G": 117.2, "F": 116.5, "C": 116.9}},
+        "CHA": {"pace": 97.5,  "def_rating": 117.4, "off_rating": 108.1, "pos_def": {"G": 117.8, "F": 117.1, "C": 117.2}},
+        "CHI": {"pace": 98.9,  "def_rating": 113.7, "off_rating": 112.3, "pos_def": {"G": 113.2, "F": 114.1, "C": 113.5}},
+        "CLE": {"pace": 98.6,  "def_rating": 109.3, "off_rating": 116.4, "pos_def": {"G": 109.8, "F": 109.2, "C": 108.8}},
+        "DAL": {"pace": 98.2,  "def_rating": 112.1, "off_rating": 116.8, "pos_def": {"G": 112.4, "F": 111.8, "C": 112.2}},
+        "DEN": {"pace": 98.7,  "def_rating": 112.8, "off_rating": 117.9, "pos_def": {"G": 112.5, "F": 113.1, "C": 112.8}},
+        "DET": {"pace": 99.1,  "def_rating": 115.2, "off_rating": 111.7, "pos_def": {"G": 115.5, "F": 115.0, "C": 115.1}},
+        "GSW": {"pace": 99.3,  "def_rating": 113.6, "off_rating": 113.1, "pos_def": {"G": 113.2, "F": 113.8, "C": 114.1}},
+        "HOU": {"pace": 99.5,  "def_rating": 110.8, "off_rating": 114.2, "pos_def": {"G": 110.5, "F": 111.2, "C": 110.9}},
+        "IND": {"pace": 101.3, "def_rating": 113.9, "off_rating": 120.1, "pos_def": {"G": 114.2, "F": 113.6, "C": 113.8}},
+        "LAC": {"pace": 98.1,  "def_rating": 111.5, "off_rating": 112.7, "pos_def": {"G": 111.2, "F": 111.8, "C": 111.5}},
+        "LAL": {"pace": 98.8,  "def_rating": 111.9, "off_rating": 115.6, "pos_def": {"G": 111.6, "F": 112.2, "C": 111.8}},
+        "MEM": {"pace": 99.6,  "def_rating": 113.5, "off_rating": 112.8, "pos_def": {"G": 113.2, "F": 113.8, "C": 113.4}},
+        "MIA": {"pace": 97.9,  "def_rating": 112.7, "off_rating": 110.4, "pos_def": {"G": 108.5, "F": 113.2, "C": 113.9}},
+        "MIL": {"pace": 100.1, "def_rating": 112.4, "off_rating": 116.3, "pos_def": {"G": 112.1, "F": 112.7, "C": 112.3}},
+        "MIN": {"pace": 97.3,  "def_rating": 110.2, "off_rating": 112.9, "pos_def": {"G": 109.1, "F": 110.0, "C": 110.5}},
+        "NOP": {"pace": 98.0,  "def_rating": 116.1, "off_rating": 109.3, "pos_def": {"G": 115.9, "F": 116.3, "C": 116.0}},
+        "NYK": {"pace": 96.8,  "def_rating": 111.2, "off_rating": 117.1, "pos_def": {"G": 111.5, "F": 110.5, "C": 110.9}},
+        "OKC": {"pace": 101.4, "def_rating": 106.8, "off_rating": 119.7, "pos_def": {"G": 106.2, "F": 107.1, "C": 107.3}},
+        "ORL": {"pace": 98.2,  "def_rating": 108.4, "off_rating": 110.6, "pos_def": {"G": 108.8, "F": 107.8, "C": 107.2}},
+        "PHI": {"pace": 98.5,  "def_rating": 114.7, "off_rating": 112.8, "pos_def": {"G": 114.5, "F": 115.0, "C": 114.8}},
+        "PHX": {"pace": 99.4,  "def_rating": 115.5, "off_rating": 113.2, "pos_def": {"G": 115.1, "F": 115.8, "C": 115.9}},
+        "POR": {"pace": 99.2,  "def_rating": 116.4, "off_rating": 110.9, "pos_def": {"G": 116.8, "F": 116.5, "C": 115.6}},
+        "SAC": {"pace": 100.8, "def_rating": 114.9, "off_rating": 116.1, "pos_def": {"G": 115.2, "F": 114.6, "C": 114.8}},
+        "SAS": {"pace": 98.4,  "def_rating": 115.1, "off_rating": 110.3, "pos_def": {"G": 115.4, "F": 115.0, "C": 115.2}},
+        "TOR": {"pace": 98.3,  "def_rating": 116.2, "off_rating": 109.8, "pos_def": {"G": 116.5, "F": 116.0, "C": 116.1}},
+        "UTA": {"pace": 99.0,  "def_rating": 116.8, "off_rating": 109.1, "pos_def": {"G": 116.4, "F": 117.2, "C": 116.9}},
+        "WAS": {"pace": 99.7,  "def_rating": 118.2, "off_rating": 107.6, "pos_def": {"G": 118.5, "F": 118.0, "C": 117.8}},
+    }
+
     # ── Team advanced stats (pace + defensive rating) ──────────────────────────
     try:
         data = nba_stats_get("leaguedashteamstats", {
@@ -1125,6 +1327,11 @@ async def get_team_context():
                 }
     except Exception:
         pass
+
+    # Fall back to hardcoded 2024-25 values for any team not returned by the API
+    for abbr, stats in TEAM_STATS_2025.items():
+        if abbr not in result["teams"]:
+            result["teams"][abbr] = stats
 
     # ── NBA CDN injury report ──────────────────────────────────────────────────
     for url in [
@@ -1200,6 +1407,91 @@ async def get_team_context():
 
     cache_set("team_context", result)
     return result
+
+
+# ── Auth models ───────────────────────────────────────────────────────────────
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    full_name: str = ""
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class UpdateProfileRequest(BaseModel):
+    preferred_name: Optional[str] = None
+    full_name: Optional[str] = None
+    favorite_players: Optional[list] = None
+
+
+def _user_public(u: dict) -> dict:
+    return {k: u[k] for k in ("id", "email", "full_name", "preferred_name", "favorite_players") if k in u}
+
+
+@app.post("/api/auth/register")
+async def auth_register(body: RegisterRequest):
+    email = body.email.strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(400, "Invalid email address")
+    if len(body.password) < 6:
+        raise HTTPException(400, "Password must be at least 6 characters")
+    users = load_users()
+    if any(u["email"] == email for u in users.values()):
+        raise HTTPException(409, "An account with this email already exists")
+    user_id = str(uuid.uuid4())
+    user = {
+        "id": user_id,
+        "email": email,
+        "password_hash": hash_password(body.password),
+        "full_name": body.full_name.strip() or email.split("@")[0],
+        "preferred_name": "",
+        "favorite_players": [],
+        "created_at": datetime.utcnow().isoformat(),
+    }
+    users[user_id] = user
+    save_users(users)
+    return {"token": create_token(user_id), "user": _user_public(user)}
+
+
+@app.post("/api/auth/login")
+async def auth_login(body: LoginRequest):
+    email = body.email.strip().lower()
+    users = load_users()
+    user = next((u for u in users.values() if u["email"] == email), None)
+    if not user or not verify_password(body.password, user["password_hash"]):
+        raise HTTPException(401, "Invalid email or password")
+    return {"token": create_token(user["id"]), "user": _user_public(user)}
+
+
+@app.get("/api/auth/me")
+async def auth_me(request: Request):
+    user_id = get_token_user_id(request)
+    users = load_users()
+    user = users.get(user_id)
+    if not user:
+        raise HTTPException(404, "User not found")
+    return _user_public(user)
+
+
+@app.put("/api/auth/me")
+async def auth_update_me(request: Request, body: UpdateProfileRequest):
+    user_id = get_token_user_id(request)
+    users = load_users()
+    user = users.get(user_id)
+    if not user:
+        raise HTTPException(404, "User not found")
+    if body.preferred_name is not None:
+        user["preferred_name"] = body.preferred_name
+    if body.full_name is not None:
+        user["full_name"] = body.full_name
+    if body.favorite_players is not None:
+        user["favorite_players"] = body.favorite_players
+    users[user_id] = user
+    save_users(users)
+    return _user_public(user)
 
 
 @app.get("/health")

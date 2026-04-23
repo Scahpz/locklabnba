@@ -10,7 +10,7 @@ import TeamLogo from '@/components/common/TeamLogo';
 
 import { NBA_API } from '@/lib/config';
 
-const labelMap = { points: 'PPG', rebounds: 'RPG', assists: 'APG', '3PM': '3PM', steals: 'SPG', blocks: 'BPG', PRA: 'PRA' };
+const labelMap = { points: 'PPG', rebounds: 'RPG', assists: 'APG', '3PM': '3PM', steals: 'SPG', blocks: 'BPG', PRA: 'PRA', 'P+R': 'P+R', 'P+A': 'P+A', 'A+R': 'A+R' };
 const iconMap  = { points: TrendingUp, rebounds: Activity, assists: Target, '3PM': Zap, steals: Clock, blocks: Clock, PRA: TrendingUp };
 const colorMap = { points: 'text-primary', rebounds: 'text-accent', assists: 'text-chart-3', '3PM': 'text-chart-4', steals: 'text-chart-3', blocks: 'text-destructive', PRA: 'text-primary' };
 
@@ -72,17 +72,20 @@ export default function Trends() {
         if (!realAnalytics) return prop;
         return {
           ...prop,
-          avg_last_5:       realAnalytics.avg_last_5,
-          avg_last_10:      realAnalytics.avg_last_10,
-          hit_rate_last_10: realAnalytics.hit_rate_last_10,
-          projection:       realAnalytics.projection,
-          edge:             realAnalytics.edge,
-          confidence_score: realAnalytics.confidence_score,
-          streak_info:      realAnalytics.streak_info,
-          last_10_games:    realAnalytics.last_10_games,
-          last_5_games:     realAnalytics.last_5_games,
+          avg_last_5:        realAnalytics.avg_last_5,
+          avg_last_10:       realAnalytics.avg_last_10,
+          hit_rate_last_10:  realAnalytics.hit_rate_last_10,
+          projection:        realAnalytics.projection,
+          edge:              realAnalytics.edge,
+          confidence_score:  realAnalytics.confidence_score,
+          season_avg:        realAnalytics.season_avg,
+          season_games:      realAnalytics.season_games,
+          season_hit_rate:   realAnalytics.season_hit_rate,
+          streak_info:       realAnalytics.streak_info,
+          last_10_games:     realAnalytics.last_10_games,
+          last_5_games:      realAnalytics.last_5_games,
           game_logs_last_10: realAnalytics.game_logs_last_10,
-          minutes_last_5:   realAnalytics.minutes_last_5,
+          minutes_last_5:    realAnalytics.minutes_last_5,
         };
       }),
     };

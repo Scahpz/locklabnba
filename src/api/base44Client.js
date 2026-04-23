@@ -1,48 +1,54 @@
 import { NBA_API } from '../lib/config';
-const LOCAL_USER_KEY = 'locklab_user';
 
-const defaultUser = {
-  full_name: 'NBA Fan',
-  preferred_name: '',
-  favorite_players: [],
-  email: 'local@locklab.app',
-};
+const AUTH_TOKEN_KEY = 'locklab_auth_token';
 
-function getLocalUser() {
-  try {
-    return JSON.parse(localStorage.getItem(LOCAL_USER_KEY)) || defaultUser;
-  } catch {
-    return defaultUser;
-  }
-}
-
-function saveLocalUser(data) {
-  const updated = { ...getLocalUser(), ...data };
-  localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(updated));
-  return updated;
+function getToken() {
+  return localStorage.getItem(AUTH_TOKEN_KEY) || '';
 }
 
 async function apiRequest(path, options = {}) {
-  const res = await fetch(`${NBA_API}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
+  const token = getToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+  const res = await fetch(`${NBA_API}${path}`, { ...options, headers });
   if (!res.ok) throw new Error(`API error ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
 export const base44 = {
   auth: {
-    me: async () => getLocalUser(),
-
-    updateMe: async (data) => saveLocalUser(data),
-
-    logout: () => {
-      // no-op — local app has no session to clear
+    me: async () => {
+      const token = getToken();
+      if (!token) return null;
+      try {
+        const res = await fetch(`${NBA_API}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return null;
+        return res.json();
+      } catch {
+        return null;
+      }
     },
 
-    redirectToLogin: () => {
-      // no-op — no login required
+    updateMe: async (data) => {
+      const token = getToken();
+      if (!token) return null;
+      const res = await fetch(`${NBA_API}/api/auth/me`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to update profile');
+      return res.json();
+    },
+
+    logout: () => {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+      window.location.href = '/';
     },
   },
 
@@ -65,7 +71,6 @@ export const base44 = {
 
   integrations: {
     Core: {
-      // Rule-based verdict analysis — no LLM key needed
       InvokeLLM: async ({ prompt }) => {
         try {
           const jsonMatch = prompt.match(/\[[\s\S]*\]/);
