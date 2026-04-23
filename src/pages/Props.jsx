@@ -275,29 +275,33 @@ export default function Props() {
     });
   }, [gamesSummary]);
 
-  // Split sorted games into today / tomorrow for the filter UI
-  const { todayGames, tomorrowGames } = useMemo(() => {
+  // Split sorted games into today / tomorrow for the filter UI.
+  // Games 2+ days out are intentionally excluded from both buckets so they
+  // never bleed into Locks / Demon Pick (which must be today-only).
+  const { todayGames, tomorrowGames, hasBeyondTomorrow } = useMemo(() => {
     const today = [], tomorrow = [];
+    let hasBeyond = false;
     sortedGames.forEach(g => {
       const d = localDateStr(g.scheduled_at);
-      if (!d || d === todayLocalStr)  today.push(g);
+      if (!d || d === todayLocalStr)   today.push(g);
       else if (d === tomorrowLocalStr) tomorrow.push(g);
-      else today.push(g); // unknown date → assume today
+      else hasBeyond = true; // 2+ days out — drop from both buckets
     });
-    return { todayGames: today, tomorrowGames: tomorrow };
+    return { todayGames: today, tomorrowGames: tomorrow, hasBeyondTomorrow: hasBeyond };
   }, [sortedGames]);
 
-  // Team abbreviations playing TODAY (robust — avoids fragile game-key matching)
+  // Team abbreviations playing TODAY only.
+  // Returns null when there are no non-today games loaded (no filtering needed).
   const todayTeams = useMemo(() => {
     const s = new Set();
-    // If no tomorrow games exist, treat everything as today
-    if (tomorrowGames.length === 0) return null;
+    // Nothing non-today → all loaded props are today's, no need to filter
+    if (tomorrowGames.length === 0 && !hasBeyondTomorrow) return null;
     todayGames.forEach(g => {
       if (g.away) s.add(g.away.toUpperCase());
       if (g.home) s.add(g.home.toUpperCase());
     });
     return s;
-  }, [todayGames, tomorrowGames]);
+  }, [todayGames, tomorrowGames, hasBeyondTomorrow]);
 
   const isTodayProp = (p) => {
     if (!todayTeams) return true; // no tomorrow split → all are today
