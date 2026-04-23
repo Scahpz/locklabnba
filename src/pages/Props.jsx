@@ -262,6 +262,38 @@ export default function Props() {
     setSelectedGames(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
   };
 
+  const sortedGames = useMemo(() => {
+    return [...gamesSummary].sort((a, b) => {
+      const ta = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity;
+      const tb = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity;
+      return ta - tb;
+    });
+  }, [gamesSummary]);
+
+  // Split sorted games into today / tomorrow for the filter UI
+  const { todayGames, tomorrowGames } = useMemo(() => {
+    const today = [], tomorrow = [];
+    sortedGames.forEach(g => {
+      const d = localDateStr(g.scheduled_at);
+      if (!d || d === todayLocalStr)  today.push(g);
+      else if (d === tomorrowLocalStr) tomorrow.push(g);
+      else today.push(g); // unknown date → assume today
+    });
+    return { todayGames: today, tomorrowGames: tomorrow };
+  }, [sortedGames]);
+
+  // Team abbreviations playing TODAY (robust — avoids fragile game-key matching)
+  const todayTeams = useMemo(() => {
+    const s = new Set();
+    // If no tomorrow games exist, treat everything as today
+    if (tomorrowGames.length === 0) return null;
+    todayGames.forEach(g => {
+      if (g.away) s.add(g.away.toUpperCase());
+      if (g.home) s.add(g.home.toUpperCase());
+    });
+    return s;
+  }, [todayGames, tomorrowGames]);
+
   const isTodayProp = (p) => {
     if (!todayTeams) return true; // no tomorrow split → all are today
     const team = (p.team || p.player_team || '').toUpperCase();
@@ -342,38 +374,6 @@ export default function Props() {
     document.addEventListener('mousedown', handle);
     return () => document.removeEventListener('mousedown', handle);
   }, []);
-
-  const sortedGames = useMemo(() => {
-    return [...gamesSummary].sort((a, b) => {
-      const ta = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity;
-      const tb = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity;
-      return ta - tb;
-    });
-  }, [gamesSummary]);
-
-  // Split sorted games into today / tomorrow for the filter UI
-  const { todayGames, tomorrowGames } = useMemo(() => {
-    const today = [], tomorrow = [];
-    sortedGames.forEach(g => {
-      const d = localDateStr(g.scheduled_at);
-      if (!d || d === todayLocalStr)  today.push(g);
-      else if (d === tomorrowLocalStr) tomorrow.push(g);
-      else today.push(g); // unknown date → assume today
-    });
-    return { todayGames: today, tomorrowGames: tomorrow };
-  }, [sortedGames]);
-
-  // Team abbreviations playing TODAY (robust — avoids fragile game-key matching)
-  const todayTeams = useMemo(() => {
-    const s = new Set();
-    // If no tomorrow games exist, treat everything as today
-    if (tomorrowGames.length === 0) return null;
-    todayGames.forEach(g => {
-      if (g.away) s.add(g.away.toUpperCase());
-      if (g.home) s.add(g.home.toUpperCase());
-    });
-    return s;
-  }, [todayGames, tomorrowGames]);
 
   const filteredAndRanked = useMemo(() => {
     let result = enrichedProps;
