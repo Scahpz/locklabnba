@@ -489,21 +489,45 @@ def _espn_get_player_id(player_name: str) -> int | None:
     if cached:
         return cached
 
-    # Scan last 4 days of games to build the player→ESPN-ID cache
-    for days_ago in range(4):
+    # Scan last 10 days of games to build the player→ESPN-ID cache
+    for days_ago in range(10):
         date_str = (datetime.now() - timedelta(days=days_ago)).strftime("%Y%m%d")
         try:
             sb = _espn_get(
                 "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard",
                 {"dates": date_str, "limit": 20},
             )
-            for event in sb.get("events", []):
-                _espn_boxscore_index(event["id"])   # side-effect: caches player IDs
+            events = sb.get("events", [])
+            logging.info(f"ESPN scoreboard {date_str}: {len(events)} events")
+            for event in events:
+                box = _espn_boxscore_index(event["id"])  # side-effect: caches player IDs
+                logging.info(f"  Event {event['id']}: {len(box)} players indexed, looking for '{player_name}'")
                 eid = cache_get(f"espn_id_{player_name}", ttl=86400)
                 if eid:
+                    logging.info(f"Found ESPN ID {eid} for {player_name}")
                     return eid
-        except Exception:
-            pass
+        except Exception as e:
+            logging.error(f"ESPN scoreboard scan failed day -{days_ago} ({date_str}): {e}\n{traceback.format_exc()}")
+
+    # Fallback: ESPN athlete search API
+    try:
+        search = _espn_get(
+            "https://site.api.espn.com/apis/search/v2",
+            {"query": player_name, "sport": "basketball", "league": "nba", "type": "athlete", "limit": 5},
+        )
+        for result in search.get("results", []):
+            for item in result.get("contents", []):
+                item_name = item.get("displayName", "")
+                item_id   = item.get("id")
+                if item_name and item_id:
+                    cache_set(f"espn_id_{item_name}", int(item_id))
+                    if item_name.lower() == player_name.lower():
+                        logging.info(f"Found ESPN ID {item_id} for {player_name} via search")
+                        return int(item_id)
+    except Exception as e:
+        logging.error(f"ESPN athlete search failed for {player_name}: {e}\n{traceback.format_exc()}")
+
+    logging.warning(f"ESPN ID not found for {player_name} after all fallbacks")
     return None
 
 
@@ -539,7 +563,7 @@ def _espn_player_event_ids(espn_id: int) -> list:
     return event_ids
 
 
-def fetch_game_logs(player_id: int, player_name: str = "") -> list:
+def fetch_game_logs(player_name: str) -> list:
     """Fetch game logs via ESPN (stats.nba.com is blocked on Railway)."""
     if not player_name:
         return []
@@ -578,7 +602,7 @@ async def get_player_stats(req: StatsRequest):
         player = find_player(req.playerName)
         if not player:
             raise HTTPException(404, f"Player '{req.playerName}' not found")
-        logs = fetch_game_logs(player["id"], req.playerName)
+        logs = fetch_game_logs(req.playerName)
         if not logs:
             raise HTTPException(404, f"No game logs for '{req.playerName}'")
         return {"analytics": calculate_analytics(logs, req.propType, req.line)}
@@ -599,7 +623,7 @@ async def get_player_gamelogs(req: PlayerNameRequest):
         if not player:
             return {"player_name": req.playerName, "analytics": {}, "error": "player_not_found"}
 
-        logs = fetch_game_logs(player["id"], req.playerName)
+        logs = fetch_game_logs(req.playerName)
         if not logs:
             return {"player_name": req.playerName, "analytics": {}, "error": "no_logs"}
 
