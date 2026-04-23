@@ -12,14 +12,14 @@ import { TEAM_STATS } from '@/lib/teamStats';
 import PropDetailModal from '@/components/props/PropDetailModal';
 
 // ── Game-log localStorage cache ───────────────────────────────────────────────
-const GL_CACHE_DATE_KEY = 'locklab_gl_date_v4';
-const GL_CACHE_PREFIX   = 'locklab_gl_v4_';
+const GL_CACHE_DATE_KEY = 'locklab_gl_date_v5';
+const GL_CACHE_PREFIX   = 'locklab_gl_v5_';
 const today = new Date().toISOString().split('T')[0];
 // Clear stale keys from older versions
-['locklab_gl_v2_', 'locklab_gl_v3_'].forEach(prefix => {
+['locklab_gl_v2_', 'locklab_gl_v3_', 'locklab_gl_v4_'].forEach(prefix => {
   Object.keys(localStorage).filter(k => k.startsWith(prefix)).forEach(k => localStorage.removeItem(k));
 });
-['locklab_gl_date_v2', 'locklab_gl_date_v3'].forEach(k => localStorage.removeItem(k));
+['locklab_gl_date_v2', 'locklab_gl_date_v3', 'locklab_gl_date_v4'].forEach(k => localStorage.removeItem(k));
 if (localStorage.getItem(GL_CACHE_DATE_KEY) !== today) {
   Object.keys(localStorage).filter(k => k.startsWith(GL_CACHE_PREFIX)).forEach(k => localStorage.removeItem(k));
   localStorage.setItem(GL_CACHE_DATE_KEY, today);
