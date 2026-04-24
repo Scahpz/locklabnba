@@ -722,34 +722,56 @@ class BulkGamelogsRequest(BaseModel):
     playerNames: list
 
 @app.post("/api/player-gamelogs-bulk")
-async def get_player_gamelogs_bulk(req: BulkGamelogsRequest):
+def get_player_gamelogs_bulk(req: BulkGamelogsRequest):
     """
-    Fetch game-log analytics for up to 50 players in one request.
+    Sync endpoint — FastAPI runs this in a thread pool automatically,
+    so blocking calls are safe and won't time out the event loop.
 
-    Strategy: pre-warm ALL boxscores in parallel first, so per-player
-    lookups are pure cache hits — no ESPN calls during the player phase.
+    Strategy:
+      1. Fetch all scoreboard event IDs (parallel, cached per-day).
+      2. Pre-warm every boxscore sequentially in small parallel batches
+         (5 at a time — gentle on ESPN to avoid rate limits).
+      3. Run per-player analytics in parallel — all boxscore lookups hit cache.
     """
     from concurrent.futures import ThreadPoolExecutor
 
     names = list(dict.fromkeys(req.playerNames))[:50]
 
-    # Step 1: get event IDs (parallel scoreboard scan, already cached after first call)
+    # Step 1: scoreboard event IDs (parallel scan, shared cache)
     event_ids = _scoreboard_event_ids_recent(days=20)
+    logging.info(f"bulk: {len(names)} players, {len(event_ids)} events")
 
-    # Step 2: pre-warm every boxscore in parallel so all player lookups hit cache
+    # Step 2: pre-warm boxscores in batches of 5 (avoids ESPN rate limiting)
     if event_ids:
-        BATCH = 20
-        for i in range(0, len(event_ids), BATCH):
-            batch = event_ids[i : i + BATCH]
-            with ThreadPoolExecutor(max_workers=BATCH) as pool:
+        for i in range(0, len(event_ids), 5):
+            batch = event_ids[i : i + 5]
+            with ThreadPoolExecutor(max_workers=5) as pool:
                 list(pool.map(_espn_boxscore_index, batch))
 
-    # Step 3: compute analytics for all players — now every boxscore is cached
-    with ThreadPoolExecutor(max_workers=10) as pool:
+    # Step 3: per-player analytics — pure cache hits now
+    with ThreadPoolExecutor(max_workers=8) as pool:
         results_list = list(pool.map(_analytics_for_player, names))
 
     analytics = {name: data for name, data in zip(names, results_list)}
+    non_empty = sum(1 for v in analytics.values() if v)
+    logging.info(f"bulk: returning analytics for {non_empty}/{len(names)} players")
     return {"analytics": analytics}
+
+
+@app.get("/api/debug/gamelogs")
+def debug_gamelogs(player: str = "LeBron James"):
+    """Quick diagnostic — returns raw game logs for one player."""
+    event_ids = _scoreboard_event_ids_recent(days=20)
+    logs = fetch_game_logs(player)
+    analytics = _analytics_for_player(player)
+    return {
+        "player": player,
+        "event_ids_count": len(event_ids),
+        "event_ids_sample": event_ids[:5],
+        "logs_count": len(logs),
+        "logs_sample": logs[:3],
+        "analytics_keys": list(analytics.keys()),
+    }
 
 
 # ── season stats (cached) ─────────────────────────────────────────────────────
