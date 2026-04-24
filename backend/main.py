@@ -736,6 +736,21 @@ async def get_player_gamelogs_bulk(req: BulkGamelogsRequest):
     return {"analytics": analytics}
 
 
+@app.get("/api/debug/gamelogs")
+async def debug_gamelogs(player: str = "LeBron James"):
+    event_ids = _scoreboard_event_ids_recent(days=40)
+    logs = fetch_game_logs(player)
+    analytics = _analytics_for_player(player)
+    return {
+        "player": player,
+        "event_ids_count": len(event_ids),
+        "event_ids_sample": event_ids[:5],
+        "logs_count": len(logs),
+        "logs_sample": [{"date": g.get("GAME_DATE"), "pts": g.get("PTS")} for g in logs[:3]],
+        "analytics_keys": list(analytics.keys()),
+    }
+
+
 # ── season stats (cached) ─────────────────────────────────────────────────────
 def fetch_all_player_stats():
     cached = cache_get("player_stats", ttl=86400)
