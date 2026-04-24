@@ -531,38 +531,59 @@ def _espn_get_player_id(player_name: str) -> int | None:
     return None
 
 
+def _fetch_scoreboard_day(date_str: str) -> tuple:
+    """Fetch event IDs for one day. Returns (date_str, [event_ids])."""
+    try:
+        sb = _espn_get(
+            "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard",
+            {"dates": date_str, "limit": 20},
+        )
+        return date_str, [e["id"] for e in sb.get("events", []) if e.get("id")]
+    except Exception as e:
+        logging.warning(f"Scoreboard {date_str}: {e}")
+        return date_str, []
+
+
 def _scoreboard_event_ids_recent(days: int = 40) -> list:
     """
     Scan ESPN scoreboards for the last N days, return event IDs newest-first.
     Cached per-day so every player request shares one scan.
-    Covers regular season tail + full first round of playoffs.
+    Fetches all days in parallel (10 at a time) to avoid cold-start timeouts.
     """
     cache_key = f"espn_scoreboard_{days}d_{datetime.now().strftime('%Y%m%d')}"
     cached = cache_get(cache_key, ttl=3600)
     if cached is not None:
         return cached
 
+    from concurrent.futures import ThreadPoolExecutor
+
+    date_strs = [
+        (datetime.now() - timedelta(days=d)).strftime("%Y%m%d")
+        for d in range(days)
+    ]
+
+    # Fetch all days in parallel (10 threads), then reassemble in newest-first order
+    results: dict = {}
+    BATCH = 10
+    for i in range(0, len(date_strs), BATCH):
+        batch = date_strs[i : i + BATCH]
+        with ThreadPoolExecutor(max_workers=BATCH) as pool:
+            for date_str, ids in pool.map(_fetch_scoreboard_day, batch):
+                results[date_str] = ids
+
+    # Reassemble newest-first, dedup
     event_ids: list = []
     seen: set = set()
-    for days_ago in range(days):
-        date_str = (datetime.now() - timedelta(days=days_ago)).strftime("%Y%m%d")
-        try:
-            sb = _espn_get(
-                "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard",
-                {"dates": date_str, "limit": 20},
-            )
-            for event in sb.get("events", []):
-                eid = event.get("id")
-                if eid and eid not in seen:
-                    event_ids.append(eid)
-                    seen.add(eid)
-        except Exception as e:
-            logging.warning(f"Scoreboard {date_str}: {e}")
+    for date_str in date_strs:
+        for eid in results.get(date_str, []):
+            if eid not in seen:
+                event_ids.append(eid)
+                seen.add(eid)
 
     logging.info(f"Scoreboard scan {days}d → {len(event_ids)} events, newest={event_ids[:3]}")
     if event_ids:
         cache_set(cache_key, event_ids)
-    return event_ids  # newest-first: days_ago=0 (today) appended first
+    return event_ids  # newest-first
 
 
 def fetch_game_logs(player_name: str) -> list:
