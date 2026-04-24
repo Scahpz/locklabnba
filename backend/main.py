@@ -576,44 +576,31 @@ def fetch_game_logs(player_name: str) -> list:
     The 40-day window covers the regular-season tail AND the first two rounds of
     playoffs, so it always returns current-season games regardless of season type.
     """
-    import unicodedata
-    def _norm(n: str) -> str:
-        return unicodedata.normalize("NFD", n).encode("ascii", "ignore").decode().lower().strip()
-
     if not player_name:
         return []
 
-    cache_key = f"espn_gamelogs_v6_{player_name}_{datetime.now().strftime('%Y%m%d')}"
+    cache_key = f"espn_gamelogs_v4_{player_name}_{datetime.now().strftime('%Y%m%d')}"
     cached = cache_get(cache_key, ttl=3600)
     if cached is not None:
         return cached
 
     event_ids = _scoreboard_event_ids_recent(days=40)
     if not event_ids:
-        logging.warning("fetch_game_logs: scoreboard returned no events")
+        logging.warning(f"fetch_game_logs: scoreboard returned no events")
         return []
-
-    cutoff = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
-    norm_name = _norm(player_name)
 
     from concurrent.futures import ThreadPoolExecutor
 
     logs: list = []
-    BATCH = 10
+    BATCH = 10  # fetch 10 boxscores in parallel at a time
     for i in range(0, len(event_ids), BATCH):
         batch = event_ids[i : i + BATCH]
         with ThreadPoolExecutor(max_workers=BATCH) as pool:
             boxes = list(pool.map(_espn_boxscore_index, batch))
         for box_index in boxes:
             entry = box_index.get(player_name)
-            if entry is None:
-                for box_name, box_entry in box_index.items():
-                    if _norm(box_name) == norm_name:
-                        entry = box_entry
-                        break
             if entry and entry.get("PTS") is not None:
-                if entry.get("GAME_DATE", "9999") >= cutoff:
-                    logs.append(entry)
+                logs.append(entry)
         if len(logs) >= 15:
             break
 
@@ -700,55 +687,20 @@ class BulkGamelogsRequest(BaseModel):
 async def get_player_gamelogs_bulk(req: BulkGamelogsRequest):
     """
     Fetch game-log analytics for up to 50 players in one request.
-
-    Step 1: warm scoreboard + all boxscores in parallel (cold-start fast path).
-    Step 2: compute per-player analytics — pure cache hits after step 1.
+    Warms the shared scoreboard cache first, then runs players in parallel.
     """
     from concurrent.futures import ThreadPoolExecutor
-    import asyncio
 
-    names = list(dict.fromkeys(req.playerNames))[:50]
+    names = list(dict.fromkeys(req.playerNames))[:50]  # dedupe, cap at 50
 
-    def _bulk_sync():
-        # Warm scoreboard cache
-        event_ids = _scoreboard_event_ids_recent(days=40)
-        logging.info(f"bulk: {len(names)} players, {len(event_ids)} events")
+    # Warm the scoreboard cache once so all workers share it immediately
+    _scoreboard_event_ids_recent(days=40)
 
-        # Pre-warm all boxscores (5 at a time to avoid ESPN rate limits)
-        if event_ids:
-            for i in range(0, len(event_ids), 5):
-                batch = event_ids[i : i + 5]
-                with ThreadPoolExecutor(max_workers=5) as pool:
-                    list(pool.map(_espn_boxscore_index, batch))
-
-        # Per-player analytics — all boxscore lookups now hit cache
-        with ThreadPoolExecutor(max_workers=8) as pool:
-            results = list(pool.map(_analytics_for_player, names))
-
-        return results
-
-    loop = asyncio.get_event_loop()
-    results_list = await loop.run_in_executor(None, _bulk_sync)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results_list = list(pool.map(_analytics_for_player, names))
 
     analytics = {name: data for name, data in zip(names, results_list)}
-    non_empty = sum(1 for v in analytics.values() if v)
-    logging.info(f"bulk: analytics for {non_empty}/{len(names)} players")
     return {"analytics": analytics}
-
-
-@app.get("/api/debug/gamelogs")
-async def debug_gamelogs(player: str = "LeBron James"):
-    event_ids = _scoreboard_event_ids_recent(days=40)
-    logs = fetch_game_logs(player)
-    analytics = _analytics_for_player(player)
-    return {
-        "player": player,
-        "event_ids_count": len(event_ids),
-        "event_ids_sample": event_ids[:5],
-        "logs_count": len(logs),
-        "logs_sample": [{"date": g.get("GAME_DATE"), "pts": g.get("PTS")} for g in logs[:3]],
-        "analytics_keys": list(analytics.keys()),
-    }
 
 
 # ── season stats (cached) ─────────────────────────────────────────────────────
@@ -854,10 +806,10 @@ async def get_live_props():
                 "home": gi.get("home", team), "away": gi.get("away", ""),
                 "player_team": team,
                 "over_odds": -110, "under_odds": -110, "bookmakers": [],
-                "season_avg": round(avg, 1),
-                "avg_last_10": None, "avg_last_5": None,
-                "hit_rate_last_10": None, "projection": round(avg, 1),
-                "edge": None, "confidence_score": 5,
+                # Basic season-avg analytics (no game-log required)
+                "avg_last_10": round(avg, 1), "avg_last_5": round(avg, 1),
+                "hit_rate_last_10": 50.0, "projection": round(avg, 1),
+                "edge": 0.0, "confidence_score": 5,
                 "streak_info": None, "last_10_games": None, "game_logs_last_10": None,
             })
 
@@ -876,10 +828,9 @@ async def get_live_props():
                     "home": gi.get("home", team), "away": gi.get("away", ""),
                     "player_team": team,
                     "over_odds": -110, "under_odds": -110, "bookmakers": [],
-                    "season_avg": round(pra, 1),
-                    "avg_last_10": None, "avg_last_5": None,
-                    "hit_rate_last_10": None, "projection": round(pra, 1),
-                    "edge": None, "confidence_score": 5,
+                    "avg_last_10": round(pra, 1), "avg_last_5": round(pra, 1),
+                    "hit_rate_last_10": 50.0, "projection": round(pra, 1),
+                    "edge": 0.0, "confidence_score": 5,
                     "streak_info": None, "last_10_games": None, "game_logs_last_10": None,
                 })
 
