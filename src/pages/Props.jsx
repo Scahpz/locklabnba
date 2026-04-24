@@ -32,22 +32,18 @@ function glCacheGet(name) {
 function glCacheSet(name, data) {
   try { localStorage.setItem(GL_CACHE_PREFIX + name, JSON.stringify(data)); } catch {}
 }
-async function fetchGameLogsWithCache(name) {
-  const cached = glCacheGet(name);
-  if (cached) return cached;
+async function fetchBulkGameLogs(names) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 12000);
+  const timer = setTimeout(() => ctrl.abort(), 90000); // 90s — bulk can be slow on first load
   try {
-    const res = await fetch(`${NBA_API}/api/player-gamelogs`, {
+    const res = await fetch(`${NBA_API}/api/player-gamelogs-bulk`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerName: name }),
+      body: JSON.stringify({ playerNames: names }),
       signal: ctrl.signal,
     });
     if (!res.ok) return null;
-    const data = await res.json();
-    if (data?.analytics) glCacheSet(name, data);
-    return data;
+    return await res.json();
   } catch { return null; }
   finally { clearTimeout(timer); }
 }
@@ -154,14 +150,14 @@ export default function Props() {
     return () => ctrl.abort();
   }, [rawProps.length]);
 
-  // Auto-fetch game logs for every player (cached in localStorage, 5 at a time)
+  // Auto-fetch game logs for all players in one bulk request
   useEffect(() => {
     if (!rawProps.length) return;
     const names = [...new Set(rawProps.map(p => p.player_name))];
     const pending = names.filter(n => !fetchedPlayers.current.has(n));
     if (!pending.length) return;
 
-    // Players with cached data → apply immediately without any fetch
+    // Apply cached data immediately
     const withCache = pending.filter(n => glCacheGet(n));
     if (withCache.length) {
       const updates = {};
@@ -170,19 +166,23 @@ export default function Props() {
     }
 
     const needsFetch = pending.filter(n => !glCacheGet(n));
-    const batchSize = 5;
-    let i = 0;
-    function fetchBatch() {
-      const batch = needsFetch.slice(i, i + batchSize);
-      i += batchSize;
-      if (!batch.length) return;
-      Promise.all(batch.map(async name => {
-        fetchedPlayers.current.add(name);
-        const data = await fetchGameLogsWithCache(name);
-        if (data?.analytics) setPlayerAnalytics(prev => ({ ...prev, [name]: data.analytics }));
-      })).then(() => fetchBatch());
-    }
-    fetchBatch();
+    if (!needsFetch.length) return;
+    needsFetch.forEach(n => fetchedPlayers.current.add(n));
+
+    // One bulk request for all uncached players
+    fetchBulkGameLogs(needsFetch).then(data => {
+      if (!data?.analytics) return;
+      const updates = {};
+      Object.entries(data.analytics).forEach(([name, analytics]) => {
+        if (analytics && Object.keys(analytics).length > 0) {
+          updates[name] = analytics;
+          glCacheSet(name, { analytics });
+        }
+      });
+      if (Object.keys(updates).length > 0) {
+        setPlayerAnalytics(prev => ({ ...prev, ...updates }));
+      }
+    });
   }, [rawProps]);
 
   // Merge game logs + team context + injury data into each prop

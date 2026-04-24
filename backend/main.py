@@ -589,15 +589,20 @@ def fetch_game_logs(player_name: str) -> list:
         logging.warning(f"fetch_game_logs: scoreboard returned no events")
         return []
 
+    from concurrent.futures import ThreadPoolExecutor
+
     logs: list = []
-    for event_id in event_ids:
-        box_index = _espn_boxscore_index(event_id)
-        entry = box_index.get(player_name)
-        if entry and entry.get("PTS") is not None:
-            logs.append(entry)
+    BATCH = 10  # fetch 10 boxscores in parallel at a time
+    for i in range(0, len(event_ids), BATCH):
+        batch = event_ids[i : i + BATCH]
+        with ThreadPoolExecutor(max_workers=BATCH) as pool:
+            boxes = list(pool.map(_espn_boxscore_index, batch))
+        for box_index in boxes:
+            entry = box_index.get(player_name)
+            if entry and entry.get("PTS") is not None:
+                logs.append(entry)
         if len(logs) >= 15:
             break
-        time.sleep(0.05)
 
     logs.sort(key=lambda g: g.get("GAME_DATE", ""), reverse=True)
     logging.info(f"fetch_game_logs '{player_name}': {len(logs)} games | {[g.get('GAME_DATE') for g in logs[:5]]}")
@@ -652,6 +657,50 @@ async def get_player_gamelogs(req: PlayerNameRequest):
     except Exception as e:
         logging.error(f"player-gamelogs error for {req.playerName}: {traceback.format_exc()}")
         return {"player_name": req.playerName, "analytics": {}, "error": str(e)}
+
+
+def _analytics_for_player(player_name: str) -> dict:
+    """Compute all prop-type analytics for one player. Used by the bulk endpoint."""
+    try:
+        logs = fetch_game_logs(player_name)
+        if not logs:
+            return {}
+        result = {}
+        for prop_type in ["points", "rebounds", "assists", "3PM", "steals", "blocks", "PRA", "P+R", "P+A", "A+R"]:
+            values = [stat_value(g, prop_type) for g in logs[:20]]
+            if not values:
+                continue
+            avg = sum(values) / len(values)
+            if avg < PROP_MIN_AVG.get(prop_type, 0):
+                continue
+            result[prop_type] = calculate_analytics(logs, prop_type, to_line(avg))
+        return result
+    except Exception as e:
+        logging.error(f"_analytics_for_player({player_name}): {e}")
+        return {}
+
+
+class BulkGamelogsRequest(BaseModel):
+    playerNames: list
+
+@app.post("/api/player-gamelogs-bulk")
+async def get_player_gamelogs_bulk(req: BulkGamelogsRequest):
+    """
+    Fetch game-log analytics for up to 50 players in one request.
+    Warms the shared scoreboard cache first, then runs players in parallel.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    names = list(dict.fromkeys(req.playerNames))[:50]  # dedupe, cap at 50
+
+    # Warm the scoreboard cache once so all workers share it immediately
+    _scoreboard_event_ids_recent(days=40)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results_list = list(pool.map(_analytics_for_player, names))
+
+    analytics = {name: data for name, data in zip(names, results_list)}
+    return {"analytics": analytics}
 
 
 # ── season stats (cached) ─────────────────────────────────────────────────────
