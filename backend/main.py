@@ -576,31 +576,48 @@ def fetch_game_logs(player_name: str) -> list:
     The 40-day window covers the regular-season tail AND the first two rounds of
     playoffs, so it always returns current-season games regardless of season type.
     """
+    import unicodedata, re as _re
+
+    def _norm(n: str) -> str:
+        """Lowercase + strip accents so 'Nikola Jokić' matches 'Nikola Jokic'."""
+        return unicodedata.normalize("NFD", n).encode("ascii", "ignore").decode().lower().strip()
+
     if not player_name:
         return []
 
-    cache_key = f"espn_gamelogs_v4_{player_name}_{datetime.now().strftime('%Y%m%d')}"
+    cache_key = f"espn_gamelogs_v5_{player_name}_{datetime.now().strftime('%Y%m%d')}"
     cached = cache_get(cache_key, ttl=3600)
     if cached is not None:
         return cached
 
     event_ids = _scoreboard_event_ids_recent(days=40)
     if not event_ids:
-        logging.warning(f"fetch_game_logs: scoreboard returned no events")
+        logging.warning("fetch_game_logs: scoreboard returned no events")
         return []
+
+    # Hard cutoff — no game older than 90 days can ever appear
+    cutoff = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+    norm_name = _norm(player_name)
 
     from concurrent.futures import ThreadPoolExecutor
 
     logs: list = []
-    BATCH = 10  # fetch 10 boxscores in parallel at a time
+    BATCH = 10
     for i in range(0, len(event_ids), BATCH):
         batch = event_ids[i : i + BATCH]
         with ThreadPoolExecutor(max_workers=BATCH) as pool:
             boxes = list(pool.map(_espn_boxscore_index, batch))
         for box_index in boxes:
+            # Exact name match first; fall back to accent-normalized match
             entry = box_index.get(player_name)
+            if entry is None:
+                for box_name, box_entry in box_index.items():
+                    if _norm(box_name) == norm_name:
+                        entry = box_entry
+                        break
             if entry and entry.get("PTS") is not None:
-                logs.append(entry)
+                if entry.get("GAME_DATE", "") >= cutoff:   # reject anything older than 90 days
+                    logs.append(entry)
         if len(logs) >= 15:
             break
 
@@ -806,10 +823,11 @@ async def get_live_props():
                 "home": gi.get("home", team), "away": gi.get("away", ""),
                 "player_team": team,
                 "over_odds": -110, "under_odds": -110, "bookmakers": [],
-                # Basic season-avg analytics (no game-log required)
-                "avg_last_10": round(avg, 1), "avg_last_5": round(avg, 1),
-                "hit_rate_last_10": 50.0, "projection": round(avg, 1),
-                "edge": 0.0, "confidence_score": 5,
+                # Season-avg only — real L10/hit_rate come from the game-log fetch
+                "season_avg": round(avg, 1),
+                "avg_last_10": None, "avg_last_5": None,
+                "hit_rate_last_10": None, "projection": round(avg, 1),
+                "edge": None, "confidence_score": 5,
                 "streak_info": None, "last_10_games": None, "game_logs_last_10": None,
             })
 
@@ -828,9 +846,10 @@ async def get_live_props():
                     "home": gi.get("home", team), "away": gi.get("away", ""),
                     "player_team": team,
                     "over_odds": -110, "under_odds": -110, "bookmakers": [],
-                    "avg_last_10": round(pra, 1), "avg_last_5": round(pra, 1),
-                    "hit_rate_last_10": 50.0, "projection": round(pra, 1),
-                    "edge": 0.0, "confidence_score": 5,
+                    "season_avg": round(pra, 1),
+                    "avg_last_10": None, "avg_last_5": None,
+                    "hit_rate_last_10": None, "projection": round(pra, 1),
+                    "edge": None, "confidence_score": 5,
                     "streak_info": None, "last_10_games": None, "game_logs_last_10": None,
                 })
 
