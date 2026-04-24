@@ -85,35 +85,50 @@ export default function PropDetailModal({ prop, onClose }) {
   // Run the 4-factor grade engine
   const rawGrade = useMemo(() => gradeProp(adjustedProp), [adjustedProp]);
 
-  // Override confidence for physically unrealistic lines.
-  // When the line is far above/below the player's average, the matchup criteria
-  // (50% weight) cannot reasonably cancel out a line that's e.g. 4× the average.
   const grade = useMemo(() => {
     const avg = prop.avg_last_10 ?? prop.avg_last_5;
-    if (avg == null || avg === 0) return rawGrade;
-    const ratio = adjustedLine / avg;
+    let result = rawGrade;
 
-    let forcedVerdict = null;
-    let minConfidence = 0;
+    // Ratio-based override for extreme lines
+    if (avg != null && avg > 0) {
+      const ratio = adjustedLine / avg;
+      let forcedVerdict = null;
+      let minConf = 0;
 
-    if (ratio >= 3.0)      { forcedVerdict = 'UNDER'; minConfidence = 97; }
-    else if (ratio >= 2.5) { forcedVerdict = 'UNDER'; minConfidence = 93; }
-    else if (ratio >= 2.0) { forcedVerdict = 'UNDER'; minConfidence = 87; }
-    else if (ratio >= 1.6) { forcedVerdict = 'UNDER'; minConfidence = 76; }
-    else if (ratio <= 0.35){ forcedVerdict = 'OVER';  minConfidence = 95; }
-    else if (ratio <= 0.45){ forcedVerdict = 'OVER';  minConfidence = 88; }
-    else if (ratio <= 0.55){ forcedVerdict = 'OVER';  minConfidence = 80; }
-    else if (ratio <= 0.70){ forcedVerdict = 'OVER';  minConfidence = 72; }
+      if      (ratio >= 3.0) { forcedVerdict = 'UNDER'; minConf = 97; }
+      else if (ratio >= 2.5) { forcedVerdict = 'UNDER'; minConf = 93; }
+      else if (ratio >= 2.0) { forcedVerdict = 'UNDER'; minConf = 87; }
+      else if (ratio >= 1.6) { forcedVerdict = 'UNDER'; minConf = 76; }
+      else if (ratio >= 1.3) { forcedVerdict = 'UNDER'; minConf = 66; }
+      else if (ratio <= 0.35){ forcedVerdict = 'OVER';  minConf = 95; }
+      else if (ratio <= 0.45){ forcedVerdict = 'OVER';  minConf = 88; }
+      else if (ratio <= 0.55){ forcedVerdict = 'OVER';  minConf = 82; }
+      else if (ratio <= 0.65){ forcedVerdict = 'OVER';  minConf = 76; }
+      else if (ratio <= 0.75){ forcedVerdict = 'OVER';  minConf = 70; }
+      else if (ratio <= 0.85){ forcedVerdict = 'OVER';  minConf = 64; }
 
-    if (forcedVerdict) {
-      return {
-        ...rawGrade,
-        verdict:    forcedVerdict,
-        confidence: Math.max(rawGrade.confidence, minConfidence),
-      };
+      if (forcedVerdict) {
+        result = { ...rawGrade, verdict: forcedVerdict, confidence: Math.max(rawGrade.confidence, minConf) };
+      }
     }
-    return rawGrade;
-  }, [rawGrade, adjustedLine, prop.avg_last_10, prop.avg_last_5]);
+
+    // Hit-rate boost from actual game logs — most direct signal of line difficulty
+    if (gameLogs.length >= 5) {
+      const hits = gameLogs.filter(v => v > adjustedLine).length;
+      const hitRate = hits / gameLogs.length;
+
+      if      (hitRate >= 0.90) result = { ...result, verdict: 'OVER',  confidence: Math.max(result.confidence, 94) };
+      else if (hitRate >= 0.80) result = { ...result, verdict: 'OVER',  confidence: Math.max(result.confidence, 88) };
+      else if (hitRate >= 0.70) result = { ...result, verdict: 'OVER',  confidence: Math.max(result.confidence, 81) };
+      else if (hitRate >= 0.60) result = { ...result, verdict: 'OVER',  confidence: Math.max(result.confidence, 74) };
+      else if (hitRate <= 0.10) result = { ...result, verdict: 'UNDER', confidence: Math.max(result.confidence, 94) };
+      else if (hitRate <= 0.20) result = { ...result, verdict: 'UNDER', confidence: Math.max(result.confidence, 88) };
+      else if (hitRate <= 0.30) result = { ...result, verdict: 'UNDER', confidence: Math.max(result.confidence, 81) };
+      else if (hitRate <= 0.40) result = { ...result, verdict: 'UNDER', confidence: Math.max(result.confidence, 74) };
+    }
+
+    return result;
+  }, [rawGrade, adjustedLine, prop.avg_last_10, prop.avg_last_5, gameLogs]);
 
   const isOverFavorable = grade.verdict === 'OVER';
   const lineChanged = adjustedLine !== originalLine;
