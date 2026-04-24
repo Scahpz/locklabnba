@@ -531,59 +531,38 @@ def _espn_get_player_id(player_name: str) -> int | None:
     return None
 
 
-def _fetch_scoreboard_day(date_str: str) -> tuple:
-    """Fetch event IDs for one day. Returns (date_str, [event_ids])."""
-    try:
-        sb = _espn_get(
-            "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard",
-            {"dates": date_str, "limit": 20},
-        )
-        return date_str, [e["id"] for e in sb.get("events", []) if e.get("id")]
-    except Exception as e:
-        logging.warning(f"Scoreboard {date_str}: {e}")
-        return date_str, []
-
-
 def _scoreboard_event_ids_recent(days: int = 40) -> list:
     """
     Scan ESPN scoreboards for the last N days, return event IDs newest-first.
     Cached per-day so every player request shares one scan.
-    Fetches all days in parallel (10 at a time) to avoid cold-start timeouts.
+    Covers regular season tail + full first round of playoffs.
     """
     cache_key = f"espn_scoreboard_{days}d_{datetime.now().strftime('%Y%m%d')}"
     cached = cache_get(cache_key, ttl=3600)
     if cached is not None:
         return cached
 
-    from concurrent.futures import ThreadPoolExecutor
-
-    date_strs = [
-        (datetime.now() - timedelta(days=d)).strftime("%Y%m%d")
-        for d in range(days)
-    ]
-
-    # Fetch all days in parallel (10 threads), then reassemble in newest-first order
-    results: dict = {}
-    BATCH = 10
-    for i in range(0, len(date_strs), BATCH):
-        batch = date_strs[i : i + BATCH]
-        with ThreadPoolExecutor(max_workers=BATCH) as pool:
-            for date_str, ids in pool.map(_fetch_scoreboard_day, batch):
-                results[date_str] = ids
-
-    # Reassemble newest-first, dedup
     event_ids: list = []
     seen: set = set()
-    for date_str in date_strs:
-        for eid in results.get(date_str, []):
-            if eid not in seen:
-                event_ids.append(eid)
-                seen.add(eid)
+    for days_ago in range(days):
+        date_str = (datetime.now() - timedelta(days=days_ago)).strftime("%Y%m%d")
+        try:
+            sb = _espn_get(
+                "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard",
+                {"dates": date_str, "limit": 20},
+            )
+            for event in sb.get("events", []):
+                eid = event.get("id")
+                if eid and eid not in seen:
+                    event_ids.append(eid)
+                    seen.add(eid)
+        except Exception as e:
+            logging.warning(f"Scoreboard {date_str}: {e}")
 
     logging.info(f"Scoreboard scan {days}d → {len(event_ids)} events, newest={event_ids[:3]}")
     if event_ids:
         cache_set(cache_key, event_ids)
-    return event_ids  # newest-first
+    return event_ids  # newest-first: days_ago=0 (today) appended first
 
 
 def fetch_game_logs(player_name: str) -> list:
@@ -597,26 +576,23 @@ def fetch_game_logs(player_name: str) -> list:
     The 40-day window covers the regular-season tail AND the first two rounds of
     playoffs, so it always returns current-season games regardless of season type.
     """
-    import unicodedata, re as _re
-
+    import unicodedata
     def _norm(n: str) -> str:
-        """Lowercase + strip accents so 'Nikola Jokić' matches 'Nikola Jokic'."""
         return unicodedata.normalize("NFD", n).encode("ascii", "ignore").decode().lower().strip()
 
     if not player_name:
         return []
 
-    cache_key = f"espn_gamelogs_v5_{player_name}_{datetime.now().strftime('%Y%m%d')}"
+    cache_key = f"espn_gamelogs_v6_{player_name}_{datetime.now().strftime('%Y%m%d')}"
     cached = cache_get(cache_key, ttl=3600)
     if cached is not None:
         return cached
 
-    event_ids = _scoreboard_event_ids_recent(days=20)
+    event_ids = _scoreboard_event_ids_recent(days=40)
     if not event_ids:
         logging.warning("fetch_game_logs: scoreboard returned no events")
         return []
 
-    # Hard cutoff — no game older than 90 days can ever appear
     cutoff = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
     norm_name = _norm(player_name)
 
@@ -629,7 +605,6 @@ def fetch_game_logs(player_name: str) -> list:
         with ThreadPoolExecutor(max_workers=BATCH) as pool:
             boxes = list(pool.map(_espn_boxscore_index, batch))
         for box_index in boxes:
-            # Exact name match first; fall back to accent-normalized match
             entry = box_index.get(player_name)
             if entry is None:
                 for box_name, box_entry in box_index.items():
@@ -637,7 +612,7 @@ def fetch_game_logs(player_name: str) -> list:
                         entry = box_entry
                         break
             if entry and entry.get("PTS") is not None:
-                if entry.get("GAME_DATE", "") >= cutoff:   # reject anything older than 90 days
+                if entry.get("GAME_DATE", "9999") >= cutoff:
                     logs.append(entry)
         if len(logs) >= 15:
             break
@@ -722,56 +697,43 @@ class BulkGamelogsRequest(BaseModel):
     playerNames: list
 
 @app.post("/api/player-gamelogs-bulk")
-def get_player_gamelogs_bulk(req: BulkGamelogsRequest):
+async def get_player_gamelogs_bulk(req: BulkGamelogsRequest):
     """
-    Sync endpoint — FastAPI runs this in a thread pool automatically,
-    so blocking calls are safe and won't time out the event loop.
+    Fetch game-log analytics for up to 50 players in one request.
 
-    Strategy:
-      1. Fetch all scoreboard event IDs (parallel, cached per-day).
-      2. Pre-warm every boxscore sequentially in small parallel batches
-         (5 at a time — gentle on ESPN to avoid rate limits).
-      3. Run per-player analytics in parallel — all boxscore lookups hit cache.
+    Step 1: warm scoreboard + all boxscores in parallel (cold-start fast path).
+    Step 2: compute per-player analytics — pure cache hits after step 1.
     """
     from concurrent.futures import ThreadPoolExecutor
+    import asyncio
 
     names = list(dict.fromkeys(req.playerNames))[:50]
 
-    # Step 1: scoreboard event IDs (parallel scan, shared cache)
-    event_ids = _scoreboard_event_ids_recent(days=20)
-    logging.info(f"bulk: {len(names)} players, {len(event_ids)} events")
+    def _bulk_sync():
+        # Warm scoreboard cache
+        event_ids = _scoreboard_event_ids_recent(days=40)
+        logging.info(f"bulk: {len(names)} players, {len(event_ids)} events")
 
-    # Step 2: pre-warm boxscores in batches of 5 (avoids ESPN rate limiting)
-    if event_ids:
-        for i in range(0, len(event_ids), 5):
-            batch = event_ids[i : i + 5]
-            with ThreadPoolExecutor(max_workers=5) as pool:
-                list(pool.map(_espn_boxscore_index, batch))
+        # Pre-warm all boxscores (5 at a time to avoid ESPN rate limits)
+        if event_ids:
+            for i in range(0, len(event_ids), 5):
+                batch = event_ids[i : i + 5]
+                with ThreadPoolExecutor(max_workers=5) as pool:
+                    list(pool.map(_espn_boxscore_index, batch))
 
-    # Step 3: per-player analytics — pure cache hits now
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        results_list = list(pool.map(_analytics_for_player, names))
+        # Per-player analytics — all boxscore lookups now hit cache
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(_analytics_for_player, names))
+
+        return results
+
+    loop = asyncio.get_event_loop()
+    results_list = await loop.run_in_executor(None, _bulk_sync)
 
     analytics = {name: data for name, data in zip(names, results_list)}
     non_empty = sum(1 for v in analytics.values() if v)
-    logging.info(f"bulk: returning analytics for {non_empty}/{len(names)} players")
+    logging.info(f"bulk: analytics for {non_empty}/{len(names)} players")
     return {"analytics": analytics}
-
-
-@app.get("/api/debug/gamelogs")
-def debug_gamelogs(player: str = "LeBron James"):
-    """Quick diagnostic — returns raw game logs for one player."""
-    event_ids = _scoreboard_event_ids_recent(days=20)
-    logs = fetch_game_logs(player)
-    analytics = _analytics_for_player(player)
-    return {
-        "player": player,
-        "event_ids_count": len(event_ids),
-        "event_ids_sample": event_ids[:5],
-        "logs_count": len(logs),
-        "logs_sample": logs[:3],
-        "analytics_keys": list(analytics.keys()),
-    }
 
 
 # ── season stats (cached) ─────────────────────────────────────────────────────
@@ -877,7 +839,6 @@ async def get_live_props():
                 "home": gi.get("home", team), "away": gi.get("away", ""),
                 "player_team": team,
                 "over_odds": -110, "under_odds": -110, "bookmakers": [],
-                # Season-avg only — real L10/hit_rate come from the game-log fetch
                 "season_avg": round(avg, 1),
                 "avg_last_10": None, "avg_last_5": None,
                 "hit_rate_last_10": None, "projection": round(avg, 1),
