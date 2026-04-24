@@ -95,7 +95,7 @@ export default function Props() {
   const [playerSearch, setPlayerSearch] = useState('');
   const [showPlayerDrop, setShowPlayerDrop] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
-  const [detailProp, setDetailProp] = useState(null);
+  const [detailKey, setDetailKey] = useState(null); // { player_name, prop_type }
   const [detailDemon, setDetailDemon] = useState(false);
   const searchRef = useRef(null);
   // Pre-seed with hardcoded stats so pace/defense show immediately
@@ -648,7 +648,7 @@ export default function Props() {
                     rank={i + 1}
                     aiVerdict={verdicts[key]}
                     aiLoading={aiLoading}
-                    onOpenDetail={() => setDetailProp(prop)}
+                    onOpenDetail={() => setDetailKey({ player_name: prop.player_name, prop_type: prop.prop_type })}
                   />
                 );
               })}
@@ -658,10 +658,11 @@ export default function Props() {
       )}
     </div>
 
-    {/* Prop detail modal */}
-    {detailProp && (
-      <PropDetailModal prop={detailProp} onClose={() => setDetailProp(null)} />
-    )}
+    {/* Prop detail modal — looks up live enriched prop so analytics update even if modal was opened early */}
+    {detailKey && (() => {
+      const liveProp = enrichedProps.find(p => p.player_name === detailKey.player_name && p.prop_type === detailKey.prop_type);
+      return liveProp ? <PropDetailModal prop={liveProp} onClose={() => setDetailKey(null)} /> : null;
+    })()}
     {detailDemon && demonPick && (
       <PropDetailModal prop={demonPick.prop} onClose={() => setDetailDemon(false)} />
     )}

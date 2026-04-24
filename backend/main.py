@@ -611,7 +611,7 @@ def fetch_game_logs(player_name: str) -> list:
     if cached is not None:
         return cached
 
-    event_ids = _scoreboard_event_ids_recent(days=40)
+    event_ids = _scoreboard_event_ids_recent(days=20)
     if not event_ids:
         logging.warning("fetch_game_logs: scoreboard returned no events")
         return []
@@ -725,16 +725,27 @@ class BulkGamelogsRequest(BaseModel):
 async def get_player_gamelogs_bulk(req: BulkGamelogsRequest):
     """
     Fetch game-log analytics for up to 50 players in one request.
-    Warms the shared scoreboard cache first, then runs players in parallel.
+
+    Strategy: pre-warm ALL boxscores in parallel first, so per-player
+    lookups are pure cache hits — no ESPN calls during the player phase.
     """
     from concurrent.futures import ThreadPoolExecutor
 
-    names = list(dict.fromkeys(req.playerNames))[:50]  # dedupe, cap at 50
+    names = list(dict.fromkeys(req.playerNames))[:50]
 
-    # Warm the scoreboard cache once so all workers share it immediately
-    _scoreboard_event_ids_recent(days=40)
+    # Step 1: get event IDs (parallel scoreboard scan, already cached after first call)
+    event_ids = _scoreboard_event_ids_recent(days=20)
 
-    with ThreadPoolExecutor(max_workers=8) as pool:
+    # Step 2: pre-warm every boxscore in parallel so all player lookups hit cache
+    if event_ids:
+        BATCH = 20
+        for i in range(0, len(event_ids), BATCH):
+            batch = event_ids[i : i + BATCH]
+            with ThreadPoolExecutor(max_workers=BATCH) as pool:
+                list(pool.map(_espn_boxscore_index, batch))
+
+    # Step 3: compute analytics for all players — now every boxscore is cached
+    with ThreadPoolExecutor(max_workers=10) as pool:
         results_list = list(pool.map(_analytics_for_player, names))
 
     analytics = {name: data for name, data in zip(names, results_list)}
