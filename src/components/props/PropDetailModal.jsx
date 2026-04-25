@@ -85,43 +85,9 @@ export default function PropDetailModal({ prop, onClose }) {
   // Run the 4-factor grade engine
   const rawGrade = useMemo(() => gradeProp(adjustedProp), [adjustedProp]);
 
-  const grade = useMemo(() => {
-    // When we have actual game logs, derive confidence directly from hit rate.
-    // This is the only approach that guarantees confidence moves in the right
-    // direction as the line changes — no criterion flipping can disturb it.
-    if (gameLogs.length >= 5) {
-      const overCount = gameLogs.filter(v => v > adjustedLine).length;
-      const overRate  = overCount / gameLogs.length;
-      const verdict   = overRate >= 0.5 ? 'OVER' : 'UNDER';
-      // Same formula used by gradeWithContext so scale feels consistent
-      const confidence = Math.min(97, Math.round(52 + Math.abs(overRate - 0.5) * 92));
-      return { ...rawGrade, verdict, confidence };
-    }
-
-    // No game logs: ratio-based fallback
-    const avg = prop.avg_last_10 ?? prop.avg_last_5;
-    if (avg == null || avg === 0) return rawGrade;
-    const ratio = adjustedLine / avg;
-    let forcedVerdict = null;
-    let minConf = 0;
-
-    if      (ratio >= 3.0) { forcedVerdict = 'UNDER'; minConf = 97; }
-    else if (ratio >= 2.5) { forcedVerdict = 'UNDER'; minConf = 93; }
-    else if (ratio >= 2.0) { forcedVerdict = 'UNDER'; minConf = 87; }
-    else if (ratio >= 1.6) { forcedVerdict = 'UNDER'; minConf = 76; }
-    else if (ratio >= 1.3) { forcedVerdict = 'UNDER'; minConf = 66; }
-    else if (ratio <= 0.35){ forcedVerdict = 'OVER';  minConf = 95; }
-    else if (ratio <= 0.45){ forcedVerdict = 'OVER';  minConf = 88; }
-    else if (ratio <= 0.55){ forcedVerdict = 'OVER';  minConf = 82; }
-    else if (ratio <= 0.65){ forcedVerdict = 'OVER';  minConf = 76; }
-    else if (ratio <= 0.75){ forcedVerdict = 'OVER';  minConf = 70; }
-    else if (ratio <= 0.85){ forcedVerdict = 'OVER';  minConf = 64; }
-
-    if (forcedVerdict) {
-      return { ...rawGrade, verdict: forcedVerdict, confidence: Math.max(rawGrade.confidence, minConf) };
-    }
-    return rawGrade;
-  }, [rawGrade, adjustedLine, prop.avg_last_10, prop.avg_last_5, gameLogs]);
+  // The grade engine now uses continuous scores for all line-dependent criteria,
+  // so confidence moves smoothly and in the correct direction as the line changes.
+  const grade = rawGrade;
 
   const isOverFavorable = grade.verdict === 'OVER';
   const lineChanged = adjustedLine !== originalLine;

@@ -8,8 +8,17 @@
  *   Blowout Risk / Rest  20%  (spread risk 10 + home/back-to-back 10)
  */
 
-const AVG_DEF_RATING = 113.5; // NBA league average
-const AVG_PACE       = 98.5;  // NBA league average possessions/game
+const AVG_DEF_RATING = 113.5;
+const AVG_PACE       = 98.5;
+
+// Continuous [0,1] score for form criteria (avg vs line).
+// Returns 0.5 when avg==line, smoothly approaches 1 as avg>>line and 0 as avg<<line.
+// Using continuous scores prevents sudden confidence jumps when the line crosses avg.
+function formScore(avg, line) {
+  if (avg == null) return null;
+  const scale = Math.max(avg, line, 1);
+  return Math.max(0, Math.min(1, 0.5 + (avg - line) / scale));
+}
 
 function impliedProbability(odds) {
   if (odds == null) return 0.5;
@@ -103,11 +112,12 @@ function gradeWithContext(prop) {
         ? `Averaging ${l10} over last 10 games — beats the line by +${(l10 - line).toFixed(1)}`
         : `Averaging ${l10} over last 10 — below line by ${(line - l10).toFixed(1)}`
       : 'Game log data loading in background',
-    pass:      l10 != null && l10 > line,
-    weight:    12,
-    available: l10 != null,
-    pending:   l10 == null,
-    category:  'form',
+    pass:            l10 != null && l10 > line,
+    continuousScore: formScore(l10, line),
+    weight:          12,
+    available:       l10 != null,
+    pending:         l10 == null,
+    category:        'form',
   });
 
   criteria.push({
@@ -119,11 +129,12 @@ function gradeWithContext(prop) {
         ? `Recent form is hot — L5 avg ${l5} beats the line`
         : `Recent cold streak — L5 avg ${l5} below line`
       : 'Game log data loading in background',
-    pass:      l5 != null && l5 > line,
-    weight:    8,
-    available: l5 != null,
-    pending:   l5 == null,
-    category:  'form',
+    pass:            l5 != null && l5 > line,
+    continuousScore: formScore(l5, line),
+    weight:          8,
+    available:       l5 != null,
+    pending:         l5 == null,
+    category:        'form',
   });
 
   criteria.push({
@@ -135,11 +146,12 @@ function gradeWithContext(prop) {
         ? `Cleared this line ${hit}% of last 10 games — highly consistent`
         : `Only ${hit}% hit rate over last 10 — inconsistent`
       : 'Game log data loading in background',
-    pass:      hit != null && hit >= 60,
-    weight:    5,
-    available: hit != null,
-    pending:   hit == null,
-    category:  'form',
+    pass:            hit != null && hit >= 60,
+    continuousScore: hit != null ? hit / 100 : null,
+    weight:          5,
+    available:       hit != null,
+    pending:         hit == null,
+    category:        'form',
   });
 
   // ── 3b. SEASON STATS (lighter factor) ────────────────────────────────────
@@ -156,11 +168,12 @@ function gradeWithContext(prop) {
         ? `Season average ${seasonAvg} over ${seasonGames} games clears the line — ${seasonHitRate}% season hit rate`
         : `Season average ${seasonAvg} over ${seasonGames} games is below the line — ${seasonHitRate}% season hit rate`
       : 'Season average loading',
-    pass:      seasonAvg != null && seasonAvg > line,
-    weight:    8,
-    available: seasonAvg != null,
-    pending:   seasonAvg == null,
-    category:  'season',
+    pass:            seasonAvg != null && seasonAvg > line,
+    continuousScore: formScore(seasonAvg, line),
+    weight:          8,
+    available:       seasonAvg != null,
+    pending:         seasonAvg == null,
+    category:        'season',
   });
 
   // ── 4. INJURY / USAGE CONTEXT (25%) ──────────────────────────────────────
@@ -174,6 +187,12 @@ function gradeWithContext(prop) {
       category:  'usage',
     });
   } else {
+    // Edge = (projection - line). Use continuous score so confidence shifts
+    // smoothly as the line moves toward/away from the projection.
+    const edgeScale = Math.max(Math.abs(l10 ?? l5 ?? seasonAvg ?? line ?? 1), 1);
+    const edgeContinuousScore = edge != null
+      ? Math.max(0, Math.min(1, 0.5 + edge / edgeScale))
+      : null;
     criteria.push({
       label: edge != null
         ? `Usage/Edge: ${edge > 0 ? '+' : ''}${edge}% model edge`
@@ -183,10 +202,11 @@ function gradeWithContext(prop) {
         : edge != null && edge < 0
           ? `Model projects ${edge}% below the line — UNDER signal`
           : 'No major lineup changes reported — normal usage expected',
-      pass:      edge != null ? edge > 0 : false,
-      weight:    25,
-      available: true,
-      category:  'usage',
+      pass:            edge != null ? edge > 0 : false,
+      continuousScore: edgeContinuousScore,
+      weight:          25,
+      available:       true,
+      category:        'usage',
     });
   }
 
@@ -223,10 +243,15 @@ function gradeWithContext(prop) {
   });
 
   // ── Score ─────────────────────────────────────────────────────────────────
-  const available     = criteria.filter(c => c.available);
-  const passingWeight = available.filter(c => c.pass).reduce((s, c) => s + c.weight, 0);
-  const totalWeight   = available.reduce((s, c) => s + c.weight, 0) || 100;
-  const overScore     = passingWeight / totalWeight;
+  // Form/season/edge criteria use a continuous [0,1] score so confidence shifts
+  // smoothly as the line changes instead of jumping at avg-crossover points.
+  // Context criteria (pace, defense, spread, rest) remain binary pass/fail.
+  const available   = criteria.filter(c => c.available);
+  const totalWeight = available.reduce((s, c) => s + c.weight, 0) || 100;
+  const overScore   = available.reduce((sum, c) => {
+    const score = c.continuousScore != null ? c.continuousScore : (c.pass ? 1 : 0);
+    return sum + score * c.weight;
+  }, 0) / totalWeight;
 
   const verdict    = overScore >= 0.5 ? 'OVER' : 'UNDER';
   const rawConf    = Math.round(52 + Math.abs(overScore - 0.5) * 92);
