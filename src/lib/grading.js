@@ -1,11 +1,16 @@
 /**
  * 4-Factor Grading Engine
  *
- * Weights (total 100):
- *   Matchup / Defense    30%  (pace 15 + defensive rating 15)
- *   Recent Form          25%  (L10 avg 12 + L5 avg 8 + hit rate 5)
- *   Injury / Usage       25%  (teammate injuries → usage boost, or edge proxy)
- *   Blowout Risk / Rest  20%  (spread risk 10 + home/back-to-back 10)
+ * Weights (approx, normalized by available criteria):
+ *   Recent Form          53  (L10 avg 25 + L5 avg 15 + hit rate 13)  ← dominant
+ *   Season Stats          8  (season avg vs line)
+ *   Matchup / Defense    20  (stat-specific opp defense 13 + pace 7)
+ *   Injury / Usage       18  (injury boost) / 8 (edge only — no injury)
+ *   Blowout Risk / Rest  12  (spread 6 + B2B 6)
+ *
+ * Game-level factors (pace, defense, spread, B2B) use continuous scores so a
+ * marginal advantage (e.g. pace 98.6 vs avg 98.5) registers as near-neutral
+ * rather than a full pass — preventing the whole game from pushing OVER.
  */
 
 const AVG_DEF_RATING = 113.5;
@@ -81,11 +86,12 @@ function gradeWithContext(prop) {
         ? `Both teams avg ${avgPace} possessions/game → high-scoring opportunity, favors OVER`
         : `Slow-paced game (${avgPace} poss) → fewer scoring chances, favors UNDER`
       : 'Fetching team pace data from NBA.com',
-    pass:      pacePass === true,
-    weight:    15,
-    available: avgPace != null,
-    pending:   avgPace == null,
-    category:  'matchup',
+    pass:            pacePass === true,
+    continuousScore: avgPace != null ? formScore(avgPace, AVG_PACE) : null,
+    weight:          7,
+    available:       avgPace != null,
+    pending:         avgPace == null,
+    category:        'matchup',
   });
 
   const posCategory  = prop.pos_category || null;   // 'G', 'F', or 'C'
@@ -144,7 +150,7 @@ function gradeWithContext(prop) {
         : `Opponent holds ${sl.toLowerCase()} to ${value.toFixed(1)} ${unitLabel} (league avg ${avg}) — disciplined defense, favors UNDER`,
       pass:            weak,
       continuousScore: statDefScore(value, avg),
-      weight:          15,
+      weight:          13,
       available:       true,
       category:        'matchup',
     });
@@ -165,7 +171,7 @@ function gradeWithContext(prop) {
         : 'Fetching position-specific defensive efficiency from NBA.com',
       pass:            weakDef === true,
       continuousScore: posDefRating != null ? statDefScore(posDefRating, AVG_DEF_RATING) : null,
-      weight:          15,
+      weight:          13,
       available:       posDefRating != null,
       pending:         posDefRating == null,
       category:        'matchup',
@@ -184,7 +190,7 @@ function gradeWithContext(prop) {
       : 'Game log data loading in background',
     pass:            l10 != null && l10 > line,
     continuousScore: formScore(l10, line),
-    weight:          12,
+    weight:          25,
     available:       l10 != null,
     pending:         l10 == null,
     category:        'form',
@@ -201,7 +207,7 @@ function gradeWithContext(prop) {
       : 'Game log data loading in background',
     pass:            l5 != null && l5 > line,
     continuousScore: formScore(l5, line),
-    weight:          8,
+    weight:          15,
     available:       l5 != null,
     pending:         l5 == null,
     category:        'form',
@@ -218,7 +224,7 @@ function gradeWithContext(prop) {
       : 'Game log data loading in background',
     pass:            hit != null && hit >= 60,
     continuousScore: hit != null ? hit / 100 : null,
-    weight:          5,
+    weight:          13,
     available:       hit != null,
     pending:         hit == null,
     category:        'form',
@@ -246,23 +252,27 @@ function gradeWithContext(prop) {
     category:        'season',
   });
 
-  // ── 4. INJURY / USAGE CONTEXT (25%) ──────────────────────────────────────
+  // ── 4. INJURY / USAGE CONTEXT ────────────────────────────────────────────
   if (injNote) {
+    // Genuine teammate injury — unique signal not captured by form criteria.
+    // Keep at weight 18 so it matters but can't override strong form signals.
     criteria.push({
       label: `Usage Boost: ${injNote}`,
       detail: `Key teammate is out → expect more shot attempts, more touches, higher usage rate — strong OVER signal`,
-      pass:      true,
-      weight:    25,
-      available: true,
-      category:  'usage',
+      pass:            true,
+      continuousScore: 1.0,
+      weight:          18,
+      available:       true,
+      category:        'usage',
     });
   } else {
-    // Edge = (projection - line). Use continuous score so confidence shifts
-    // smoothly as the line moves toward/away from the projection.
+    // Edge = (avg_last_10 - line) — correlated with L10 criterion.
+    // Use weight 8 (vs 25 before) so it doesn't double-count the L10 signal.
+    // When no data: default to 0.5 (neutral) instead of 0 (false UNDER signal).
     const edgeScale = Math.max(Math.abs(l10 ?? l5 ?? seasonAvg ?? line ?? 1), 1);
     const edgeContinuousScore = edge != null
       ? Math.max(0, Math.min(1, 0.5 + edge / edgeScale))
-      : null;
+      : 0.5;
     criteria.push({
       label: edge != null
         ? `Usage/Edge: ${edge > 0 ? '+' : ''}${edge}% model edge`
@@ -274,7 +284,7 @@ function gradeWithContext(prop) {
           : 'No major lineup changes reported — normal usage expected',
       pass:            edge != null ? edge > 0 : false,
       continuousScore: edgeContinuousScore,
-      weight:          25,
+      weight:          8,
       available:       true,
       category:        'usage',
     });
@@ -284,6 +294,12 @@ function gradeWithContext(prop) {
   const absSpread   = spread != null ? Math.abs(spread) : null;
   const blowoutRisk = absSpread != null && absSpread >= 12;
 
+  // Continuous spread score: small spreads are near-neutral; large spreads signal
+  // blowout risk (UNDER). A 0-pt spread = 0.62 (slight positive — full minutes likely).
+  // A 12-pt spread = 0.12 (significant blowout risk). Beyond ~17 → 0.
+  const spreadContinuousScore = absSpread != null
+    ? Math.max(0, Math.min(1, 0.62 - absSpread / 20))
+    : 0.5;
   criteria.push({
     label: absSpread != null
       ? blowoutRisk
@@ -295,10 +311,11 @@ function gradeWithContext(prop) {
         ? `${absSpread.toFixed(1)}-pt spread → stars likely sit in 4th quarter with reduced minutes — UNDER risk`
         : 'Competitive game expected — full 35–38 minutes likely, maximizes prop upside'
       : 'No live spread available — blowout risk unknown',
-    pass:      absSpread == null ? true : !blowoutRisk,
-    weight:    10,
-    available: true,
-    category:  'rest',
+    pass:            absSpread == null ? true : !blowoutRisk,
+    continuousScore: spreadContinuousScore,
+    weight:          6,
+    available:       true,
+    category:        'rest',
   });
 
   criteria.push({
@@ -307,7 +324,7 @@ function gradeWithContext(prop) {
       ? 'Second game in two nights — shooting %, energy, and minutes typically drop on back-to-backs'
       : 'Normal rest — no schedule fatigue concerns',
     pass:      !isB2B,
-    weight:    10,
+    weight:    6,
     available: true,
     category:  'rest',
   });
