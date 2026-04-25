@@ -367,12 +367,22 @@ function gradeFromMarket(prop) {
 }
 
 /**
- * Composite ranking score — higher = more confident bet.
- * Props with real analytics always rank above market-only.
+ * Ranking score — higher = more confident bet.
+ * Applies same game-log normalization as the prop cards so ranking order
+ * matches the AI confidence numbers shown on each card.
+ * Props with full analytics (real game logs) always rank above market-only.
  */
 export function rankScore(prop) {
-  const grade   = gradeProp(prop);
-  const base    = grade.dataQuality === 'full' ? 1000 : grade.dataQuality === 'context' ? 500 : 0;
-  const confPts = Math.pow((grade.confidence - 50) / 48, 1.5) * 90;
-  return base + confPts;
+  const logs = prop.last_10_games || [];
+  let p = prop;
+  if (logs.length > 0) {
+    const hitCount = logs.filter(v => v > prop.line).length;
+    const dynamicHitRate = Math.round(hitCount / logs.length * 100);
+    const base = prop.projection ?? prop.avg_last_10 ?? null;
+    const dynamicEdge = base != null ? Math.round((base - prop.line) * 100) / 100 : prop.edge;
+    p = { ...prop, hit_rate_last_10: dynamicHitRate, edge: dynamicEdge };
+  }
+  const grade = gradeProp(p);
+  const base  = grade.dataQuality === 'full' ? 1000 : grade.dataQuality === 'context' ? 500 : 0;
+  return base + grade.confidence;
 }
