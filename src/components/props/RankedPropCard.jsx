@@ -31,7 +31,18 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, onOpe
   const [showBooks, setShowBooks] = useState(false);
   const [selectedBook, setSelectedBook] = useState(null);
 
-  const grade = gradeProp(prop);
+  // Match the same normalization the detail modal uses: recalculate hit_rate and
+  // edge from actual game logs so the card confidence equals the modal confidence.
+  const gradedProp = React.useMemo(() => {
+    const logs = prop.last_10_games || [];
+    if (logs.length === 0) return prop;
+    const hitCount = logs.filter(v => v > prop.line).length;
+    const dynamicHitRate = Math.round(hitCount / logs.length * 100);
+    const base = prop.projection ?? prop.avg_last_10 ?? null;
+    const dynamicEdge = base != null ? Math.round((base - prop.line) * 100) / 100 : prop.edge;
+    return { ...prop, hit_rate_last_10: dynamicHitRate, edge: dynamicEdge };
+  }, [prop]);
+  const grade = gradeProp(gradedProp);
   const tier = tierConfig[prop.has_analytics ? prop.confidence_tier : 'C'] || tierConfig.C;
   const isOverFavorable = grade.verdict === 'OVER';
   const hasBooks = prop.all_books?.length > 1;

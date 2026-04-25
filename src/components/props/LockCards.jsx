@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import TeamLogo from '@/components/common/TeamLogo';
 import { useParlay } from '@/lib/ParlayContext';
 import VerdictBadge from '@/components/props/VerdictBadge';
+import { gradeProp } from '@/lib/grading';
 
 function fmtOdds(n) {
   if (n == null) return '—';
@@ -13,22 +14,18 @@ function fmtOdds(n) {
 function LockCard({ prop, aiVerdict, aiLoading }) {
   const { addLeg } = useParlay();
 
-  // Calculate grade confidence (same as RankedPropCard)
-  function calculateGradeConfidence(p) {
-    const dvpPass = p.matchup_rating != null && ['elite', 'favorable', 'neutral'].includes(p.matchup_rating);
-    const usagePass = p.usage_rate != null && p.usage_rate >= 20;
-    const l10Pass = p.avg_last_10 != null && p.avg_last_10 > p.line;
-    const seasonPass = p.avg_last_10 != null && p.avg_last_10 > p.line;
-    const lineActualPass = p.projection != null && p.projection > p.line;
-    const passCount = [dvpPass, usagePass, l10Pass, seasonPass, lineActualPass].filter(Boolean).length;
-    return passCount * 20;
-  }
-
-  const gradeConfidence = calculateGradeConfidence(prop);
-  const isPositiveEdge = prop.edge > 0;
-  const localVerdict = gradeConfidence >= 60
-    ? (isPositiveEdge ? 'OVER' : 'UNDER')
-    : 'UNSAFE';
+  const logs = prop.last_10_games || [];
+  const gradedProp = (() => {
+    if (logs.length === 0) return prop;
+    const hitCount = logs.filter(v => v > prop.line).length;
+    const dynamicHitRate = Math.round(hitCount / logs.length * 100);
+    const base = prop.projection ?? prop.avg_last_10 ?? null;
+    const dynamicEdge = base != null ? Math.round((base - prop.line) * 100) / 100 : prop.edge;
+    return { ...prop, hit_rate_last_10: dynamicHitRate, edge: dynamicEdge };
+  })();
+  const grade = gradeProp(gradedProp);
+  const gradeConfidence = grade.confidence;
+  const localVerdict = grade.verdict;
 
   return (
     <div className="rounded-xl border border-chart-3/40 bg-gradient-to-br from-chart-3/10 via-card to-card p-4 shadow-[0_0_30px_hsl(199,89%,48%,0.2)] flex flex-col gap-3">
