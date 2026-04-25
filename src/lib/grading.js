@@ -11,13 +11,25 @@
 const AVG_DEF_RATING = 113.5;
 const AVG_PACE       = 98.5;
 
+// Stat-specific opponent league averages (2024-25 season)
+const AVG_OPP_AST  = 25.3;  // assists allowed per game
+const AVG_OPP_REB  = 44.3;  // rebounds allowed per game
+const AVG_OPP_3PM  = 13.9;  // 3-pointers allowed per game
+
 // Continuous [0,1] score for form criteria (avg vs line).
 // Returns 0.5 when avg==line, smoothly approaches 1 as avg>>line and 0 as avg<<line.
-// Using continuous scores prevents sudden confidence jumps when the line crosses avg.
 function formScore(avg, line) {
   if (avg == null) return null;
   const scale = Math.max(avg, line, 1);
   return Math.max(0, Math.min(1, 0.5 + (avg - line) / scale));
+}
+
+// Continuous [0,1] score for stat-specific opponent defense.
+// Higher opponent stat allowed = weaker defense = OVER favorable (score → 1).
+// Scale = 25% of avg so the spread between worst/best teams moves confidence meaningfully.
+function statDefScore(value, leagueAvg) {
+  if (value == null || leagueAvg == null) return null;
+  return Math.max(0, Math.min(1, 0.5 + (value - leagueAvg) / (leagueAvg * 0.25)));
 }
 
 function impliedProbability(odds) {
@@ -77,30 +89,88 @@ function gradeWithContext(prop) {
   });
 
   const posCategory  = prop.pos_category || null;   // 'G', 'F', or 'C'
-  const posDefRating = prop.pos_def_rating ?? oppDef; // position-specific, falls back to overall
+  const posDefRating = prop.pos_def_rating ?? oppDef;
   const hasPosData   = prop.pos_def_rating != null;
   const posLabel     = posCategory === 'G' ? 'Guards' : posCategory === 'F' ? 'Forwards' : posCategory === 'C' ? 'Centers' : 'Position';
+  const propType     = prop.prop_type;
 
-  const weakDef  = posDefRating != null ? posDefRating > AVG_DEF_RATING : null;
-  criteria.push({
-    label: posDefRating != null
-      ? `Def vs ${posLabel}: ${posDefRating.toFixed(1)} pts/100 — ${weakDef ? 'weak ✓' : 'elite ✗'}`
-      : 'Opponent Defense — loading…',
-    detail: posDefRating != null
-      ? weakDef
-        ? hasPosData
-          ? `Opponent allows ${posDefRating.toFixed(1)} pts/100 to ${posLabel.toLowerCase()} (avg ${AVG_DEF_RATING}) — favorable positional matchup`
-          : `Opponent allows ${posDefRating.toFixed(1)} pts/100 (league avg ${AVG_DEF_RATING}) — favorable matchup`
-        : hasPosData
-          ? `Opponent holds ${posLabel.toLowerCase()} to ${posDefRating.toFixed(1)} pts/100 — elite positional defense, tough matchup`
-          : `Opponent holds teams to ${posDefRating.toFixed(1)} pts/100 — elite defense, tough matchup`
-      : 'Fetching position-specific defensive efficiency from NBA.com',
-    pass:      weakDef === true,
-    weight:    15,
-    available: posDefRating != null,
-    pending:   posDefRating == null,
-    category:  'matchup',
-  });
+  // Choose the most relevant defensive metric for this specific prop type.
+  // Points-based: use positional defensive rating (pts/100).
+  // Assists: how many assists does this opponent allow per game?
+  // Rebounds: how many rebounds allowed?
+  // 3PM: how many 3s allowed?
+  // Composites: pick the dominant non-points stat.
+  const statSpecific = (() => {
+    const astProps = ['assists', 'P+A', 'A+R'];
+    const rebProps = ['rebounds', 'P+R'];
+    const tpmProps = ['3PM'];
+    if (astProps.includes(propType) && prop.opp_ast_pg != null) {
+      return {
+        value:     prop.opp_ast_pg,
+        avg:       AVG_OPP_AST,
+        statLabel: 'AST allowed',
+        unitLabel: 'ast/game',
+        posLabel:  posCategory === 'G' ? 'Guard assists' : posCategory === 'F' ? 'Forward assists' : 'Assists',
+      };
+    }
+    if (rebProps.includes(propType) && prop.opp_reb_pg != null) {
+      return {
+        value:     prop.opp_reb_pg,
+        avg:       AVG_OPP_REB,
+        statLabel: 'REB allowed',
+        unitLabel: 'reb/game',
+        posLabel:  posCategory === 'C' ? 'Center rebounds' : posCategory === 'F' ? 'Forward rebounds' : 'Rebounds',
+      };
+    }
+    if (tpmProps.includes(propType) && prop.opp_3pm_pg != null) {
+      return {
+        value:     prop.opp_3pm_pg,
+        avg:       AVG_OPP_3PM,
+        statLabel: '3PM allowed',
+        unitLabel: '3pm/game',
+        posLabel:  'Guard 3-pointers',
+      };
+    }
+    return null;
+  })();
+
+  if (statSpecific) {
+    const { value, avg, statLabel, unitLabel, posLabel: sl } = statSpecific;
+    const weak = value > avg;
+    criteria.push({
+      label: `${sl}: opp allows ${value.toFixed(1)} ${unitLabel} (avg ${avg}) — ${weak ? 'weak ✓' : 'elite ✗'}`,
+      detail: weak
+        ? `Opponent allows ${value.toFixed(1)} ${unitLabel} (league avg ${avg}) — this defense struggles to limit ${sl.toLowerCase()}, favors OVER`
+        : `Opponent holds ${sl.toLowerCase()} to ${value.toFixed(1)} ${unitLabel} (league avg ${avg}) — disciplined defense, favors UNDER`,
+      pass:            weak,
+      continuousScore: statDefScore(value, avg),
+      weight:          15,
+      available:       true,
+      category:        'matchup',
+    });
+  } else {
+    const weakDef = posDefRating != null ? posDefRating > AVG_DEF_RATING : null;
+    criteria.push({
+      label: posDefRating != null
+        ? `Def vs ${posLabel}: ${posDefRating.toFixed(1)} pts/100 — ${weakDef ? 'weak ✓' : 'elite ✗'}`
+        : 'Opponent Defense — loading…',
+      detail: posDefRating != null
+        ? weakDef
+          ? hasPosData
+            ? `Opponent allows ${posDefRating.toFixed(1)} pts/100 to ${posLabel.toLowerCase()} (avg ${AVG_DEF_RATING}) — favorable positional matchup`
+            : `Opponent allows ${posDefRating.toFixed(1)} pts/100 (league avg ${AVG_DEF_RATING}) — favorable matchup`
+          : hasPosData
+            ? `Opponent holds ${posLabel.toLowerCase()} to ${posDefRating.toFixed(1)} pts/100 — elite positional defense, tough matchup`
+            : `Opponent holds teams to ${posDefRating.toFixed(1)} pts/100 — elite defense, tough matchup`
+        : 'Fetching position-specific defensive efficiency from NBA.com',
+      pass:            weakDef === true,
+      continuousScore: posDefRating != null ? statDefScore(posDefRating, AVG_DEF_RATING) : null,
+      weight:          15,
+      available:       posDefRating != null,
+      pending:         posDefRating == null,
+      category:        'matchup',
+    });
+  }
 
   // ── 2. RECENT FORM (25%) ─────────────────────────────────────────────────
   criteria.push({

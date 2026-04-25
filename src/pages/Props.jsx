@@ -255,6 +255,10 @@ export default function Props() {
         pos_category:         posCategory,
         opponent_pace:        oppData.pace          ?? null,
         player_team_pace:     tmData.pace           ?? null,
+        // Stat-specific opponent defense (higher = weaker defense = favors OVER)
+        opp_ast_pg:           oppData.opp_ast       ?? null,
+        opp_reb_pg:           oppData.opp_reb       ?? null,
+        opp_3pm_pg:           oppData.opp_3pm       ?? null,
         is_home:              isHome,
         is_back_to_back:      b2b.has(team),
         spread:               playerSpread,
