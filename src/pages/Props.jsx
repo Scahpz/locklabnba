@@ -6,7 +6,7 @@ import RankedPropCard from '@/components/props/RankedPropCard';
 import DemonPickCard from '@/components/props/DemonPickCard';
 import { RefreshCw, Wifi, WifiOff, Zap, SlidersHorizontal, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { rankScore } from '@/lib/grading';
+import { rankScore, gradeProp } from '@/lib/grading';
 import { NBA_API } from '@/lib/config';
 import { TEAM_STATS } from '@/lib/teamStats';
 import PropDetailModal from '@/components/props/PropDetailModal';
@@ -316,21 +316,20 @@ export default function Props() {
     return todayTeams.has(team);
   };
 
-  // Picks of the day: top 2 ranked picks with 100% grade confidence — TODAY only
+  // Picks of the day: top 2 props by AI confidence (≥75%) with real game log data — TODAY only
   const locks = useMemo(() => {
-    const gradeConfidence = (p) => {
-      if (!p.has_analytics) return 0;
-      return [
-        p.avg_last_10 != null && p.avg_last_10 > p.line,
-        p.avg_last_5  != null && p.avg_last_5  > p.line,
-        p.hit_rate_last_10 != null && p.hit_rate_last_10 >= 60,
-        p.projection  != null && p.projection  > p.line,
-        p.edge        != null && p.edge > 0,
-      ].filter(Boolean).length * 20;
+    const getConfidence = (p) => {
+      const logs = p.last_10_games || [];
+      if (logs.length === 0 && p.avg_last_10 == null) return 0;
+      const hitCount = logs.length > 0 ? logs.filter(v => v > p.line).length : 0;
+      const dynamicHitRate = logs.length > 0 ? Math.round(hitCount / logs.length * 100) : p.hit_rate_last_10;
+      const base = p.projection ?? p.avg_last_10 ?? null;
+      const dynamicEdge = base != null ? Math.round((base - p.line) * 100) / 100 : p.edge;
+      return gradeProp({ ...p, hit_rate_last_10: dynamicHitRate, edge: dynamicEdge }).confidence;
     };
 
     return [...enrichedProps]
-      .filter(p => gradeConfidence(p) === 100 && isTodayProp(p))
+      .filter(p => p.avg_last_10 != null && isTodayProp(p) && getConfidence(p) >= 75)
       .sort((a, b) => rankScore(b) - rankScore(a))
       .slice(0, 2);
   }, [enrichedProps, todayTeams]);
@@ -338,7 +337,7 @@ export default function Props() {
   // Demon Pick: player on a hot over-streak projected to explode well above their line tonight
   const demonPick = useMemo(() => {
     const candidates = enrichedProps
-      .filter(p => p.has_analytics && isTodayProp(p) && p.avg_last_10 != null)
+      .filter(p => p.avg_last_10 != null && isTodayProp(p))
       .filter(p => {
         // Must be on an over-streak of 3+ games
         const overMatch = (p.streak_info || '').match(/^(\d+) game over streak/i);
