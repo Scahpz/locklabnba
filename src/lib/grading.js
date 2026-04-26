@@ -57,10 +57,13 @@ export function gradeProp(prop) {
 }
 
 function gradeWithContext(prop) {
-  const line = prop.line;
-  const l10  = prop.avg_last_10;
-  const l5   = prop.avg_last_5;
-  const hit  = prop.hit_rate_last_10;
+  const line       = prop.line;
+  const l10        = prop.avg_last_10;
+  const l5         = prop.avg_last_5;
+  const hit        = prop.hit_rate_last_10;
+  const noData     = prop.data_unavailable === true;
+  const pendingLabel = (loading, unavail) => noData ? unavail : loading;
+  const pendingDetail = (loading, unavail) => noData ? unavail : loading;
 
   // Context fields
   const oppDef    = prop.opponent_def_rating;   // pts/100 — higher = weaker defense
@@ -182,51 +185,51 @@ function gradeWithContext(prop) {
   criteria.push({
     label: l10 != null
       ? `L10 Avg: ${l10} vs Line ${line}`
-      : 'L10 Average — loading game logs…',
+      : pendingLabel('L10 Average — loading game logs…', 'L10 Average — not available'),
     detail: l10 != null
       ? l10 > line
         ? `Averaging ${l10} over last 10 games — beats the line by +${(l10 - line).toFixed(1)}`
         : `Averaging ${l10} over last 10 — below line by ${(line - l10).toFixed(1)}`
-      : 'Game log data loading in background',
+      : pendingDetail('Game log data loading in background', 'Player not found in NBA stats — using market odds only'),
     pass:            l10 != null && l10 > line,
     continuousScore: formScore(l10, line),
     weight:          25,
     available:       l10 != null,
-    pending:         l10 == null,
+    pending:         l10 == null && !noData,
     category:        'form',
   });
 
   criteria.push({
     label: l5 != null
       ? `L5 Avg: ${l5} vs Line ${line}`
-      : 'L5 Average — loading…',
+      : pendingLabel('L5 Average — loading…', 'L5 Average — not available'),
     detail: l5 != null
       ? l5 > line
         ? `Recent form is hot — L5 avg ${l5} beats the line`
         : `Recent cold streak — L5 avg ${l5} below line`
-      : 'Game log data loading in background',
+      : pendingDetail('Game log data loading in background', 'Player not found in NBA stats — using market odds only'),
     pass:            l5 != null && l5 > line,
     continuousScore: formScore(l5, line),
     weight:          15,
     available:       l5 != null,
-    pending:         l5 == null,
+    pending:         l5 == null && !noData,
     category:        'form',
   });
 
   criteria.push({
     label: hit != null
       ? `Hit Rate: ${hit}% (need ≥ 60%)`
-      : 'Hit Rate — loading…',
+      : pendingLabel('Hit Rate — loading…', 'Hit Rate — not available'),
     detail: hit != null
       ? hit >= 60
         ? `Cleared this line ${hit}% of last 10 games — highly consistent`
         : `Only ${hit}% hit rate over last 10 — inconsistent`
-      : 'Game log data loading in background',
+      : pendingDetail('Game log data loading in background', 'Player not found in NBA stats — using market odds only'),
     pass:            hit != null && hit >= 60,
     continuousScore: hit != null ? hit / 100 : null,
     weight:          13,
     available:       hit != null,
-    pending:         hit == null,
+    pending:         hit == null && !noData,
     category:        'form',
   });
 
@@ -238,17 +241,17 @@ function gradeWithContext(prop) {
   criteria.push({
     label: seasonAvg != null
       ? `Season Avg: ${seasonAvg} vs Line ${line} (${seasonGames}G)`
-      : 'Season Stats — loading…',
+      : pendingLabel('Season Stats — loading…', 'Season Stats — not available'),
     detail: seasonAvg != null
       ? seasonAvg > line
         ? `Season average ${seasonAvg} over ${seasonGames} games clears the line — ${seasonHitRate}% season hit rate`
         : `Season average ${seasonAvg} over ${seasonGames} games is below the line — ${seasonHitRate}% season hit rate`
-      : 'Season average loading',
+      : pendingDetail('Season average loading', 'Player not found in NBA stats — using market odds only'),
     pass:            seasonAvg != null && seasonAvg > line,
     continuousScore: formScore(seasonAvg, line),
     weight:          8,
     available:       seasonAvg != null,
-    pending:         seasonAvg == null,
+    pending:         seasonAvg == null && !noData,
     category:        'season',
   });
 

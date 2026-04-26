@@ -174,17 +174,24 @@ export default function Props() {
 
     // One bulk request for all uncached players
     fetchBulkGameLogs(needsFetch).then(data => {
-      if (!data?.analytics) return;
       const updates = {};
-      Object.entries(data.analytics).forEach(([name, analytics]) => {
-        if (analytics && Object.keys(analytics).length > 0) {
-          updates[name] = analytics;
-          glCacheSet(name, { analytics });
-        }
-      });
-      if (Object.keys(updates).length > 0) {
-        setPlayerAnalytics(prev => ({ ...prev, ...updates }));
+      if (data?.analytics) {
+        Object.entries(data.analytics).forEach(([name, analytics]) => {
+          if (analytics && Object.keys(analytics).length > 0) {
+            updates[name] = analytics;
+            glCacheSet(name, { analytics });
+          }
+        });
       }
+      // Mark every requested player as attempted (null = no data found).
+      // Without this, players with no NBA API match stay stuck on "loading".
+      needsFetch.forEach(n => { if (!(n in updates)) updates[n] = null; });
+      setPlayerAnalytics(prev => ({ ...prev, ...updates }));
+    }).catch(() => {
+      // On network failure, mark all as null so the UI clears the spinner
+      const updates = {};
+      needsFetch.forEach(n => { updates[n] = null; });
+      setPlayerAnalytics(prev => ({ ...prev, ...updates }));
     });
   }, [rawProps]);
 
@@ -198,7 +205,12 @@ export default function Props() {
 
     return rawProps.map(prop => {
       // 1. Game log analytics
-      const analytics = playerAnalytics[prop.player_name]?.[prop.prop_type];
+      // playerAnalytics[name] === undefined  → not yet fetched (show loading)
+      // playerAnalytics[name] === null       → fetched, player not found (show "not available")
+      // playerAnalytics[name] is an object   → fetched, has data
+      const analyticsEntry = playerAnalytics[prop.player_name];
+      const analytics = (analyticsEntry != null) ? analyticsEntry?.[prop.prop_type] : undefined;
+      const dataUnavailable = analyticsEntry === null; // tried but no match in NBA API
       const cs = analytics?.confidence_score || prop.confidence_score || 5;
       const base = analytics ? {
         ...prop,
@@ -219,7 +231,7 @@ export default function Props() {
         confidence_tier:   cs >= 8 ? 'A' : cs >= 6 ? 'B' : 'C',
         is_lock:           cs === 10,
         best_value:        (analytics.edge || 0) > 8,
-      } : prop;
+      } : { ...prop, data_unavailable: dataUnavailable };
 
       // 2. Team context
       const team    = prop.player_team || '';
