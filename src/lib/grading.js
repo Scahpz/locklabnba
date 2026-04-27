@@ -343,9 +343,9 @@ function gradeWithContext(prop) {
     return sum + score * c.weight;
   }, 0) / totalWeight;
 
-  const verdict    = overScore >= 0.5 ? 'OVER' : 'UNDER';
   const rawConf    = Math.round(52 + Math.abs(overScore - 0.5) * 92);
   const confidence = Math.min(98, rawConf);
+  const verdict    = confidence < 65 ? 'UNSAFE' : (overScore >= 0.5 ? 'OVER' : 'UNDER');
   const passCount  = available.filter(c => c.pass).length;
 
   const hasRealData = l10 != null || oppDef != null;
