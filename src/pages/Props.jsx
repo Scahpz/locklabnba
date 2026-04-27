@@ -253,15 +253,17 @@ export default function Props() {
       const posDefRating = oppData.pos_def?.[posCategory] ?? oppData.def_rating ?? null;
 
       // 3. Injury context — find injured teammates and opponents
+      const teamUpper = team.toUpperCase();
+      const oppUpper  = opp.toUpperCase();
       const injuredTeammates = Object.entries(injuries)
-        .filter(([name, info]) => info.team === team && name !== prop.player_name)
+        .filter(([name, info]) => (info.team || '').toUpperCase() === teamUpper && name !== prop.player_name)
         .map(([name]) => name);
       const injuryContext = injuredTeammates.length > 0
         ? injuredTeammates.slice(0, 2).join(', ') + (injuredTeammates.length > 2 ? ` +${injuredTeammates.length - 2} more` : '') + ' (Out)'
         : null;
 
       const injuredOpponents = Object.entries(injuries)
-        .filter(([, info]) => info.team === opp)
+        .filter(([, info]) => oppUpper && (info.team || '').toUpperCase() === oppUpper)
         .map(([name]) => name);
       const oppInjuryContext = injuredOpponents.length > 0
         ? injuredOpponents.slice(0, 2).join(', ') + (injuredOpponents.length > 2 ? ` +${injuredOpponents.length - 2} more` : '') + ' (Out)'

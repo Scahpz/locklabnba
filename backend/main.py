@@ -1598,6 +1598,26 @@ async def get_team_context():
             result["teams"][abbr] = stats
 
     # ── NBA CDN injury report ──────────────────────────────────────────────────
+    def _parse_injury_entries(data):
+        """Extract team-injury entries from multiple known NBA CDN JSON shapes."""
+        # Root-level list
+        if isinstance(data, list):
+            return data
+        # Common wrapper keys
+        for key in ("data", "injuryData", "injuries", "players"):
+            val = data.get(key)
+            if isinstance(val, list) and val:
+                return val
+        # Nested under "payload" or similar
+        for key in ("payload", "result", "resultSets"):
+            nested = data.get(key)
+            if isinstance(nested, dict):
+                for sub in ("injuries", "data", "injuryData"):
+                    val = nested.get(sub)
+                    if isinstance(val, list) and val:
+                        return val
+        return []
+
     for url in [
         "https://cdn.nba.com/static/json/staticData/injuries.json",
         "https://cdn.nba.com/static/json/liveData/injuries/injuries.json",
@@ -1607,23 +1627,25 @@ async def get_team_context():
             if not r.ok:
                 continue
             data = r.json()
-            # Two possible shapes: list under "data" or dict under "injuryData"
-            entries = data.get("data") or data.get("injuryData") or []
+            entries = _parse_injury_entries(data)
             for item in entries:
                 # Shape A: { teamAbbreviation, players: [{playerName, status, comment}] }
-                team_abbr = item.get("teamAbbreviation", "")
-                for p in item.get("players") or []:
-                    name   = p.get("playerName") or p.get("name") or ""
-                    status = (p.get("status") or p.get("injuryStatus") or "").lower()
+                team_abbr = (item.get("teamAbbreviation") or item.get("teamAbbr") or item.get("team") or "").upper()
+                players_list = item.get("players") or item.get("injuries") or []
+                for p in players_list:
+                    name   = (p.get("playerName") or p.get("name") or p.get("player") or "").strip()
+                    status = (p.get("status") or p.get("injuryStatus") or p.get("injury_status") or "").lower()
                     if name and ("out" in status or "doubtful" in status):
                         result["injuries"][name] = {
                             "status": status,
                             "team": team_abbr,
-                            "reason": p.get("comment") or p.get("description") or "",
+                            "reason": p.get("comment") or p.get("description") or p.get("reason") or "",
                         }
             if result["injuries"] or entries:
+                logging.info(f"Injury report loaded: {len(result['injuries'])} players from {url}")
                 break
-        except Exception:
+        except Exception as e:
+            logging.warning(f"Injury fetch failed for {url}: {e}")
             continue
 
     # ── Back-to-back detection (teams playing yesterday) ──────────────────────
