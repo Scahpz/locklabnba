@@ -66,22 +66,20 @@ export default function DemonPickCard({ pick, onOpenDetail }) {
           </div>
         </div>
 
-        {/* Projection + bet line */}
+        {/* Demon line + bet */}
         <div className="bg-orange-500/5 border border-orange-500/20 rounded-lg p-3 mb-3">
-          {/* Projected explosion number */}
           <div className="flex items-end justify-between mb-2">
             <div>
-              <p className="text-[9px] text-orange-400/80 font-bold uppercase tracking-wider mb-0.5">Projected {label}</p>
-              <p className="text-3xl font-black text-orange-400 leading-none">{boomLine}+</p>
+              <p className="text-[9px] text-orange-400/80 font-bold uppercase tracking-wider mb-0.5">Demon Line</p>
+              <p className="text-3xl font-black text-orange-400 leading-none">{boomLine}</p>
             </div>
             <div className="text-right">
-              <p className="text-[9px] text-muted-foreground uppercase mb-0.5">Sportsbook Line</p>
-              <p className="text-lg font-bold text-foreground">{prop.line}</p>
+              <p className="text-[9px] text-muted-foreground uppercase mb-0.5">Book Line</p>
+              <p className="text-lg font-bold text-muted-foreground line-through">{prop.line}</p>
             </div>
           </div>
-          {/* OVER button spanning full width */}
           <button
-            onClick={() => addLeg({ ...prop }, 'over')}
+            onClick={() => addLeg({ ...prop, line: boomLine }, 'over')}
             className={cn(
               "w-full flex items-center justify-center gap-2 border rounded-lg py-2 transition-all",
               picked
@@ -89,7 +87,7 @@ export default function DemonPickCard({ pick, onOpenDetail }) {
                 : "bg-orange-500/15 hover:bg-orange-500/25 border-orange-500/30 text-orange-400"
             )}
           >
-            <span className="text-xs font-bold">OVER {prop.line}</span>
+            <span className="text-xs font-bold">OVER {boomLine}</span>
             <span className="text-sm font-black">{fmtOdds(prop.over_odds)}</span>
           </button>
         </div>
