@@ -71,7 +71,10 @@ function gradeWithContext(prop) {
   const teamPace  = prop.player_team_pace;
   const spread    = prop.spread;                // from player team's perspective (+= favored)
   const isB2B     = prop.is_back_to_back ?? false;
-  const injNote   = prop.injury_context;        // e.g. "LeBron James (Out)"
+  const injNote      = prop.injury_context;      // e.g. "LeBron James (Out)"
+  const injCount     = prop.injury_count ?? 0;  // number of injured teammates
+  const oppInjNote   = prop.opp_injury_context; // e.g. "Anthony Edwards (Out)"
+  const oppInjCount  = prop.opp_injury_count ?? 0;
   const edge      = prop.edge;
 
   const criteria = [];
@@ -199,14 +202,15 @@ function gradeWithContext(prop) {
     category:        'form',
   });
 
+  const expandedRoleNote = injNote ? ` (expanded role — ${injNote.replace(' (Out)', '')} out)` : '';
   criteria.push({
     label: l5 != null
-      ? `L5 Avg: ${l5} vs Line ${line}`
+      ? `L5 Avg: ${l5} vs Line ${line}${expandedRoleNote}`
       : pendingLabel('L5 Average — loading…', 'L5 Average — not available'),
     detail: l5 != null
       ? l5 > line
-        ? `Recent form is hot — L5 avg ${l5} beats the line`
-        : `Recent cold streak — L5 avg ${l5} below line`
+        ? `Recent form is hot — L5 avg ${l5} beats the line${injNote ? `. Recent games may reflect expanded role with ${injNote}` : ''}`
+        : `Recent cold streak — L5 avg ${l5} below line${injNote ? `. Consider that recent games may reflect expanded role with ${injNote}` : ''}`
       : pendingDetail('Game log data loading in background', 'Player not found in NBA stats — using market odds only'),
     pass:            l5 != null && l5 > line,
     continuousScore: formScore(l5, line),
@@ -257,14 +261,14 @@ function gradeWithContext(prop) {
 
   // ── 4. INJURY / USAGE CONTEXT ────────────────────────────────────────────
   if (injNote) {
-    // Genuine teammate injury — unique signal not captured by form criteria.
-    // Keep at weight 18 so it matters but can't override strong form signals.
+    // Scale weight by number of injured teammates: 1 out → 15, 2 out → 20, 3+ out → 25
+    const injWeight = injCount >= 3 ? 25 : injCount === 2 ? 20 : 15;
     criteria.push({
       label: `Usage Boost: ${injNote}`,
-      detail: `Key teammate is out → expect more shot attempts, more touches, higher usage rate — strong OVER signal`,
+      detail: `${injCount > 1 ? `${injCount} key teammates are` : 'Key teammate is'} out → expect more shot attempts, more touches, higher usage rate — strong OVER signal`,
       pass:            true,
       continuousScore: 1.0,
-      weight:          18,
+      weight:          injWeight,
       available:       true,
       category:        'usage',
     });
@@ -332,6 +336,21 @@ function gradeWithContext(prop) {
     category:  'rest',
   });
 
+  // ── 5. OPPONENT INJURIES ────────────────────────────────────────────────
+  if (oppInjNote) {
+    // Scale weight by number of opponent players out: more absences = weaker defense
+    const oppInjWeight = oppInjCount >= 3 ? 14 : oppInjCount === 2 ? 10 : 7;
+    criteria.push({
+      label: `Weakened Opponent: ${oppInjNote}`,
+      detail: `${oppInjCount > 1 ? `${oppInjCount} key players are` : 'Key player is'} out for the opponent (${oppInjNote}) — reduced defensive depth and rotations, favors OVER`,
+      pass:            true,
+      continuousScore: 0.85,
+      weight:          oppInjWeight,
+      available:       true,
+      category:        'matchup',
+    });
+  }
+
   // ── Score ─────────────────────────────────────────────────────────────────
   // Form/season/edge criteria use a continuous [0,1] score so confidence shifts
   // smoothly as the line changes instead of jumping at avg-crossover points.
@@ -345,12 +364,13 @@ function gradeWithContext(prop) {
 
   const rawConf    = Math.round(52 + Math.abs(overScore - 0.5) * 92);
   const confidence = Math.min(98, rawConf);
-  const verdict    = confidence < 65 ? 'UNSAFE' : (overScore >= 0.5 ? 'OVER' : 'UNDER');
+  const verdict    = confidence < 60 ? 'UNSAFE' : (overScore >= 0.5 ? 'OVER' : 'UNDER');
   const passCount  = available.filter(c => c.pass).length;
 
   const hasRealData = l10 != null || oppDef != null;
   return {
     verdict, confidence, criteria, passCount,
+    lean:          overScore >= 0.5 ? 'OVER' : 'UNDER',
     totalCriteria: criteria.length,
     dataQuality:   hasRealData ? 'full' : 'context',
   };
@@ -383,7 +403,7 @@ function gradeFromMarket(prop) {
 
   const verdict    = trueOver >= 0.5 ? 'OVER' : 'UNDER';
   const confidence = Math.min(54, Math.round(50 + Math.abs(trueOver - 0.5) * 100));
-  return { verdict, confidence, criteria, passCount: trueOver > 0.505 ? 1 : 0, totalCriteria: 6, dataQuality: 'market' };
+  return { verdict, confidence, criteria, passCount: trueOver > 0.505 ? 1 : 0, lean: verdict, totalCriteria: 6, dataQuality: 'market' };
 }
 
 /**

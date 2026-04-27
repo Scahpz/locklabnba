@@ -252,12 +252,19 @@ export default function Props() {
         : 'F'; // SF, PF, F, or unknown default to F
       const posDefRating = oppData.pos_def?.[posCategory] ?? oppData.def_rating ?? null;
 
-      // 3. Injury context — find injured teammates (same team, not the player themselves)
+      // 3. Injury context — find injured teammates and opponents
       const injuredTeammates = Object.entries(injuries)
         .filter(([name, info]) => info.team === team && name !== prop.player_name)
         .map(([name]) => name);
       const injuryContext = injuredTeammates.length > 0
         ? injuredTeammates.slice(0, 2).join(', ') + (injuredTeammates.length > 2 ? ` +${injuredTeammates.length - 2} more` : '') + ' (Out)'
+        : null;
+
+      const injuredOpponents = Object.entries(injuries)
+        .filter(([, info]) => info.team === opp)
+        .map(([name]) => name);
+      const oppInjuryContext = injuredOpponents.length > 0
+        ? injuredOpponents.slice(0, 2).join(', ') + (injuredOpponents.length > 2 ? ` +${injuredOpponents.length - 2} more` : '') + ' (Out)'
         : null;
 
       return {
@@ -275,6 +282,9 @@ export default function Props() {
         is_back_to_back:      b2b.has(team),
         spread:               playerSpread,
         injury_context:       injuryContext,
+        injury_count:         injuredTeammates.length,
+        opp_injury_context:   oppInjuryContext,
+        opp_injury_count:     injuredOpponents.length,
       };
     });
   }, [rawProps, playerAnalytics, teamContext]);

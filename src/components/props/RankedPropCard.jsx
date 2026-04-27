@@ -44,7 +44,7 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, onOpe
   }, [prop]);
   const grade = gradeProp(gradedProp);
   const tier = tierConfig[prop.has_analytics ? prop.confidence_tier : 'C'] || tierConfig.C;
-  const isOverFavorable = grade.verdict === 'OVER';
+  const isOverFavorable = grade.lean === 'OVER';
   const hasBooks = prop.all_books?.length > 1;
 
   const activeBook = selectedBook ? prop.all_books?.find(b => b.key === selectedBook) : null;
