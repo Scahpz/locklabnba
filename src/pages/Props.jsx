@@ -358,18 +358,40 @@ export default function Props() {
 
   // Demon Pick: player on a cold streak BUT the line is set too low vs their season avg —
   // AI predicts a bounce-back explosion because books overreacted to the slump.
+  // Hidden scoring factors drive selection (not shown as explicit criteria in UI).
   const demonPick = useMemo(() => {
+    // Parse minutes string "32:15" or "32" → float
+    const parseMins = (m) => {
+      if (m == null) return 0;
+      const s = String(m);
+      const parts = s.split(':');
+      return parseFloat(parts[0]) + (parts[1] ? parseFloat(parts[1]) / 60 : 0);
+    };
+
+    const AVG_DEF = 113.5;
+    const AVG_PACE = 98.5;
+
     const candidates = enrichedProps
       .filter(p => p.avg_last_10 != null && p.season_avg != null && isTodayProp(p))
       .filter(p => {
-        // Must be in a cold streak (under streak of 2+ games OR L5 below L10)
+        // Must be in a cold streak (under streak of 2+ games OR L5 meaningfully below L10)
         const underMatch = (p.streak_info || '').match(/^(\d+) game under streak/i);
         const coldStreak = underMatch && parseInt(underMatch[1], 10) >= 2;
-        const l5Slump = p.avg_last_5 != null && p.avg_last_5 < p.avg_last_10;
+        const l5Slump = p.avg_last_5 != null && p.avg_last_5 < p.avg_last_10 * 0.92;
         if (!coldStreak && !l5Slump) return false;
+
+        // Factor 9: Fluke filter — if most under games had low minutes, skip (not a real slump)
+        const gameLogs = p.game_logs_last_10 || [];
+        const underGames = gameLogs.filter(g => g.value != null && g.value <= p.line);
+        if (underGames.length >= 2) {
+          const flukePct = underGames.filter(g => parseMins(g.minutes) < 20).length / underGames.length;
+          if (flukePct > 0.5) return false; // >50% of unders were limited-minute games — skip
+        }
+
         // Season avg must be at least 10% above the line — books set it too low
         if (p.season_avg < p.line * 1.10) return false;
-        // AI must still predict OVER (grade leans over despite cold streak)
+
+        // AI must still lean OVER (grade engine agrees despite cold streak)
         const logs = p.last_10_games || [];
         const hitCount = logs.filter(v => v > p.line).length;
         const dynamicHitRate = logs.length > 0 ? Math.round(hitCount / logs.length * 100) : p.hit_rate_last_10;
@@ -381,20 +403,70 @@ export default function Props() {
       .map(p => {
         const underMatch = (p.streak_info || '').match(/^(\d+) game under streak/i);
         const coldStreakLen = underMatch ? parseInt(underMatch[1], 10) : 0;
-        // Bounce target: season avg rounded to nearest 0.5
+        const label = (propTypeLabels[p.prop_type] || p.prop_type).toUpperCase();
         const boomLine = Math.round(p.season_avg * 2) / 2;
         const gap = +(p.season_avg - p.line).toFixed(1);
-        // Score: bigger season-vs-line gap = higher score; deeper cold streak = higher score (more due)
-        const boomScore = Math.min(99, Math.round(50 + (gap / p.line) * 80 + coldStreakLen * 5));
-        const label = (propTypeLabels[p.prop_type] || p.prop_type).toUpperCase();
 
-        let reason = `${p.player_name} is averaging ${p.season_avg} ${label} this season but the line is only ${p.line} — books overreacted to a recent slump.`;
-        if (coldStreakLen >= 2) {
-          reason += ` On a ${coldStreakLen}-game under streak, making this line even softer.`;
-        } else if (p.avg_last_5 != null && p.avg_last_5 < p.avg_last_10) {
-          reason += ` L5 avg of ${p.avg_last_5} is down from ${p.avg_last_10} L10 — the dip looks temporary.`;
+        // ── Hidden multi-factor score ──────────────────────────────────────
+        let score = 0;
+        const signals = [];
+
+        // Factor 1: Season vs Recent Gap — core bounce signal (0–25)
+        const recentAvg = p.avg_last_5 ?? p.avg_last_10;
+        const dropPct = p.season_avg > 0 ? (p.season_avg - recentAvg) / p.season_avg : 0;
+        const gapPts = Math.min(25, Math.round(dropPct * 80));
+        score += gapPts;
+        if (dropPct >= 0.15) signals.push(`down ${Math.round(dropPct * 100)}% from season avg`);
+
+        // Factor 2: Minutes/role stability — slump is variance not role loss (0–15)
+        const minsArr = p.minutes_last_5 || [];
+        if (minsArr.length >= 3) {
+          const avgMins = minsArr.reduce((a, b) => a + b, 0) / minsArr.length;
+          if (avgMins >= 28) { score += 15; signals.push(`still logging ${avgMins.toFixed(0)}+ min/game`); }
+          else if (avgMins >= 22) { score += 8; }
         }
-        reason += ` Season average of ${p.season_avg} is ${gap} above tonight's line — primed for a bounce-back explosion vs ${p.opponent}.`;
+
+        // Factor 4: Teammate injuries — more opportunity (0–15)
+        const injBoost = Math.min(15, (p.injury_count || 0) * 8);
+        score += injBoost;
+        if (injBoost > 0) signals.push(`${p.injury_count} teammate${p.injury_count > 1 ? 's' : ''} out`);
+
+        // Factor 5: Matchup advantage — weak opposing defense (0–15)
+        const defRating = p.pos_def_rating ?? p.opponent_def_rating;
+        if (defRating != null && defRating > AVG_DEF) {
+          const defBoost = Math.min(15, Math.round((defRating - AVG_DEF) * 2.5));
+          score += defBoost;
+          if (defRating > AVG_DEF + 3) signals.push(`weak opp defense (${defRating.toFixed(1)} pts/100)`);
+        }
+
+        // Factor 6: Line vs season average gap (0–20)
+        const lineGapPct = p.season_avg > 0 ? (p.season_avg - p.line) / p.season_avg : 0;
+        score += Math.min(20, Math.round(lineGapPct * 65));
+
+        // Factor 7: Fast-paced game — more possessions (0–8)
+        const avgPace = p.opponent_pace && p.player_team_pace
+          ? (p.opponent_pace + p.player_team_pace) / 2 : null;
+        if (avgPace != null && avgPace >= AVG_PACE + 1) { score += 8; signals.push('fast-paced game'); }
+        else if (avgPace != null && avgPace >= AVG_PACE) { score += 4; }
+
+        // Factor 9: Genuine cold streak (not flukes) — cold in full-minute games (0–10)
+        const gameLogs = p.game_logs_last_10 || [];
+        const fullMinsGames = gameLogs.filter(g => parseMins(g.minutes) >= 20);
+        const genuineUnders = fullMinsGames.filter(g => g.value != null && g.value <= p.line).length;
+        if (fullMinsGames.length >= 3 && genuineUnders / fullMinsGames.length >= 0.6) {
+          score += 10; // Genuine slump in healthy games → strongest bounce signal
+        }
+
+        const boomScore = Math.min(99, score);
+
+        // ── Reason narrative ────────────────────────────────────────────────
+        let reason = `${p.player_name} averages ${p.season_avg} ${label} this season but the line is only ${p.line} — books overreacted to a cold streak.`;
+        if (coldStreakLen >= 2) {
+          reason += ` ${coldStreakLen}-game under streak, but the slump is variance: ${signals.length > 0 ? signals.join(', ') + '.' : 'role and minutes unchanged.'}`;
+        } else {
+          reason += ` L5 avg dropped to ${p.avg_last_5} but ${signals.length > 0 ? signals.join(', ') + '.' : 'role unchanged.'}`;
+        }
+        reason += ` Season average of ${p.season_avg} is ${gap} above tonight's line — prime bounce-back spot vs ${p.opponent}.`;
 
         return { prop: p, coldStreakLen, seasonAvg: p.season_avg, boomLine, boomScore, reason };
       })
