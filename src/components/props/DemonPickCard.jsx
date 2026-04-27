@@ -20,7 +20,7 @@ export default function DemonPickCard({ pick, onOpenDetail }) {
   const { addLeg, isSelected } = useParlay();
   if (!pick) return null;
 
-  const { prop, reason, streakGames, seasonAvg, boomLine, boomScore } = pick;
+  const { prop, reason, coldStreakLen, seasonAvg, boomLine, boomScore } = pick;
   const label = propTypeLabels[prop.prop_type] || prop.prop_type.toUpperCase();
   const picked = isSelected(prop.player_name, prop.prop_type, 'over');
 
@@ -118,8 +118,8 @@ export default function DemonPickCard({ pick, onOpenDetail }) {
             </p>
           </div>
           <div className="text-center bg-orange-500/10 border border-orange-500/20 rounded-lg py-2">
-            <p className="text-[9px] text-orange-400/80 uppercase">Hot Streak</p>
-            <p className="text-sm font-bold text-orange-400">{streakGames}G Over</p>
+            <p className="text-[9px] text-orange-400/80 uppercase">Cold Streak</p>
+            <p className="text-sm font-bold text-orange-400">{coldStreakLen > 0 ? `${coldStreakLen}G Under` : 'Slumping'}</p>
           </div>
         </div>
 

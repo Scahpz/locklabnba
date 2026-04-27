@@ -356,42 +356,47 @@ export default function Props() {
       .slice(0, 2);
   }, [enrichedProps, todayTeams]);
 
-  // Demon Pick: player on a hot over-streak projected to explode well above their line tonight
+  // Demon Pick: player on a cold streak BUT the line is set too low vs their season avg —
+  // AI predicts a bounce-back explosion because books overreacted to the slump.
   const demonPick = useMemo(() => {
     const candidates = enrichedProps
-      .filter(p => p.avg_last_10 != null && isTodayProp(p))
+      .filter(p => p.avg_last_10 != null && p.season_avg != null && isTodayProp(p))
       .filter(p => {
-        // Must be on an over-streak of 3+ games
-        const overMatch = (p.streak_info || '').match(/^(\d+) game over streak/i);
-        if (!overMatch) return false;
-        if (parseInt(overMatch[1], 10) < 3) return false;
-        // L10 avg must be at least 8% above the line — genuinely outperforming
-        return p.avg_last_10 >= p.line * 1.08;
+        // Must be in a cold streak (under streak of 2+ games OR L5 below L10)
+        const underMatch = (p.streak_info || '').match(/^(\d+) game under streak/i);
+        const coldStreak = underMatch && parseInt(underMatch[1], 10) >= 2;
+        const l5Slump = p.avg_last_5 != null && p.avg_last_5 < p.avg_last_10;
+        if (!coldStreak && !l5Slump) return false;
+        // Season avg must be at least 10% above the line — books set it too low
+        if (p.season_avg < p.line * 1.10) return false;
+        // AI must still predict OVER (grade leans over despite cold streak)
+        const logs = p.last_10_games || [];
+        const hitCount = logs.filter(v => v > p.line).length;
+        const dynamicHitRate = logs.length > 0 ? Math.round(hitCount / logs.length * 100) : p.hit_rate_last_10;
+        const base = p.projection ?? p.avg_last_10 ?? null;
+        const dynamicEdge = base != null ? Math.round((base - p.line) * 100) / 100 : p.edge;
+        const g = gradeProp({ ...p, hit_rate_last_10: dynamicHitRate, edge: dynamicEdge });
+        return g.lean === 'OVER';
       })
       .map(p => {
-        const streakLen = parseInt(p.streak_info.match(/^(\d+)/)[1], 10);
-        // Boom line: use best of L5/L10, nudge up 10%, round to nearest 0.5
-        const bestAvg = Math.max(p.avg_last_5 ?? p.avg_last_10, p.avg_last_10);
-        const boomLine = Math.round(bestAvg * 1.1 * 2) / 2;
-        const gap = +(p.avg_last_10 - p.line).toFixed(1);
-        const boomScore = Math.min(99, Math.round(50 + streakLen * 7 + (gap / p.line) * 60));
+        const underMatch = (p.streak_info || '').match(/^(\d+) game under streak/i);
+        const coldStreakLen = underMatch ? parseInt(underMatch[1], 10) : 0;
+        // Bounce target: season avg rounded to nearest 0.5
+        const boomLine = Math.round(p.season_avg * 2) / 2;
+        const gap = +(p.season_avg - p.line).toFixed(1);
+        // Score: bigger season-vs-line gap = higher score; deeper cold streak = higher score (more due)
+        const boomScore = Math.min(99, Math.round(50 + (gap / p.line) * 80 + coldStreakLen * 5));
         const label = (propTypeLabels[p.prop_type] || p.prop_type).toUpperCase();
 
-        let reason = `${p.player_name} is averaging ${p.avg_last_10} ${label} over the last 10 games — ${gap} above the ${p.line} line.`;
-        if (streakLen >= 6) {
-          reason += ` On a ${streakLen}-game over streak — the hottest player at this line right now.`;
-        } else {
-          reason += ` Has cleared this line ${streakLen} straight with no signs of slowing down.`;
+        let reason = `${p.player_name} is averaging ${p.season_avg} ${label} this season but the line is only ${p.line} — books overreacted to a recent slump.`;
+        if (coldStreakLen >= 2) {
+          reason += ` On a ${coldStreakLen}-game under streak, making this line even softer.`;
+        } else if (p.avg_last_5 != null && p.avg_last_5 < p.avg_last_10) {
+          reason += ` L5 avg of ${p.avg_last_5} is down from ${p.avg_last_10} L10 — the dip looks temporary.`;
         }
-        if (p.avg_last_5 != null && p.avg_last_5 > p.avg_last_10) {
-          reason += ` L5 avg of ${p.avg_last_5} is trending even higher.`;
-        }
-        if (p.hit_rate_last_10 != null && p.hit_rate_last_10 >= 80) {
-          reason += ` ${p.hit_rate_last_10}% hit rate over last 10 — elite consistency.`;
-        }
-        reason += ` Projecting a ${boomLine}+ ${label} explosion tonight vs ${p.opponent}.`;
+        reason += ` Season average of ${p.season_avg} is ${gap} above tonight's line — primed for a bounce-back explosion vs ${p.opponent}.`;
 
-        return { prop: p, streakGames: streakLen, seasonAvg: p.season_avg, boomLine, boomScore, reason };
+        return { prop: p, coldStreakLen, seasonAvg: p.season_avg, boomLine, boomScore, reason };
       })
       .sort((a, b) => b.boomScore - a.boomScore);
 
