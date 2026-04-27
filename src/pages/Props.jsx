@@ -388,8 +388,13 @@ export default function Props() {
           if (flukePct > 0.5) return false; // >50% of unders were limited-minute games — skip
         }
 
-        // Season avg must be at least 10% above the line — books set it too low
-        if (p.season_avg < p.line * 1.10) return false;
+        // Season avg must be meaningfully above the line — both relatively AND absolutely.
+        // Percentage alone allows trivial picks like 0.5→1.0; absolute floor prevents that.
+        const absGap = p.season_avg - p.line;
+        const minAbsGap = ['points', 'PRA', 'P+R', 'P+A', 'A+R'].includes(p.prop_type) ? 4 : 2;
+        if (p.season_avg < p.line * 1.15) return false;  // must be 15%+ above line
+        if (absGap < minAbsGap) return false;             // must be meaningful in actual units
+        if (p.line < 3) return false;                     // no micro-lines (0.5 AST, 0.5 3PM)
 
         // AI must still lean OVER (grade engine agrees despite cold streak)
         const logs = p.last_10_games || [];
