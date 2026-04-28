@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { TrendingUp, Zap, Shield, Layers, Bell, User, Trophy, Flame, GitCompare, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TrendingUp, Zap, Shield, Layers, Bell, User, Flame, GitCompare, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
+import logo from '@/assets/logo.png';
 
 const navItems = [
   { path: '/', label: 'Props', icon: Zap },
@@ -27,9 +28,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
         "flex items-center gap-3 border-b border-white/5 flex-shrink-0",
         collapsed ? "justify-center p-4" : "px-5 py-4"
       )}>
-        <div className="w-8 h-8 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0 ring-1 ring-primary/30">
-          <Trophy className="w-4 h-4 text-primary" />
-        </div>
+        <img src={logo} alt="LockLab NBA" className="w-8 h-8 object-contain flex-shrink-0" />
         {!collapsed && (
           <div>
             <p className="text-sm font-bold text-foreground tracking-tight leading-none">LockLab<span className="text-primary">NBA</span></p>

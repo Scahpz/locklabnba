@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
-import { Eye, EyeOff, Loader2, Lock, Mail, User, Trophy } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Lock, Mail, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import logo from '@/assets/logo.png';
 
 export default function Login() {
   const { login, register } = useAuth();
@@ -42,8 +43,8 @@ export default function Login() {
 
       {/* Logo */}
       <div className="mb-8 text-center relative">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 mb-5 shadow-[0_0_30px_hsl(142,71%,45%,0.15)]">
-          <Trophy className="w-8 h-8 text-primary" />
+        <div className="mb-5">
+          <img src={logo} alt="LockLab NBA" className="w-20 h-20 object-contain mx-auto" />
         </div>
         <h1 className="text-3xl font-bold text-foreground tracking-tight">LockLab<span className="text-primary">NBA</span></h1>
         <p className="text-sm text-muted-foreground mt-2">AI-powered props intelligence</p>
