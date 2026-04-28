@@ -42,7 +42,7 @@ function LockCard({ prop, aiVerdict, aiLoading }) {
             </div>
           </div>
           <span className="text-[10px] text-muted-foreground/60 bg-white/5 border border-white/8 rounded-lg px-2 py-0.5 font-medium">
-            {prop.confidence_score}/10 confidence
+            10/10 confidence
           </span>
         </div>
 
