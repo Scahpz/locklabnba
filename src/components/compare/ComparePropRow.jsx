@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, Zap } from 'lucide-react';
+import { TrendingUp, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LineChart, Line, ReferenceLine, ResponsiveContainer, Tooltip } from 'recharts';
 

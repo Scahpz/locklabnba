@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import GameOddsCard from '@/components/odds/GameOddsCard';
-import { RefreshCw, Activity, Clock, WifiOff, Key, Check, ChevronDown, ChevronUp, Zap } from 'lucide-react';
+import { RefreshCw, Activity, Clock, WifiOff, Key, Check, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 

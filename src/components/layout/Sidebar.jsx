@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { TrendingUp, Zap, Shield, Layers, Bell, User, Flame, GitCompare, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TrendingUp, Zap, Layers, Bell, User, GitCompare, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
 import logo from '@/assets/logo.png';
 
 const navItems = [

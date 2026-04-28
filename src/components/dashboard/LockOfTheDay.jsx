@@ -1,6 +1,5 @@
 import React from 'react';
 import { Lock, Zap, Plus } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import TeamLogo from '@/components/common/TeamLogo';
 import { useParlay } from '@/lib/ParlayContext';
 

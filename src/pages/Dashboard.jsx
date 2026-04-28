@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { fetchLiveProps, clearLiveCache, getStoredApiKey } from '@/lib/liveData';
+import { fetchLiveProps, clearLiveCache } from '@/lib/liveData';
 import ApiKeyPrompt from '@/components/dashboard/ApiKeyPrompt';
 import StatsOverview from '@/components/dashboard/StatsOverview';
 import PropFilters from '@/components/dashboard/PropFilters';

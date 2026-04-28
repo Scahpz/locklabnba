@@ -9,7 +9,7 @@ import { mockPlayers } from '@/lib/mockData';
 import TeamLogo from '@/components/common/TeamLogo';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 const statusConfig = {
   pending: { label: 'Pending', icon: Clock, color: 'text-chart-4 bg-chart-4/10 border-chart-4/20' },

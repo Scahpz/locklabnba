@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Badge } from '@/components/ui/badge';
+
 import { cn } from '@/lib/utils';
 import { Lock, AlertTriangle, Award, Zap, ChevronDown, ChevronUp, Check, TrendingUp, TrendingDown } from 'lucide-react';
 import { Link } from 'react-router-dom';

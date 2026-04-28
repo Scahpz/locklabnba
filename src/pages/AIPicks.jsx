@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { getAllProps } from '@/lib/mockData';
 import { fetchLiveProps } from '@/lib/liveData';
 import { Badge } from '@/components/ui/badge';
 import { Lock, Zap, Shield, AlertTriangle, Award, Wifi, WifiOff, RefreshCw } from 'lucide-react';

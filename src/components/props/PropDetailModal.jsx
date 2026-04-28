@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, Check, Clock, TrendingUp, TrendingDown, Zap } from 'lucide-react';
+import { X, Check, Clock, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { gradeProp } from '@/lib/grading';
 import TeamLogo from '@/components/common/TeamLogo';
