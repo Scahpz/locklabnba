@@ -85,12 +85,19 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-inter);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
 /* Prevent horizontal overflow on mobile */
 html, body {
   overflow-x: hidden;
+}
+
+/* Smooth transitions globally */
+*, *::before, *::after {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Hide scrollbar utility */
@@ -104,15 +111,33 @@ html, body {
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: hsl(222 47% 6%);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(217 33% 25%);
-  border-radius: 3px;
+  background: hsl(217 33% 28%);
+  border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(217 33% 35%);
+  background: hsl(217 33% 38%);
+}
+
+/* Glass card utility */
+.glass {
+  background: hsl(222 47% 9% / 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Glow utilities */
+.glow-green {
+  box-shadow: 0 0 20px hsl(142 71% 45% / 0.15), 0 0 40px hsl(142 71% 45% / 0.05);
+}
+.glow-red {
+  box-shadow: 0 0 20px hsl(0 84% 60% / 0.15), 0 0 40px hsl(0 84% 60% / 0.05);
+}
+.glow-orange {
+  box-shadow: 0 0 20px hsl(25 100% 50% / 0.15), 0 0 40px hsl(25 100% 50% / 0.05);
 }

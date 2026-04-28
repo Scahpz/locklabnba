@@ -1,15 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { 
-  LayoutDashboard, TrendingUp, Zap, Shield, Layers, 
-  Bell, User, ChevronLeft, ChevronRight, Trophy, Flame, GitCompare, Activity
-} from 'lucide-react';
+import { TrendingUp, Zap, Shield, Layers, Bell, User, Trophy, Flame, GitCompare, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const navItems = [
   { path: '/', label: 'Props', icon: Zap },
   { path: '/trends', label: 'Streaks & Trends', icon: TrendingUp },
-
   { path: '/compare', label: 'Compare', icon: GitCompare },
   { path: '/odds', label: 'Live Odds', icon: Activity },
   { path: '/parlay', label: 'Parlay Builder', icon: Layers },
@@ -22,39 +18,50 @@ export default function Sidebar({ collapsed, setCollapsed }) {
 
   return (
     <aside className={cn(
-      "fixed left-0 top-0 h-full z-40 bg-card border-r border-border transition-all duration-300 flex flex-col",
-      collapsed ? "w-16" : "w-60"
+      "fixed left-0 top-0 h-full z-40 flex flex-col transition-all duration-300",
+      "bg-[hsl(222,47%,7%)] border-r border-white/5",
+      collapsed ? "w-[68px]" : "w-[220px]"
     )}>
       {/* Logo */}
-      <div className="flex items-center gap-3 p-4 border-b border-border">
-        <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
-          <Trophy className="w-5 h-5 text-primary" />
+      <div className={cn(
+        "flex items-center gap-3 border-b border-white/5 flex-shrink-0",
+        collapsed ? "justify-center p-4" : "px-5 py-4"
+      )}>
+        <div className="w-8 h-8 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0 ring-1 ring-primary/30">
+          <Trophy className="w-4 h-4 text-primary" />
         </div>
         {!collapsed && (
-          <div className="overflow-hidden">
-            <h1 className="text-lg font-bold text-foreground tracking-tight">LockLabNBA</h1>
-            <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">Analytics</p>
+          <div>
+            <p className="text-sm font-bold text-foreground tracking-tight leading-none">LockLab<span className="text-primary">NBA</span></p>
+            <p className="text-[10px] text-muted-foreground mt-0.5 tracking-widest uppercase">Analytics</p>
           </div>
         )}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+      <nav className="flex-1 p-2.5 space-y-0.5 overflow-y-auto">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           return (
             <Link
               key={item.path}
               to={item.path}
+              title={collapsed ? item.label : undefined}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
-                isActive 
-                  ? "bg-primary/10 text-primary" 
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                "relative flex items-center gap-3 rounded-xl transition-all duration-200 group",
+                collapsed ? "justify-center p-3" : "px-3 py-2.5",
+                isActive
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/5"
               )}
             >
-              <item.icon className={cn("w-5 h-5 flex-shrink-0", isActive && "drop-shadow-[0_0_6px_hsl(142,71%,45%)]")} />
-              {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+              {isActive && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-primary rounded-r-full" />
+              )}
+              <item.icon className={cn("w-[18px] h-[18px] flex-shrink-0", isActive && "text-primary")} />
+              {!collapsed && (
+                <span className="text-[13px] font-medium truncate">{item.label}</span>
+              )}
             </Link>
           );
         })}
@@ -63,14 +70,15 @@ export default function Sidebar({ collapsed, setCollapsed }) {
       {/* Collapse toggle */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="p-3 border-t border-border text-muted-foreground hover:text-foreground transition-colors"
-      >
-        {collapsed ? <ChevronRight className="w-5 h-5 mx-auto" /> : (
-          <div className="flex items-center gap-2">
-            <ChevronLeft className="w-5 h-5" />
-            <span className="text-xs">Collapse</span>
-          </div>
+        className={cn(
+          "flex items-center border-t border-white/5 text-muted-foreground hover:text-foreground transition-colors",
+          collapsed ? "justify-center p-4" : "gap-2 px-4 py-3"
         )}
+      >
+        {collapsed
+          ? <ChevronRight className="w-4 h-4" />
+          : <><ChevronLeft className="w-4 h-4" /><span className="text-xs">Collapse</span></>
+        }
       </button>
     </aside>
   );

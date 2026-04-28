@@ -25,106 +25,100 @@ export default function DemonPickCard({ pick, onOpenDetail }) {
   const picked = isSelected(prop.player_name, prop.prop_type, 'over');
 
   return (
-    <div className="relative rounded-xl border border-orange-500/40 bg-card overflow-hidden shadow-[0_0_24px_hsl(25,100%,50%,0.12)]">
-      {/* Gradient header bar */}
-      <div className="h-1 w-full bg-gradient-to-r from-orange-600 via-red-500 to-orange-400" />
+    <div className="relative rounded-2xl overflow-hidden border border-orange-500/25 bg-[hsl(222,47%,9%)] glow-orange">
+      {/* Top gradient bar */}
+      <div className="h-0.5 w-full bg-gradient-to-r from-orange-600/0 via-orange-500 to-red-500/0" />
 
       <div className="p-4">
-        {/* Title row */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-orange-500/15 border border-orange-500/30">
-              <Flame className="w-4 h-4 text-orange-400" />
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center">
+              <Flame className="w-4.5 h-4.5 text-orange-400" />
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-orange-400">Demon Pick</p>
-              <p className="text-[9px] text-muted-foreground">Explosion Alert</p>
+              <p className="text-xs font-bold text-orange-400 uppercase tracking-widest leading-none">Demon Pick</p>
+              <p className="text-[10px] text-orange-400/50 mt-0.5">Bounce-back Alert</p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <TrendingUp className="w-3 h-3 text-orange-400/70" />
-            <span className="text-[10px] text-orange-400/80 font-medium">HIGH UPSIDE</span>
+          {/* Boom score */}
+          <div className="flex flex-col items-center justify-center w-12 h-12 rounded-2xl bg-orange-500/10 border border-orange-500/20">
+            <p className="text-lg font-black text-orange-400 leading-none">{boomScore}</p>
+            <p className="text-[8px] text-orange-400/60 uppercase tracking-wider leading-none mt-0.5">Boom</p>
           </div>
         </div>
 
-        {/* Player row */}
-        <div className="flex items-center gap-3 mb-3">
-          <TeamLogo team={prop.team} className="w-10 h-10" />
+        {/* Player */}
+        <div className="flex items-center gap-3 mb-4">
+          <TeamLogo team={prop.team} className="w-11 h-11" />
           <div className="flex-1 min-w-0">
-            <Link
-              to={`/trends?player=${encodeURIComponent(prop.player_name)}`}
-              className="font-bold text-sm text-foreground hover:text-orange-400 transition-colors"
-            >
+            <Link to={`/trends?player=${encodeURIComponent(prop.player_name)}`}
+              className="font-bold text-sm text-foreground hover:text-orange-400 transition-colors">
               {prop.player_name}
             </Link>
-            <p className="text-[10px] text-muted-foreground">{prop.team} vs {prop.opponent} · {prop.position}</p>
-          </div>
-          {/* Boom score badge */}
-          <div className="flex flex-col items-center justify-center w-12 h-12 rounded-xl bg-orange-500/10 border border-orange-500/25">
-            <p className="text-base font-black text-orange-400">{boomScore}</p>
-            <p className="text-[8px] text-orange-400/70 uppercase leading-none">Boom</p>
+            <p className="text-[11px] text-muted-foreground/60 mt-0.5">{prop.team} vs {prop.opponent} · {prop.position}</p>
           </div>
         </div>
 
-        {/* Demon line + bet */}
-        <div className="bg-orange-500/5 border border-orange-500/20 rounded-lg p-3 mb-3">
-          <div className="flex items-end justify-between mb-2">
+        {/* Demon line block */}
+        <div className="bg-orange-500/5 border border-orange-500/15 rounded-2xl p-4 mb-4">
+          <div className="flex items-end justify-between mb-3">
             <div>
-              <p className="text-[9px] text-orange-400/80 font-bold uppercase tracking-wider mb-0.5">Demon Line</p>
-              <p className="text-3xl font-black text-orange-400 leading-none">{boomLine}</p>
+              <p className="text-[9px] text-orange-400/60 font-bold uppercase tracking-wider mb-1">Demon Line · {label}</p>
+              <p className="text-4xl font-black text-orange-400 leading-none">{boomLine}</p>
             </div>
             <div className="text-right">
-              <p className="text-[9px] text-muted-foreground uppercase mb-0.5">Book Line</p>
-              <p className="text-lg font-bold text-muted-foreground line-through">{prop.line}</p>
+              <p className="text-[9px] text-muted-foreground/50 uppercase mb-1">Book Line</p>
+              <p className="text-xl font-bold text-muted-foreground/40 line-through">{prop.line}</p>
             </div>
           </div>
           <button
             onClick={() => addLeg({ ...prop, line: boomLine }, 'over')}
             className={cn(
-              "w-full flex items-center justify-center gap-2 border rounded-lg py-2 transition-all",
+              "w-full flex items-center justify-center gap-2 rounded-xl py-2.5 transition-all active:scale-[0.98] font-bold text-sm border",
               picked
-                ? "bg-orange-500 border-orange-500 text-white"
-                : "bg-orange-500/15 hover:bg-orange-500/25 border-orange-500/30 text-orange-400"
+                ? "bg-orange-500 border-orange-500 text-white shadow-[0_0_16px_hsl(25,100%,50%,0.3)]"
+                : "bg-orange-500/10 hover:bg-orange-500/20 border-orange-500/25 text-orange-400"
             )}
           >
-            <span className="text-xs font-bold">OVER {boomLine}</span>
-            <span className="text-sm font-black">{fmtOdds(prop.over_odds)}</span>
+            <TrendingUp className="w-4 h-4" />
+            OVER {boomLine} · {fmtOdds(prop.over_odds)}
           </button>
         </div>
 
-        {/* Why they'll explode */}
-        <div className="bg-secondary/50 rounded-lg p-3 mb-3 space-y-1.5">
-          <div className="flex items-center gap-1.5 mb-1">
+        {/* Why section */}
+        <div className="bg-white/3 border border-white/5 rounded-xl p-3 mb-4">
+          <div className="flex items-center gap-1.5 mb-2">
             <Zap className="w-3 h-3 text-orange-400" />
-            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-400">Why They'll Explode</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-400/80">Why They'll Explode</p>
           </div>
-          <p className="text-xs text-foreground leading-snug">{reason}</p>
+          <p className="text-xs text-muted-foreground/80 leading-relaxed">{reason}</p>
         </div>
 
-        {/* Stat pills */}
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          <div className="text-center bg-secondary/40 rounded-lg py-2">
-            <p className="text-[9px] text-muted-foreground uppercase">L10 Avg</p>
-            <p className={cn("text-sm font-bold", (prop.avg_last_10 || 0) > prop.line ? 'text-primary' : 'text-destructive')}>
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className="text-center bg-white/3 rounded-xl py-2.5">
+            <p className="text-[9px] text-muted-foreground/50 uppercase font-semibold">L10 Avg</p>
+            <p className={cn("text-sm font-bold mt-0.5", (prop.avg_last_10 || 0) > prop.line ? 'text-primary' : 'text-destructive')}>
               {prop.avg_last_10 ?? '—'}
             </p>
           </div>
-          <div className="text-center bg-secondary/40 rounded-lg py-2">
-            <p className="text-[9px] text-muted-foreground uppercase">Season</p>
-            <p className={cn("text-sm font-bold", (seasonAvg || 0) > prop.line ? 'text-primary' : 'text-muted-foreground')}>
+          <div className="text-center bg-white/3 rounded-xl py-2.5">
+            <p className="text-[9px] text-muted-foreground/50 uppercase font-semibold">Season</p>
+            <p className={cn("text-sm font-bold mt-0.5", (seasonAvg || 0) > prop.line ? 'text-primary' : 'text-muted-foreground')}>
               {seasonAvg ?? '—'}
             </p>
           </div>
-          <div className="text-center bg-orange-500/10 border border-orange-500/20 rounded-lg py-2">
-            <p className="text-[9px] text-orange-400/80 uppercase">Cold Streak</p>
-            <p className="text-sm font-bold text-orange-400">{coldStreakLen > 0 ? `${coldStreakLen}G Under` : 'Slumping'}</p>
+          <div className="text-center bg-orange-500/8 border border-orange-500/15 rounded-xl py-2.5">
+            <p className="text-[9px] text-orange-400/60 uppercase font-semibold">Cold Streak</p>
+            <p className="text-sm font-bold text-orange-400 mt-0.5">
+              {coldStreakLen > 0 ? `${coldStreakLen}G Under` : 'Slumping'}
+            </p>
           </div>
         </div>
 
-        <button
-          onClick={onOpenDetail}
-          className="w-full text-xs text-orange-400/70 hover:text-orange-400 border border-orange-500/20 hover:border-orange-500/40 rounded-lg py-2 transition-all bg-orange-500/5 hover:bg-orange-500/10 font-medium flex items-center justify-center gap-1"
-        >
+        <button onClick={onOpenDetail}
+          className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-orange-400/60 hover:text-orange-400 border border-orange-500/15 hover:border-orange-500/30 rounded-xl py-2.5 transition-all bg-orange-500/3 hover:bg-orange-500/8">
           Full Analysis <ChevronRight className="w-3 h-3" />
         </button>
       </div>
