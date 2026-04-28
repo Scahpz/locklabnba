@@ -12,28 +12,25 @@ import { TEAM_STATS } from '@/lib/teamStats';
 import PropDetailModal from '@/components/props/PropDetailModal';
 
 // ── Game-log localStorage cache ───────────────────────────────────────────────
-const GL_CACHE_DATE_KEY = 'locklab_gl_date_v7';
-const GL_CACHE_PREFIX   = 'locklab_gl_v7_';
-const today = new Date().toISOString().split('T')[0];
+const GL_CACHE_PREFIX = 'locklab_gl_v8_';
+const GL_TTL_MS = 2 * 60 * 60 * 1000; // 2-hour TTL per entry
 // Wipe all older cache versions on load
 for (let i = localStorage.length - 1; i >= 0; i--) {
   const k = localStorage.key(i);
-  if (k && k.startsWith('locklab_gl_') && !k.startsWith('locklab_gl_v7_') && k !== 'locklab_gl_date_v7') {
+  if (k && k.startsWith('locklab_gl_') && !k.startsWith('locklab_gl_v8_')) {
     localStorage.removeItem(k);
   }
 }
-if (localStorage.getItem(GL_CACHE_DATE_KEY) !== today) {
-  for (let i = localStorage.length - 1; i >= 0; i--) {
-    const k = localStorage.key(i);
-    if (k && k.startsWith(GL_CACHE_PREFIX)) localStorage.removeItem(k);
-  }
-  localStorage.setItem(GL_CACHE_DATE_KEY, today);
-}
 function glCacheGet(name) {
-  try { return JSON.parse(localStorage.getItem(GL_CACHE_PREFIX + name)); } catch { return null; }
+  try {
+    const item = JSON.parse(localStorage.getItem(GL_CACHE_PREFIX + name));
+    if (!item) return null;
+    if (Date.now() - item.ts > GL_TTL_MS) { localStorage.removeItem(GL_CACHE_PREFIX + name); return null; }
+    return item.data;
+  } catch { return null; }
 }
 function glCacheSet(name, data) {
-  try { localStorage.setItem(GL_CACHE_PREFIX + name, JSON.stringify(data)); } catch {}
+  try { localStorage.setItem(GL_CACHE_PREFIX + name, JSON.stringify({ data, ts: Date.now() })); } catch {}
 }
 async function fetchBulkGameLogs(names) {
   const ctrl = new AbortController();
