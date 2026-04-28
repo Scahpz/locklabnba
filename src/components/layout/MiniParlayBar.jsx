@@ -13,7 +13,7 @@ export default function MiniParlayBar() {
   if (legs.length === 0) return null;
 
   return (
-    <div className="fixed bottom-[72px] md:bottom-0 left-0 right-0 z-40">
+    <div className="fixed above-mobile-nav md:bottom-0 left-0 right-0 z-40">
       {/* Expanded legs */}
       {expanded && (
         <div className="mx-3 md:mx-0 mb-1 md:mb-0 bg-[hsl(222,47%,9%)] border border-white/8 rounded-2xl md:rounded-none md:rounded-t-xl overflow-hidden shadow-2xl">

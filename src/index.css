@@ -90,9 +90,21 @@
   }
 }
 
-/* Prevent horizontal overflow on mobile */
-html, body {
+/* Prevent horizontal overflow on mobile.
+   IMPORTANT: only on html, NOT body — overflow on body breaks position:fixed on iOS Safari */
+html {
   overflow-x: hidden;
+}
+
+/* MiniParlayBar: sits above mobile nav, accounts for iPhone home-bar safe area */
+@media (max-width: 767px) {
+  .above-mobile-nav {
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+  /* Main content: enough room for nav + parlay bar + safe area on any phone */
+  .mobile-scroll-pad {
+    padding-bottom: calc(160px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 /* Smooth transitions globally */

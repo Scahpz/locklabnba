@@ -8,7 +8,7 @@ export default function MobileHeader() {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-40 md:hidden">
-      <div className="bg-[hsl(222,47%,7%)/95] backdrop-blur-xl border-b border-white/5">
+      <div className="bg-[hsl(222,47%,7%)] backdrop-blur-xl border-b border-white/5">
         <div className="flex items-center justify-between px-4 h-14">
           <Link to="/" className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-primary/20 flex items-center justify-center ring-1 ring-primary/30">
@@ -29,7 +29,7 @@ export default function MobileHeader() {
                   : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
               )}
             >
-              <Bell className="w-4.5 h-4.5" />
+              <Bell className="w-4 h-4" />
             </Link>
             <Link
               to="/profile"
@@ -40,7 +40,7 @@ export default function MobileHeader() {
                   : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
               )}
             >
-              <User className="w-4.5 h-4.5" />
+              <User className="w-4 h-4" />
             </Link>
           </div>
         </div>
