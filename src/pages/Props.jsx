@@ -303,20 +303,20 @@ export default function Props() {
     });
   }, [gamesSummary]);
 
-  // Split sorted games into today / tomorrow for the filter UI.
-  // Games 2+ days out are intentionally excluded from both buckets so they
-  // never bleed into Locks / Demon Pick (which must be today-only).
-  const { todayGames, tomorrowGames, hasBeyondTomorrow } = useMemo(() => {
-    const today = [], tomorrow = [];
-    let hasBeyond = false;
+  // Split sorted games into today / tomorrow / other for the filter UI.
+  // "Other" games are shown in the filter but never affect Locks / Demon Pick (today-only).
+  const { todayGames, tomorrowGames, otherGames } = useMemo(() => {
+    const today = [], tomorrow = [], other = [];
     sortedGames.forEach(g => {
       const d = localDateStr(g.scheduled_at);
       if (!d || d === todayLocalStr)   today.push(g);
       else if (d === tomorrowLocalStr) tomorrow.push(g);
-      else hasBeyond = true; // 2+ days out — drop from both buckets
+      else other.push(g);
     });
-    return { todayGames: today, tomorrowGames: tomorrow, hasBeyondTomorrow: hasBeyond };
+    return { todayGames: today, tomorrowGames: tomorrow, otherGames: other };
   }, [sortedGames]);
+
+  const hasBeyondTomorrow = otherGames.length > 0;
 
   // Team abbreviations playing TODAY only.
   // Returns null when there are no non-today games loaded (no filtering needed).
@@ -651,6 +651,33 @@ export default function Props() {
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Tomorrow</p>
               <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap scrollbar-none">
                 {tomorrowGames.map((g, i) => {
+                  const key = `${(g.away || '').toUpperCase()}@${(g.home || '').toUpperCase()}`;
+                  const active = selectedGames.includes(key);
+                  const tipoff = fmtTipoff(g.scheduled_at) || g.tipoff;
+                  return (
+                    <button key={i} onClick={() => toggleGame(g)}
+                      className={cn(
+                        "flex items-center gap-2 border rounded-lg px-3 py-2 text-xs transition-all flex-shrink-0 whitespace-nowrap",
+                        active ? "bg-primary/15 border-primary/50 text-foreground" : "bg-secondary/60 border-border text-foreground hover:border-primary/30"
+                      )}
+                    >
+                      <span className="font-bold">{g.away} @ {g.home}</span>
+                      {tipoff && <span className="text-muted-foreground">{tipoff}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Other days */}
+          {otherGames.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">
+                {new Date(otherGames[0].scheduled_at).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+              </p>
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap scrollbar-none">
+                {otherGames.map((g, i) => {
                   const key = `${(g.away || '').toUpperCase()}@${(g.home || '').toUpperCase()}`;
                   const active = selectedGames.includes(key);
                   const tipoff = fmtTipoff(g.scheduled_at) || g.tipoff;

@@ -20,11 +20,18 @@ const propTypeLabels = {
   'P+R': 'P+R', 'P+A': 'P+A', 'A+R': 'A+R',
 };
 
+// Tier is derived from grade confidence — nothing to do with the backend confidence_tier field
+// A = strong (≥75% conf, not UNSAFE)  B = moderate (≥60%)  C = weak/no clear edge
 const tierConfig = {
-  A: { label: 'Tier A', className: 'bg-primary/10 text-primary border-primary/20' },
-  B: { label: 'Tier B', className: 'bg-chart-4/10 text-chart-4 border-chart-4/20' },
-  C: { label: 'Tier C', className: 'bg-white/5 text-muted-foreground border-white/8' },
+  A: { label: 'Tier A', title: 'Strong signal',   className: 'bg-primary/10 text-primary border-primary/20' },
+  B: { label: 'Tier B', title: 'Moderate signal', className: 'bg-chart-4/10 text-chart-4 border-chart-4/20' },
+  C: { label: 'Tier C', title: 'Weak signal',     className: 'bg-white/5 text-muted-foreground border-white/8' },
 };
+function getTier(grade) {
+  if (grade.verdict !== 'UNSAFE' && grade.confidence >= 75) return 'A';
+  if (grade.verdict !== 'UNSAFE' && grade.confidence >= 60) return 'B';
+  return 'C';
+}
 
 export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, onOpenDetail }) {
   const { addLeg, isSelected } = useParlay();
@@ -42,7 +49,7 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, onOpe
   }, [prop]);
 
   const grade = gradeProp(gradedProp);
-  const tier = tierConfig[prop.has_analytics ? prop.confidence_tier : 'C'] || tierConfig.C;
+  const tier = tierConfig[getTier(grade)];
   const isOverFavorable = grade.lean === 'OVER';
   const hasBooks = prop.all_books?.length > 1;
 
@@ -100,7 +107,7 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, onOpe
             {prop.is_lock && <Lock className="w-3.5 h-3.5 text-primary" />}
             {prop.trap_warning && <AlertTriangle className="w-3.5 h-3.5 text-destructive" />}
             {prop.best_value && <Award className="w-3.5 h-3.5 text-chart-4" />}
-            <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-lg border", tier.className)}>
+            <span title={tier.title} className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-lg border cursor-help", tier.className)}>
               {tier.label}
             </span>
           </div>

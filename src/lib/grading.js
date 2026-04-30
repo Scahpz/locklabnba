@@ -70,12 +70,14 @@ function gradeWithContext(prop) {
   const oppPace   = prop.opponent_pace;
   const teamPace  = prop.player_team_pace;
   const spread    = prop.spread;                // from player team's perspective (+= favored)
-  const isB2B     = prop.is_back_to_back ?? false;
+  const isB2B        = prop.is_back_to_back ?? false;
   const injNote      = prop.injury_context;      // e.g. "LeBron James (Out)"
   const injCount     = prop.injury_count ?? 0;  // number of injured teammates
   const oppInjNote   = prop.opp_injury_context; // e.g. "Anthony Edwards (Out)"
   const oppInjCount  = prop.opp_injury_count ?? 0;
-  const edge      = prop.edge;
+  const ownInjStatus = (prop.injury_status || '').toLowerCase(); // player's own status from odds API
+  const isReturning  = ownInjStatus && !['', 'active', 'out'].includes(ownInjStatus); // questionable/probable/gtd/dtd
+  const edge         = prop.edge;
 
   const criteria = [];
 
@@ -336,7 +338,21 @@ function gradeWithContext(prop) {
     category:  'rest',
   });
 
-  // ── 5. OPPONENT INJURIES ────────────────────────────────────────────────
+  // ── 5. RETURN FROM INJURY ───────────────────────────────────────────────
+  if (isReturning) {
+    const statusLabel = ownInjStatus.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    criteria.push({
+      label:           `Injury Status: ${statusLabel}`,
+      detail:          `Player is listed as ${statusLabel} — may play on a minutes restriction or be a late scratch, expect reduced production risk`,
+      pass:            false,
+      continuousScore: 0.28, // strong negative — significant UNDER risk
+      weight:          14,
+      available:       true,
+      category:        'rest',
+    });
+  }
+
+  // ── 6. OPPONENT INJURIES ────────────────────────────────────────────────
   if (oppInjNote) {
     // Scale weight by number of opponent players out: more absences = weaker defense
     const oppInjWeight = oppInjCount >= 3 ? 14 : oppInjCount === 2 ? 10 : 7;
