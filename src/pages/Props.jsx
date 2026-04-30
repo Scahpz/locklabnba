@@ -91,7 +91,7 @@ export default function Props() {
   const [playerAnalytics, setPlayerAnalytics] = useState({});
   const [playerSearch, setPlayerSearch] = useState('');
   const [showPlayerDrop, setShowPlayerDrop] = useState(false);
-  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [selectedPlayers, setSelectedPlayers] = useState([]);
   const [detailKey, setDetailKey] = useState(null); // { player_name, prop_type }
   const [detailDemon, setDetailDemon] = useState(false);
   const searchRef = useRef(null);
@@ -506,8 +506,8 @@ export default function Props() {
   const filteredAndRanked = useMemo(() => {
     let result = enrichedProps;
 
-    if (selectedPlayer) {
-      result = result.filter(p => p.player_name === selectedPlayer);
+    if (selectedPlayers.length > 0) {
+      result = result.filter(p => selectedPlayers.includes(p.player_name));
     }
 
     if (selectedGames.length > 0) {
@@ -534,7 +534,7 @@ export default function Props() {
     });
 
     return result;
-  }, [enrichedProps, selectedGames, selectedType, sortBy, selectedPlayer]);
+  }, [enrichedProps, selectedGames, selectedType, sortBy, selectedPlayers]);
 
   if (loading) {
     return (
@@ -573,44 +573,68 @@ export default function Props() {
         </button>
       </div>
 
-      {/* Player search */}
-      <div className="relative" ref={searchRef}>
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-        <input
-          type="text"
-          placeholder="Search player…"
-          value={selectedPlayer ? selectedPlayer : playerSearch}
-          onChange={e => { setPlayerSearch(e.target.value); setSelectedPlayer(null); setShowPlayerDrop(true); }}
-          onFocus={() => setShowPlayerDrop(true)}
-          className="w-full sm:w-72 pl-9 pr-8 py-2 text-sm bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-        />
-        {(selectedPlayer || playerSearch) && (
-          <button
-            onClick={() => { setSelectedPlayer(null); setPlayerSearch(''); setShowPlayerDrop(false); }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        )}
-        {showPlayerDrop && playerSuggestions.length > 0 && (
-          <div className="absolute top-full mt-1 w-full sm:w-72 bg-popover border border-border rounded-lg shadow-xl z-50 overflow-hidden">
-            {playerSuggestions.map(name => {
-              const p = enrichedProps.find(ep => ep.player_name === name);
-              const propCount = enrichedProps.filter(ep => ep.player_name === name).length;
-              return (
-                <button
-                  key={name}
-                  onClick={() => { setSelectedPlayer(name); setPlayerSearch(''); setShowPlayerDrop(false); }}
-                  className="w-full flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-secondary transition-colors text-left"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{name}</p>
-                    <p className="text-[10px] text-muted-foreground">{p?.team} · {p?.position}</p>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">{propCount} prop{propCount !== 1 ? 's' : ''}</span>
-                </button>
-              );
-            })}
+      {/* Player search — multi-select */}
+      <div className="space-y-2" ref={searchRef}>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            placeholder={selectedPlayers.length > 0 ? 'Add another player…' : 'Search player…'}
+            value={playerSearch}
+            onChange={e => { setPlayerSearch(e.target.value); setShowPlayerDrop(true); }}
+            onFocus={() => setShowPlayerDrop(true)}
+            className="w-full sm:w-72 pl-9 pr-8 py-2 text-sm bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          {playerSearch && (
+            <button
+              onClick={() => { setPlayerSearch(''); setShowPlayerDrop(false); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {showPlayerDrop && playerSuggestions.length > 0 && (
+            <div className="absolute top-full mt-1 w-full sm:w-72 bg-popover border border-border rounded-lg shadow-xl z-50 overflow-hidden">
+              {playerSuggestions.filter(name => !selectedPlayers.includes(name)).map(name => {
+                const p = enrichedProps.find(ep => ep.player_name === name);
+                const propCount = enrichedProps.filter(ep => ep.player_name === name).length;
+                return (
+                  <button
+                    key={name}
+                    onClick={() => { setSelectedPlayers(prev => [...prev, name]); setPlayerSearch(''); setShowPlayerDrop(false); }}
+                    className="w-full flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-secondary transition-colors text-left"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{name}</p>
+                      <p className="text-[10px] text-muted-foreground">{p?.team} · {p?.position}</p>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">{propCount} prop{propCount !== 1 ? 's' : ''}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        {/* Selected player chips */}
+        {selectedPlayers.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {selectedPlayers.map(name => (
+              <button
+                key={name}
+                onClick={() => setSelectedPlayers(prev => prev.filter(n => n !== name))}
+                className="flex items-center gap-1 text-xs bg-primary/15 border border-primary/30 text-primary px-2.5 py-1 rounded-full hover:bg-primary/25 transition-colors"
+              >
+                {name} <X className="w-3 h-3" />
+              </button>
+            ))}
+            {selectedPlayers.length > 1 && (
+              <button
+                onClick={() => setSelectedPlayers([])}
+                className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 transition-colors"
+              >
+                Clear all
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -762,14 +786,6 @@ export default function Props() {
           <div>
             <div className="flex items-center gap-2 mb-3">
               <p className="text-xs text-muted-foreground">{filteredAndRanked.length} props · ranked by {SORT_OPTIONS.find(o => o.value === sortBy)?.label}</p>
-              {selectedPlayer && (
-                <button
-                  onClick={() => setSelectedPlayer(null)}
-                  className="flex items-center gap-1 text-xs bg-primary/15 border border-primary/30 text-primary px-2 py-0.5 rounded-full hover:bg-primary/25 transition-colors"
-                >
-                  {selectedPlayer} <X className="w-3 h-3" />
-                </button>
-              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredAndRanked.map((prop, i) => {
