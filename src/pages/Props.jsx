@@ -83,21 +83,28 @@ export default function Props() {
   const [gamesSummary, setGamesSummary] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
-  const [selectedGames, setSelectedGames] = useState([]);
-  const [selectedType, setSelectedType] = useState('all');
-  const [sortBy, setSortBy] = useState('ai_rank');
+  // Restore filter state from sessionStorage so navigating away and back preserves selections
+  const savedFilters = (() => { try { return JSON.parse(sessionStorage.getItem('props_filters') || '{}'); } catch { return {}; } })();
+  const [selectedGames, setSelectedGames] = useState(savedFilters.selectedGames ?? []);
+  const [selectedType, setSelectedType] = useState(savedFilters.selectedType ?? 'all');
+  const [sortBy, setSortBy] = useState(savedFilters.sortBy ?? 'ai_rank');
   const [verdicts, setVerdicts] = useState({});
   const [aiLoading, setAiLoading] = useState(false);
   const [playerAnalytics, setPlayerAnalytics] = useState({});
   const [playerSearch, setPlayerSearch] = useState('');
   const [showPlayerDrop, setShowPlayerDrop] = useState(false);
-  const [selectedPlayers, setSelectedPlayers] = useState([]);
+  const [selectedPlayers, setSelectedPlayers] = useState(savedFilters.selectedPlayers ?? []);
   const [detailKey, setDetailKey] = useState(null); // { player_name, prop_type }
   const [detailDemon, setDetailDemon] = useState(false);
   const searchRef = useRef(null);
   // Pre-seed with hardcoded stats so pace/defense show immediately
   const [teamContext, setTeamContext] = useState({ teams: TEAM_STATS, injuries: {}, back_to_back: [], game_spreads: {} });
   const fetchedPlayers = useRef(new Set());
+
+  // Persist filter state to sessionStorage so it survives navigation
+  useEffect(() => {
+    sessionStorage.setItem('props_filters', JSON.stringify({ selectedGames, selectedType, sortBy, selectedPlayers }));
+  }, [selectedGames, selectedType, sortBy, selectedPlayers]);
 
   const loadData = async (forceRefresh = false) => {
     setLoading(true);
