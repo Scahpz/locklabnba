@@ -573,72 +573,6 @@ export default function Props() {
         </button>
       </div>
 
-      {/* Player search — multi-select */}
-      <div className="space-y-2" ref={searchRef}>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-          <input
-            type="text"
-            placeholder={selectedPlayers.length > 0 ? 'Add another player…' : 'Search player…'}
-            value={playerSearch}
-            onChange={e => { setPlayerSearch(e.target.value); setShowPlayerDrop(true); }}
-            onFocus={() => setShowPlayerDrop(true)}
-            className="w-full sm:w-72 pl-9 pr-8 py-2 text-sm bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-          {playerSearch && (
-            <button
-              onClick={() => { setPlayerSearch(''); setShowPlayerDrop(false); }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-          {showPlayerDrop && playerSuggestions.length > 0 && (
-            <div className="absolute top-full mt-1 w-full sm:w-72 bg-popover border border-border rounded-lg shadow-xl z-50 overflow-hidden">
-              {playerSuggestions.filter(name => !selectedPlayers.includes(name)).map(name => {
-                const p = enrichedProps.find(ep => ep.player_name === name);
-                const propCount = enrichedProps.filter(ep => ep.player_name === name).length;
-                return (
-                  <button
-                    key={name}
-                    onClick={() => { setSelectedPlayers(prev => [...prev, name]); setPlayerSearch(''); setShowPlayerDrop(false); }}
-                    className="w-full flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-secondary transition-colors text-left"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{name}</p>
-                      <p className="text-[10px] text-muted-foreground">{p?.team} · {p?.position}</p>
-                    </div>
-                    <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">{propCount} prop{propCount !== 1 ? 's' : ''}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        {/* Selected player chips */}
-        {selectedPlayers.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {selectedPlayers.map(name => (
-              <button
-                key={name}
-                onClick={() => setSelectedPlayers(prev => prev.filter(n => n !== name))}
-                className="flex items-center gap-1 text-xs bg-primary/15 border border-primary/30 text-primary px-2.5 py-1 rounded-full hover:bg-primary/25 transition-colors"
-              >
-                {name} <X className="w-3 h-3" />
-              </button>
-            ))}
-            {selectedPlayers.length > 1 && (
-              <button
-                onClick={() => setSelectedPlayers([])}
-                className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 transition-colors"
-              >
-                Clear all
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
       {/* Game filter — split by Today / Tomorrow */}
       {sortedGames.length > 0 && (
         <div className="space-y-2">
@@ -752,7 +686,8 @@ export default function Props() {
           )}
 
           {/* Filters */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2" ref={searchRef}>
+            {/* Row 1: prop type pills */}
             <div className="flex gap-1.5 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap pb-1 scrollbar-none">
               <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 self-center" />
               {PROP_TYPES.map(t => (
@@ -770,7 +705,52 @@ export default function Props() {
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-2">
+
+            {/* Row 2: player search + sort */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Player search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder={selectedPlayers.length > 0 ? 'Add player…' : 'Search player…'}
+                  value={playerSearch}
+                  onChange={e => { setPlayerSearch(e.target.value); setShowPlayerDrop(true); }}
+                  onFocus={() => setShowPlayerDrop(true)}
+                  className="w-44 pl-8 pr-7 py-1.5 text-xs bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                {playerSearch && (
+                  <button
+                    onClick={() => { setPlayerSearch(''); setShowPlayerDrop(false); }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+                {showPlayerDrop && playerSuggestions.length > 0 && (
+                  <div className="absolute top-full mt-1 w-64 bg-popover border border-border rounded-lg shadow-xl z-50 overflow-hidden">
+                    {playerSuggestions.filter(name => !selectedPlayers.includes(name)).map(name => {
+                      const p = enrichedProps.find(ep => ep.player_name === name);
+                      const propCount = enrichedProps.filter(ep => ep.player_name === name).length;
+                      return (
+                        <button
+                          key={name}
+                          onClick={() => { setSelectedPlayers(prev => [...prev, name]); setPlayerSearch(''); setShowPlayerDrop(false); }}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-secondary transition-colors text-left"
+                        >
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{name}</p>
+                            <p className="text-[10px] text-muted-foreground">{p?.team} · {p?.position}</p>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">{propCount}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Sort */}
               <span className="text-xs text-muted-foreground">Sort:</span>
               <select
                 value={sortBy}
@@ -779,6 +759,25 @@ export default function Props() {
               >
                 {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
+
+              {/* Selected player chips */}
+              {selectedPlayers.map(name => (
+                <button
+                  key={name}
+                  onClick={() => setSelectedPlayers(prev => prev.filter(n => n !== name))}
+                  className="flex items-center gap-1 text-xs bg-primary/15 border border-primary/30 text-primary px-2.5 py-1 rounded-full hover:bg-primary/25 transition-colors whitespace-nowrap"
+                >
+                  {name} <X className="w-3 h-3" />
+                </button>
+              ))}
+              {selectedPlayers.length > 1 && (
+                <button
+                  onClick={() => setSelectedPlayers([])}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Clear all
+                </button>
+              )}
             </div>
           </div>
 
