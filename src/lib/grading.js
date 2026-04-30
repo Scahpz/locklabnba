@@ -75,8 +75,9 @@ function gradeWithContext(prop) {
   const injCount     = prop.injury_count ?? 0;  // number of injured teammates
   const oppInjNote   = prop.opp_injury_context; // e.g. "Anthony Edwards (Out)"
   const oppInjCount  = prop.opp_injury_count ?? 0;
-  const ownInjStatus = (prop.injury_status || '').toLowerCase(); // player's own status from odds API
-  const isReturning  = ownInjStatus && !['', 'active', 'out'].includes(ownInjStatus); // questionable/probable/gtd/dtd
+  const ownInjStatus = (prop.injury_status || '').toLowerCase();
+  // Only trigger for explicitly limited-availability statuses — not healthy/active/null
+  const isReturning = ['questionable', 'probable', 'game time decision', 'gtd', 'dtd', 'day-to-day', 'day to day'].some(s => ownInjStatus.includes(s));
   const edge         = prop.edge;
 
   const criteria = [];
