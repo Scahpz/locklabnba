@@ -4,6 +4,25 @@ import { Bell, AlertTriangle, TrendingUp, Zap, Newspaper, Check, Wifi, WifiOff, 
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
+const ALERTS_READ_KEY = 'locklab_alerts_read_v1';
+const MAX_STORED_IDS = 100;
+
+function getPersistedReadIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(ALERTS_READ_KEY) || '[]')); } catch { return new Set(); }
+}
+function persistReadId(alertKey) {
+  try {
+    const arr = JSON.parse(localStorage.getItem(ALERTS_READ_KEY) || '[]');
+    if (!arr.includes(alertKey)) {
+      const next = [...arr, alertKey].slice(-MAX_STORED_IDS);
+      localStorage.setItem(ALERTS_READ_KEY, JSON.stringify(next));
+    }
+  } catch {}
+}
+function persistAllReadIds(keys) {
+  try { localStorage.setItem(ALERTS_READ_KEY, JSON.stringify(keys.slice(-MAX_STORED_IDS))); } catch {}
+}
+
 const typeConfig = {
   injury: { icon: AlertTriangle, color: 'text-destructive', bg: 'bg-destructive/10' },
   line_movement: { icon: TrendingUp, color: 'text-chart-3', bg: 'bg-chart-3/10' },
@@ -94,13 +113,17 @@ function buildLiveAlerts(props) {
     }
   });
 
-  // Deduplicate by player+type combination, prioritize higher severity
+  // Deduplicate by player+type, add stable persistent key
   const seen = new Set();
+  const readIds = getPersistedReadIds();
   return alerts.filter(a => {
     const key = `${a.player_name}-${a.type}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
+  }).map(a => {
+    const persistKey = `${a.player_name}-${a.type}`;
+    return { ...a, persistKey, is_read: readIds.has(persistKey) };
   }).slice(0, 25);
 }
 
@@ -128,7 +151,17 @@ export default function Alerts() {
     load();
   }, []);
 
-  const markRead = (id) => setAlerts(alerts.map(a => a.id === id ? { ...a, is_read: true } : a));
+  const markRead = (id) => {
+    const alert = alerts.find(a => a.id === id);
+    if (alert?.persistKey) persistReadId(alert.persistKey);
+    setAlerts(prev => prev.map(a => a.id === id ? { ...a, is_read: true } : a));
+  };
+  const markAllRead = () => {
+    const keys = alerts.filter(a => !a.is_read).map(a => a.persistKey);
+    const existing = JSON.parse(localStorage.getItem(ALERTS_READ_KEY) || '[]');
+    persistAllReadIds([...existing, ...keys]);
+    setAlerts(prev => prev.map(a => ({ ...a, is_read: true })));
+  };
   const unreadCount = alerts.filter(a => !a.is_read).length;
 
   if (loading) {
@@ -157,7 +190,7 @@ export default function Alerts() {
         </div>
         {unreadCount > 0 && (
           <button
-            onClick={() => setAlerts(alerts.map(a => ({ ...a, is_read: true })))}
+            onClick={markAllRead}
             className="text-xs text-primary hover:text-primary/80 font-medium transition-colors"
           >
             Mark all read

@@ -1,41 +1,48 @@
-const CACHE_KEY = 'locklab_live_props_v33';
-const CACHE_DATE_KEY = 'locklab_live_props_date_v33';
+const CACHE_KEY = 'locklab_live_props_v34';
+const CACHE_TS_KEY = 'locklab_live_props_ts_v34';
+const FRESH_TTL_MS = 25 * 60 * 1000; // 25 min = "fresh", stale data still shown instantly
 
 (function purgeOldCaches() {
-  for (let i = 1; i <= 32; i++) {
+  for (let i = 1; i <= 33; i++) {
     localStorage.removeItem(`locklab_live_props_v${i}`);
     localStorage.removeItem(`locklab_live_props_date_v${i}`);
+    localStorage.removeItem(`locklab_live_props_ts_v${i}`);
   }
 })();
 
 import { NBA_API } from './config';
 
-function todayStr() {
-  return new Date().toISOString().split('T')[0];
+export function isCacheValid() {
+  const ts = Number(localStorage.getItem(CACHE_TS_KEY) || 0);
+  return Date.now() - ts < FRESH_TTL_MS && !!localStorage.getItem(CACHE_KEY);
 }
 
-export function isCacheValid() {
-  return localStorage.getItem(CACHE_DATE_KEY) === todayStr() && !!localStorage.getItem(CACHE_KEY);
+/** Returns any cached data (even stale) — null if nothing cached yet */
+export function getCachedProps() {
+  try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch { return null; }
 }
 
 export function clearLiveCache() {
   localStorage.removeItem(CACHE_KEY);
-  localStorage.removeItem(CACHE_DATE_KEY);
+  localStorage.removeItem(CACHE_TS_KEY);
 }
 
 export function getStoredApiKey() { return null; }
 export function setStoredApiKey() {}
 
+function fetchWithTimeout(url, opts, ms) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(timer));
+}
+
 /**
  * Enrich a raw prop from the backend with display-ready fields.
- * No per-player API calls — analytics come from backend or are defaults.
  */
 function enrichProp(prop, index) {
   const team = prop.player_team || prop.home || '';
-  // Determine opponent: if player_team is known and differs from home, opponent is home; else away
   const opponent = (prop.player_team && prop.player_team !== prop.home) ? prop.home : prop.away;
 
-  // Only use analytics values if they are real (not null) — never fake them with line value
   const hasRealAnalytics = prop.avg_last_10 != null && prop.hit_rate_last_10 != null;
   const avg_last_10 = prop.avg_last_10 ?? null;
   const avg_last_5  = prop.avg_last_5  ?? null;
@@ -43,7 +50,6 @@ function enrichProp(prop, index) {
   const projection  = prop.projection ?? null;
   const edge        = hasRealAnalytics ? (prop.edge ?? 0) : null;
   const confidence_score = hasRealAnalytics ? (prop.confidence_score ?? 5) : 5;
-
   const isHome = team === prop.home;
 
   return {
@@ -68,9 +74,9 @@ function enrichProp(prop, index) {
     game_logs_last_10: prop.game_logs_last_10 ?? null,
     minutes_avg: null,
     minutes_last_5: null,
-    usage_rate: null,          // null = unknown, not hardcoded 25
+    usage_rate: null,
     def_rank_vs_pos: null,
-    matchup_rating: null,      // null = unknown, not hardcoded 'neutral'
+    matchup_rating: null,
     pace_rating: null,
     game_total: null,
     has_analytics: hasRealAnalytics,
@@ -84,58 +90,66 @@ function enrichProp(prop, index) {
   };
 }
 
+// ── Line movement tracking ────────────────────────────────────────────────────
+const LINE_PREV_KEY = 'locklab_prev_lines_v1';
+
+export function getPrevLines() {
+  try { return JSON.parse(sessionStorage.getItem(LINE_PREV_KEY) || '{}'); } catch { return {}; }
+}
+
+export function savePrevLines(props) {
+  const map = {};
+  props.forEach(p => {
+    const k = `${p.player_name}__${p.prop_type}`;
+    if (p.line != null) map[k] = p.line;
+  });
+  try { sessionStorage.setItem(LINE_PREV_KEY, JSON.stringify(map)); } catch {}
+}
+
 export async function fetchLiveProps() {
   if (isCacheValid()) {
-    try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch {}
+    return getCachedProps();
   }
 
-  const settings = await fetch(`${NBA_API}/api/settings`).then(r => r.json()).catch(() => ({}));
+  const defaultBookmakers = 'draftkings,fanduel,betmgm,caesars,pointsbetus';
+
+  // Step 1: fetch settings + underdog in parallel (fastest path — settings is tiny, underdog usually works)
+  const [settingsResult, underdogResult] = await Promise.allSettled([
+    fetchWithTimeout(`${NBA_API}/api/settings`, {}, 5000).then(r => r.json()).catch(() => ({})),
+    fetchWithTimeout(`${NBA_API}/api/underdog/props`, {}, 12000).then(r => r.ok ? r.json() : null).catch(() => null),
+  ]);
+
+  const settings = settingsResult.status === 'fulfilled' ? settingsResult.value : {};
   const hasOddsKey = !!settings?.odds_api_key;
-  const bookmakers = settings?.bookmakers || 'draftkings,fanduel,betmgm,caesars,pointsbetus';
+  const bookmakers = settings?.bookmakers || defaultBookmakers;
 
-  let oddsData;
+  let oddsData = null;
 
-  // Priority 1: Real sportsbook lines via The Odds API (requires key)
+  // Paid odds API (if key configured) — checked first for best data quality
   if (hasOddsKey) {
-    try {
-      const res = await fetch(`${NBA_API}/api/odds/props?bookmakers=${encodeURIComponent(bookmakers)}`);
-      if (res.ok) {
-        oddsData = await res.json();
-      }
-    } catch {}
+    oddsData = await fetchWithTimeout(
+      `${NBA_API}/api/odds/props?bookmakers=${encodeURIComponent(bookmakers)}`, {}, 10000
+    ).then(r => r.ok ? r.json() : null).catch(() => null);
   }
 
-  // Priority 2: Underdog Fantasy — free, no key, works from cloud servers
-  if (!oddsData || !oddsData.rawProps?.length) {
-    try {
-      const res = await fetch(`${NBA_API}/api/underdog/props`);
-      if (res.ok) {
-        const ud = await res.json();
-        if (ud.rawProps?.length) oddsData = ud;
-      }
-    } catch {}
+  // Underdog (fetched in parallel above — use it if still no data)
+  if (!oddsData?.rawProps?.length) {
+    const ud = underdogResult.status === 'fulfilled' ? underdogResult.value : null;
+    if (ud?.rawProps?.length) oddsData = ud;
   }
 
-  // Priority 3: PrizePicks — free, no key (may be blocked from some servers)
-  if (!oddsData || !oddsData.rawProps?.length) {
-    try {
-      const res = await fetch(`${NBA_API}/api/prizepicks/props`);
-      if (res.ok) {
-        const pp = await res.json();
-        if (pp.rawProps?.length) oddsData = pp;
-      }
-    } catch {}
+  // Slower fallbacks — only reached if both paid odds and underdog failed
+  if (!oddsData?.rawProps?.length) {
+    oddsData = await fetchWithTimeout(`${NBA_API}/api/prizepicks/props`, {}, 12000)
+      .then(r => r.ok ? r.json() : null).catch(() => null);
   }
 
-  // Priority 4: Season-average projections from NBA.com (always available)
-  if (!oddsData || !oddsData.rawProps?.length) {
-    try {
-      const res = await fetch(`${NBA_API}/api/live-props`);
-      if (res.ok) oddsData = await res.json();
-    } catch {}
+  if (!oddsData?.rawProps?.length) {
+    oddsData = await fetchWithTimeout(`${NBA_API}/api/live-props`, {}, 12000)
+      .then(r => r.ok ? r.json() : null).catch(() => null);
   }
 
-  if (!oddsData || !oddsData.rawProps?.length) {
+  if (!oddsData?.rawProps?.length) {
     return { game_date: new Date().toLocaleDateString(), games_summary: [], props: [] };
   }
 
@@ -148,6 +162,6 @@ export async function fetchLiveProps() {
   };
 
   localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
-  localStorage.setItem(CACHE_DATE_KEY, todayStr());
+  localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
   return payload;
 }

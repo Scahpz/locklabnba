@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { fetchLiveProps } from '@/lib/liveData';
+import { fetchLiveProps, getCachedProps, isCacheValid } from '@/lib/liveData';
 import { getAIVerdicts } from '@/lib/aiVerdicts';
 import LockCards from '@/components/props/LockCards';
 import RankedPropCard from '@/components/props/RankedPropCard';
@@ -81,7 +81,8 @@ export default function Props() {
   const [rawProps, setRawProps] = useState([]);
   const [gameDate, setGameDate] = useState(null);
   const [gamesSummary, setGamesSummary] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !getCachedProps()); // skip spinner if stale cache exists
+  const [refreshing, setRefreshing] = useState(false); // subtle background refresh indicator
   const [isLive, setIsLive] = useState(false);
   // Restore filter state from sessionStorage so navigating away and back preserves selections
   const savedFilters = (() => { try { return JSON.parse(sessionStorage.getItem('props_filters') || '{}'); } catch { return {}; } })();
@@ -106,34 +107,52 @@ export default function Props() {
     sessionStorage.setItem('props_filters', JSON.stringify({ selectedGames, selectedType, sortBy, selectedPlayers }));
   }, [selectedGames, selectedType, sortBy, selectedPlayers]);
 
+  const applyData = (data, skipAI = false) => {
+    if (!data?.props?.length) return false;
+    const realProps = data.props.filter(p => p.injury_status !== 'out');
+    setRawProps(realProps);
+    setGameDate(data.game_date);
+    setGamesSummary(data.games_summary || []);
+    setIsLive(true);
+    if (!skipAI) {
+      setAiLoading(true);
+      getAIVerdicts(realProps.slice(0, 50)).then(v => {
+        setVerdicts(v);
+        setAiLoading(false);
+      }).catch(() => setAiLoading(false));
+    }
+    return true;
+  };
+
   const loadData = async (forceRefresh = false) => {
-    setLoading(true);
     if (forceRefresh) {
       setPlayerAnalytics({});
       setTeamContext({ teams: TEAM_STATS, injuries: {}, back_to_back: [], game_spreads: {} });
       fetchedPlayers.current = new Set();
     }
+
+    // Show stale cache instantly — no spinner
+    const stale = getCachedProps();
+    const cacheIsFresh = isCacheValid();
+    if (stale && !forceRefresh) {
+      applyData(stale, /* skipAI= */ !cacheIsFresh); // AI already ran if fresh
+      setLoading(false);
+      if (cacheIsFresh) return; // nothing more to do
+      // Stale cache shown — fetch fresh silently in background
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
     try {
       const data = await fetchLiveProps();
-      if (data?.props?.length > 0) {
-        const realProps = data.props.filter(p => p.injury_status !== 'out');
-        setRawProps(realProps);
-        setGameDate(data.game_date);
-        setGamesSummary(data.games_summary || []);
-        setIsLive(true);
-
-        setAiLoading(true);
-        getAIVerdicts(realProps.slice(0, 50)).then(v => {
-          setVerdicts(v);
-          setAiLoading(false);
-        }).catch(() => setAiLoading(false));
-      } else {
-        setRawProps([]);
-      }
+      applyData(data);
     } catch {
-      setRawProps([]);
+      if (!stale) setRawProps([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-    setLoading(false);
   };
 
   // Fetch live team context (injuries, back-to-back, spreads) — merges on top of hardcoded stats
@@ -568,14 +587,15 @@ export default function Props() {
             ) : (
               <><WifiOff className="w-3.5 h-3.5" />No live data available</>
             )}
-            {aiLoading && <span className="text-muted-foreground flex items-center gap-1"><RefreshCw className="w-3 h-3 animate-spin" />AI analyzing…</span>}
+            {(aiLoading || refreshing) && <span className="text-muted-foreground flex items-center gap-1"><RefreshCw className="w-3 h-3 animate-spin" />{refreshing ? 'Updating…' : 'AI analyzing…'}</span>}
           </p>
         </div>
         <button
           onClick={() => loadData(true)}
-          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-border text-foreground bg-secondary hover:bg-secondary/80 transition-all"
+          disabled={refreshing}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-border text-foreground bg-secondary hover:bg-secondary/80 transition-all disabled:opacity-50"
         >
-          <RefreshCw className="w-3.5 h-3.5" />
+          <RefreshCw className={cn("w-3.5 h-3.5", refreshing && "animate-spin")} />
           Refresh
         </button>
       </div>
