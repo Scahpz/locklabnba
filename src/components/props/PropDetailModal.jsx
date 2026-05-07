@@ -18,6 +18,45 @@ function fmtOdds(n) {
   return n > 0 ? `+${n}` : `${n}`;
 }
 
+/** Convert American odds → implied probability (includes vig) */
+function oddsToProb(odds) {
+  if (odds == null) return null;
+  return odds < 0 ? (-odds) / (-odds + 100) : 100 / (odds + 100);
+}
+
+/** Convert implied probability → American odds, rounded to nearest 5 */
+function probToOdds(prob) {
+  prob = Math.max(0.01, Math.min(0.99, prob));
+  const raw = prob >= 0.5 ? -(prob / (1 - prob)) * 100 : ((1 - prob) / prob) * 100;
+  return Math.round(raw / 5) * 5;
+}
+
+/**
+ * Estimate fair book odds at a new line given:
+ *  - fairOverProb: the hit-rate-derived probability at the new line (0–1)
+ *  - originalOverOdds / originalUnderOdds: the book's original odds (used to extract vig)
+ * Returns { over, under } as American integers, or null if original odds unavailable.
+ */
+function estimateAdjustedOdds(fairOverProb, originalOverOdds, originalUnderOdds) {
+  if (fairOverProb == null) return { over: null, under: null };
+
+  // Extract vig from original odds so we re-apply the same juice
+  const origOverProb  = oddsToProb(originalOverOdds);
+  const origUnderProb = oddsToProb(originalUnderOdds);
+  const totalVig = (origOverProb != null && origUnderProb != null)
+    ? Math.max(0, origOverProb + origUnderProb - 1)
+    : 0.05; // default ~5% vig if original odds unknown
+
+  const vigPerSide = totalVig / 2;
+  const adjOverProb  = fairOverProb + vigPerSide;
+  const adjUnderProb = (1 - fairOverProb) + vigPerSide;
+
+  return {
+    over:  probToOdds(adjOverProb),
+    under: probToOdds(adjUnderProb),
+  };
+}
+
 function StatBox({ label, value, sub, good, neutral }) {
   return (
     <div className="bg-secondary/60 rounded-xl p-3 text-center">
@@ -97,6 +136,13 @@ export default function PropDetailModal({ prop, onClose }) {
   const dynamicHitRate = gameLogs.length > 0
     ? Math.round(hitCount / gameLogs.length * 100)
     : estimateHitRate(prop.avg_last_10, adjustedLine);
+
+  // Adjusted odds at the new line — uses dynamic hit rate as the fair over probability
+  const adjustedOdds = useMemo(() => {
+    if (!lineChanged) return { over: prop.over_odds, under: prop.under_odds };
+    const fairOverProb = dynamicHitRate != null ? dynamicHitRate / 100 : null;
+    return estimateAdjustedOdds(fairOverProb, prop.over_odds, prop.under_odds);
+  }, [lineChanged, dynamicHitRate, prop.over_odds, prop.under_odds]);
 
   // Chart data — game_logs_last_10 is already chronological (oldest first)
   const chartGameLogs = useMemo(() =>
@@ -375,8 +421,9 @@ export default function PropDetailModal({ prop, onClose }) {
                   OVER {adjustedLine}
                 </span>
                 <span className={cn('text-xl font-bold mt-0.5', isOverFavorable ? 'text-primary' : 'text-foreground')}>
-                  {fmtOdds(prop.over_odds)}
+                  {fmtOdds(adjustedOdds.over)}
                 </span>
+                {lineChanged && <span className="text-[9px] text-muted-foreground/60 mt-0.5">est. odds</span>}
               </button>
               <button
                 onClick={() => handlePick('under')}
@@ -393,10 +440,16 @@ export default function PropDetailModal({ prop, onClose }) {
                   UNDER {adjustedLine}
                 </span>
                 <span className={cn('text-xl font-bold mt-0.5', !isOverFavorable ? 'text-destructive' : 'text-foreground')}>
-                  {fmtOdds(prop.under_odds)}
+                  {fmtOdds(adjustedOdds.under)}
                 </span>
+                {lineChanged && <span className="text-[9px] text-muted-foreground/60 mt-0.5">est. odds</span>}
               </button>
             </div>
+            {lineChanged && (
+              <p className="text-[10px] text-muted-foreground/50 text-center -mt-3 pb-1">
+                Estimated odds at adjusted line · Original: {fmtOdds(prop.over_odds)} / {fmtOdds(prop.under_odds)}
+              </p>
+            )}
           </div>
         </div>
       </div>
