@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { fetchLiveProps, getCachedProps, isCacheValid } from '@/lib/liveData';
+import { fetchLiveProps, getCachedProps, isCacheValid, clearLiveCache } from '@/lib/liveData';
 import { getAIVerdicts } from '@/lib/aiVerdicts';
 import LockCards from '@/components/props/LockCards';
 import RankedPropCard from '@/components/props/RankedPropCard';
@@ -126,6 +126,7 @@ export default function Props() {
 
   const loadData = async (forceRefresh = false) => {
     if (forceRefresh) {
+      clearLiveCache(); // bust cache so fetchLiveProps goes to network
       setPlayerAnalytics({});
       setTeamContext({ teams: TEAM_STATS, injuries: {}, back_to_back: [], game_spreads: {} });
       fetchedPlayers.current = new Set();
@@ -133,13 +134,12 @@ export default function Props() {
 
     // Show stale cache instantly — no spinner
     const stale = getCachedProps();
-    const cacheIsFresh = isCacheValid();
+    const cacheIsFresh = !forceRefresh && isCacheValid();
     if (stale && !forceRefresh) {
-      applyData(stale, /* skipAI= */ !cacheIsFresh); // AI already ran if fresh
+      applyData(stale, /* skipAI= */ !cacheIsFresh);
       setLoading(false);
-      if (cacheIsFresh) return; // nothing more to do
-      // Stale cache shown — fetch fresh silently in background
-      setRefreshing(true);
+      if (cacheIsFresh) return; // fresh — nothing more to do
+      setRefreshing(true); // stale — fetch fresh in background
     } else {
       setLoading(true);
     }

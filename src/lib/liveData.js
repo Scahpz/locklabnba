@@ -1,6 +1,6 @@
 const CACHE_KEY = 'locklab_live_props_v34';
 const CACHE_TS_KEY = 'locklab_live_props_ts_v34';
-const FRESH_TTL_MS = 25 * 60 * 1000; // 25 min = "fresh", stale data still shown instantly
+const FRESH_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours — stays valid across typical use gaps
 
 (function purgeOldCaches() {
   for (let i = 1; i <= 33; i++) {
@@ -17,7 +17,6 @@ export function isCacheValid() {
   return Date.now() - ts < FRESH_TTL_MS && !!localStorage.getItem(CACHE_KEY);
 }
 
-/** Returns any cached data (even stale) — null if nothing cached yet */
 export function getCachedProps() {
   try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch { return null; }
 }
@@ -36,9 +35,6 @@ function fetchWithTimeout(url, opts, ms) {
   return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(timer));
 }
 
-/**
- * Enrich a raw prop from the backend with display-ready fields.
- */
 function enrichProp(prop, index) {
   const team = prop.player_team || prop.home || '';
   const opponent = (prop.player_team && prop.player_team !== prop.home) ? prop.home : prop.away;
@@ -54,31 +50,19 @@ function enrichProp(prop, index) {
 
   return {
     ...prop,
-    team,
-    opponent,
-    is_home: isHome,
+    team, opponent, is_home: isHome,
     player_id: `live_${index}`,
     photo_url: null,
     position: prop.position || 'G',
     is_starter: true,
     injury_status: 'healthy',
-    confidence_score,
-    edge,
-    avg_last_10,
-    avg_last_5,
-    hit_rate_last_10: hit_rate,
-    projection,
+    confidence_score, edge, avg_last_10, avg_last_5, hit_rate_last_10: hit_rate, projection,
     streak_info: prop.streak_info ?? null,
     last_10_games: prop.last_10_games ?? null,
     last_5_games:  prop.last_5_games  ?? null,
     game_logs_last_10: prop.game_logs_last_10 ?? null,
-    minutes_avg: null,
-    minutes_last_5: null,
-    usage_rate: null,
-    def_rank_vs_pos: null,
-    matchup_rating: null,
-    pace_rating: null,
-    game_total: null,
+    minutes_avg: null, minutes_last_5: null, usage_rate: null,
+    def_rank_vs_pos: null, matchup_rating: null, pace_rating: null, game_total: null,
     has_analytics: hasRealAnalytics,
     is_top_pick: hasRealAnalytics && confidence_score >= 8,
     is_lock: hasRealAnalytics && confidence_score === 10,
@@ -106,14 +90,14 @@ export function savePrevLines(props) {
   try { sessionStorage.setItem(LINE_PREV_KEY, JSON.stringify(map)); } catch {}
 }
 
-export async function fetchLiveProps() {
-  if (isCacheValid()) {
-    return getCachedProps();
-  }
+// ── In-flight promise deduplication ──────────────────────────────────────────
+// Shared across all callers so a prefetch and Props.jsx share one network request.
+let _fetchPromise = null;
 
+async function _doFetch() {
   const defaultBookmakers = 'draftkings,fanduel,betmgm,caesars,pointsbetus';
 
-  // Step 1: fetch settings + underdog in parallel (fastest path — settings is tiny, underdog usually works)
+  // Settings + underdog in parallel — underdog is the fastest reliable source
   const [settingsResult, underdogResult] = await Promise.allSettled([
     fetchWithTimeout(`${NBA_API}/api/settings`, {}, 5000).then(r => r.json()).catch(() => ({})),
     fetchWithTimeout(`${NBA_API}/api/underdog/props`, {}, 12000).then(r => r.ok ? r.json() : null).catch(() => null),
@@ -125,20 +109,17 @@ export async function fetchLiveProps() {
 
   let oddsData = null;
 
-  // Paid odds API (if key configured) — checked first for best data quality
   if (hasOddsKey) {
     oddsData = await fetchWithTimeout(
       `${NBA_API}/api/odds/props?bookmakers=${encodeURIComponent(bookmakers)}`, {}, 10000
     ).then(r => r.ok ? r.json() : null).catch(() => null);
   }
 
-  // Underdog (fetched in parallel above — use it if still no data)
   if (!oddsData?.rawProps?.length) {
     const ud = underdogResult.status === 'fulfilled' ? underdogResult.value : null;
     if (ud?.rawProps?.length) oddsData = ud;
   }
 
-  // Slower fallbacks — only reached if both paid odds and underdog failed
   if (!oddsData?.rawProps?.length) {
     oddsData = await fetchWithTimeout(`${NBA_API}/api/prizepicks/props`, {}, 12000)
       .then(r => r.ok ? r.json() : null).catch(() => null);
@@ -154,7 +135,6 @@ export async function fetchLiveProps() {
   }
 
   const props = oddsData.rawProps.map((prop, i) => enrichProp(prop, i));
-
   const payload = {
     game_date: oddsData.game_date || new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
     games_summary: oddsData.games_summary || [],
@@ -164,4 +144,19 @@ export async function fetchLiveProps() {
   localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
   localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
   return payload;
+}
+
+export async function fetchLiveProps() {
+  if (isCacheValid()) return getCachedProps();
+  // Reuse an already-running fetch — avoids duplicate network requests
+  if (_fetchPromise) return _fetchPromise;
+  _fetchPromise = _doFetch().finally(() => { _fetchPromise = null; });
+  return _fetchPromise;
+}
+
+// ── Eager prefetch ────────────────────────────────────────────────────────────
+// Kick off the network request the moment this module is imported —
+// before any React component mounts — so Props.jsx "joins" an already-running fetch.
+if (!isCacheValid()) {
+  fetchLiveProps().catch(() => {});
 }
