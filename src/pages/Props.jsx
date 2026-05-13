@@ -559,6 +559,23 @@ export default function Props() {
       return 0;
     });
 
+    // Diversity cap: max 3 props per team so a single favorable matchup can't
+    // flood the top of the list. Only applies to AI Rank sort with no active filters.
+    const isUnfiltered = selectedGames.length === 0 && selectedPlayers.length === 0 && selectedType === 'all';
+    if (sortBy === 'ai_rank' && isUnfiltered) {
+      const teamCount = {};
+      const capped = [];
+      const overflow = [];
+      for (const p of result) {
+        const t = (p.team || '').toUpperCase();
+        teamCount[t] = (teamCount[t] || 0) + 1;
+        if (teamCount[t] <= 3) capped.push(p);
+        else overflow.push(p);
+      }
+      // Append overflow after all capped props so nothing is hidden — just reordered
+      return [...capped, ...overflow];
+    }
+
     return result;
   }, [enrichedProps, selectedGames, selectedType, sortBy, selectedPlayers]);
 

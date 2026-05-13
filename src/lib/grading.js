@@ -97,7 +97,7 @@ function gradeWithContext(prop) {
       : 'Fetching team pace data from NBA.com',
     pass:            pacePass === true,
     continuousScore: avgPace != null ? formScore(avgPace, AVG_PACE) : null,
-    weight:          7,
+    weight:          5,
     available:       avgPace != null,
     pending:         avgPace == null,
     category:        'matchup',
@@ -264,11 +264,12 @@ function gradeWithContext(prop) {
 
   // ── 4. INJURY / USAGE CONTEXT ────────────────────────────────────────────
   if (injNote) {
-    // Scale weight by number of injured teammates: 1 out → 15, 2 out → 20, 3+ out → 25
-    const injWeight = injCount >= 3 ? 25 : injCount === 2 ? 20 : 15;
+    // Capped at 12 regardless of count — prevents stacking with matchup bonuses
+    // and stops a single "teammates are out" signal from dominating the rank
+    const injWeight = Math.min(12, injCount >= 3 ? 12 : injCount === 2 ? 10 : 8);
     criteria.push({
       label: `Usage Boost: ${injNote}`,
-      detail: `${injCount > 1 ? `${injCount} key teammates are` : 'Key teammate is'} out → expect more shot attempts, more touches, higher usage rate — strong OVER signal`,
+      detail: `${injCount > 1 ? `${injCount} key teammates are` : 'Key teammate is'} out → expect more shot attempts, more touches, higher usage rate — OVER signal`,
       pass:            true,
       continuousScore: 1.0,
       weight:          injWeight,
@@ -355,8 +356,9 @@ function gradeWithContext(prop) {
 
   // ── 6. OPPONENT INJURIES ────────────────────────────────────────────────
   if (oppInjNote) {
-    // Scale weight by number of opponent players out: more absences = weaker defense
-    const oppInjWeight = oppInjCount >= 3 ? 14 : oppInjCount === 2 ? 10 : 7;
+    // Capped at 8 — opponent injuries are a shared team bonus; keeping it modest
+    // prevents every player on a team from inflating equally when a star is out
+    const oppInjWeight = Math.min(8, oppInjCount >= 3 ? 8 : oppInjCount === 2 ? 6 : 4);
     criteria.push({
       label: `Weakened Opponent: ${oppInjNote}`,
       detail: `${oppInjCount > 1 ? `${oppInjCount} key players are` : 'Key player is'} out for the opponent (${oppInjNote}) — reduced defensive depth and rotations, favors OVER`,
