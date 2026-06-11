@@ -13,23 +13,53 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [serverStarting, setServerStarting] = useState(false);
+  const [retryCountdown, setRetryCountdown] = useState(0);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const startRetryCountdown = (secs, emailVal, passwordVal, fullNameVal) => {
+    setRetryCountdown(secs);
+    const tick = setInterval(() => {
+      setRetryCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(tick);
+          doSubmit(emailVal, passwordVal, fullNameVal);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const doSubmit = async (emailVal, passwordVal, fullNameVal) => {
     setError('');
+    setServerStarting(false);
     setLoading(true);
     try {
       if (mode === 'login') {
-        await login(email.trim(), password);
+        await login(emailVal, passwordVal);
       } else {
-        if (!fullName.trim()) { setError('Please enter your name.'); setLoading(false); return; }
-        await register(email.trim(), password, fullName.trim());
+        await register(emailVal, passwordVal, fullNameVal);
       }
-    } catch (err) {
-      setError(err.message || 'Something went wrong. Please try again.');
-    } finally {
       setLoading(false);
+    } catch (err) {
+      setLoading(false);
+      const isServerIssue = err.message === 'SERVER_STARTING' ||
+        err.message === 'Failed to fetch' ||
+        err.name === 'AbortError' ||
+        err.name === 'TypeError';
+      if (isServerIssue) {
+        setServerStarting(true);
+        startRetryCountdown(20, emailVal, passwordVal, fullNameVal);
+      } else {
+        setError(err.message || 'Something went wrong. Please try again.');
+      }
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!fullName.trim() && mode === 'signup') { setError('Please enter your name.'); return; }
+    doSubmit(email.trim(), password, fullName.trim());
   };
 
   const inputClass = "w-full pl-10 pr-4 py-3 text-sm bg-white/5 border border-white/10 rounded-xl text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-all";
@@ -107,16 +137,26 @@ export default function Login() {
               </div>
             </div>
 
+            {serverStarting && (
+              <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-sm text-amber-400 flex items-start gap-2">
+                <Loader2 className="w-4 h-4 animate-spin mt-0.5 shrink-0" />
+                <span>
+                  Server is warming up — retrying automatically in{' '}
+                  <span className="font-bold">{retryCountdown}s</span>…
+                </span>
+              </div>
+            )}
+
             {error && (
               <div className="rounded-xl bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
                 {error}
               </div>
             )}
 
-            <button type="submit" disabled={loading}
+            <button type="submit" disabled={loading || serverStarting}
               className="w-full py-3 rounded-xl bg-primary hover:bg-primary/90 active:scale-[0.98] text-primary-foreground font-bold text-sm transition-all disabled:opacity-50 flex items-center justify-center gap-2 mt-2 shadow-[0_0_20px_hsl(142,71%,45%,0.2)]">
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {mode === 'login' ? 'Sign In' : 'Create Account'}
+              {serverStarting ? `Retrying in ${retryCountdown}s…` : mode === 'login' ? 'Sign In' : 'Create Account'}
             </button>
           </form>
         </div>
