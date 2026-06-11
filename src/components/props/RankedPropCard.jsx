@@ -8,6 +8,7 @@ import { useParlay } from '@/lib/ParlayContext';
 import VerdictBadge from '@/components/props/VerdictBadge';
 import PropGradeChecklist from '@/components/props/PropGradeChecklist';
 import { gradeProp } from '@/lib/grading';
+import { calcEVVerdict, TIER_CONFIG } from '@/lib/verdict';
 
 function fmtOdds(n) {
   if (n == null) return '—';
@@ -49,8 +50,9 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, onOpe
   }, [prop]);
 
   const grade = gradeProp(gradedProp);
+  const evVerdict = calcEVVerdict(gradedProp, grade);
   const tier = tierConfig[getTier(grade)];
-  const isOverFavorable = grade.lean === 'OVER';
+  const isOverFavorable = evVerdict.direction === 'OVER';
   const hasBooks = prop.all_books?.length > 1;
 
   const activeBook = selectedBook ? prop.all_books?.find(b => b.key === selectedBook) : null;
@@ -107,20 +109,22 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, onOpe
             {prop.is_lock && <Lock className="w-3.5 h-3.5 text-primary" />}
             {prop.trap_warning && <AlertTriangle className="w-3.5 h-3.5 text-destructive" />}
             {prop.best_value && <Award className="w-3.5 h-3.5 text-chart-4" />}
-            <span title={tier.title} className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-lg border cursor-help", tier.className)}>
-              {tier.label}
+            <span
+              title={`${evVerdict.label} · ${evVerdict.direction} · ${evVerdict.edgePP > 0 ? '+' : ''}${evVerdict.edgePP}% edge`}
+              className={cn(
+                "flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-lg border cursor-help",
+                TIER_CONFIG[evVerdict.tier]?.badge
+              )}
+            >
+              <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', TIER_CONFIG[evVerdict.tier]?.dot)} />
+              {evVerdict.label}
             </span>
           </div>
         </div>
 
         {/* Verdict */}
         <div className="mb-3">
-          <VerdictBadge
-            verdict={grade.verdict}
-            ai_confidence={grade.confidence}
-            dataQuality={grade.dataQuality}
-            loading={false}
-          />
+          <VerdictBadge evVerdict={evVerdict} loading={false} />
           {grade.dataQuality === 'full' && aiVerdict?.reason && (
             <p className="text-[11px] text-muted-foreground/70 mt-2 leading-snug">{aiVerdict.reason}</p>
           )}

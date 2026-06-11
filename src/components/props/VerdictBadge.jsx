@@ -1,8 +1,17 @@
 import React from 'react';
-import { TrendingUp, TrendingDown, BarChart2, Loader2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, AlertTriangle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { TIER_CONFIG } from '@/lib/verdict';
 
-export default function VerdictBadge({ verdict, ai_confidence, dataQuality, loading, isPickOfDay }) {
+/**
+ * New stoplight + EV badge.
+ *
+ * Props:
+ *   evVerdict  — result of calcEVVerdict(prop, grade)
+ *   loading    — bool, show spinner while grading
+ *   compact    — bool, hide edge % (for tight spaces)
+ */
+export default function VerdictBadge({ evVerdict, loading, compact = false }) {
   if (loading) {
     return (
       <div className="flex items-center gap-2 bg-white/5 rounded-xl px-3 py-2 w-fit">
@@ -12,46 +21,45 @@ export default function VerdictBadge({ verdict, ai_confidence, dataQuality, load
     );
   }
 
-  if (!verdict) return null;
+  if (!evVerdict) return null;
 
-  const isMarket = dataQuality === 'market';
-  const conf = isPickOfDay ? 100 : ai_confidence;
+  const { tier, label, direction, edgePP, hasRealOdds } = evVerdict;
+  const cfg = TIER_CONFIG[tier] || TIER_CONFIG.RED;
+  const isTrap = label === 'TRAP';
+  const Icon = isTrap
+    ? AlertTriangle
+    : direction === 'OVER'
+    ? TrendingUp
+    : TrendingDown;
 
-  const configs = {
-    OVER: {
-      icon: TrendingUp,
-      label: isMarket ? 'Market: OVER' : 'Take the OVER',
-      className: isMarket
-        ? 'bg-primary/8 border border-primary/15 text-primary/60'
-        : 'bg-primary/12 border border-primary/30 text-primary',
-      barColor: 'bg-primary',
-    },
-    UNDER: {
-      icon: TrendingDown,
-      label: isMarket ? 'Market: UNDER' : 'Take the UNDER',
-      className: isMarket
-        ? 'bg-destructive/8 border border-destructive/15 text-destructive/60'
-        : 'bg-destructive/12 border border-destructive/30 text-destructive',
-      barColor: 'bg-destructive',
-    },
-    UNSAFE: {
-      icon: BarChart2,
-      label: 'No Clear Edge',
-      className: 'bg-chart-4/10 border border-chart-4/25 text-chart-4',
-      barColor: 'bg-chart-4',
-    },
-  };
-
-  const cfg = configs[verdict] || configs.UNSAFE;
-  const Icon = cfg.icon;
+  const edgeSign   = edgePP > 0 ? '+' : '';
+  const edgeStr    = `${edgeSign}${edgePP}%`;
+  const dirLabel   = isTrap ? 'AVOID' : direction;
 
   return (
-    <div className={cn('flex items-center gap-2 rounded-xl px-3 py-2 w-fit', cfg.className)}>
-      <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-      <span className="text-xs font-bold tracking-wide">{cfg.label}</span>
-      {conf != null && (
-        <span className="text-[11px] font-semibold opacity-75 ml-0.5">
-          {conf}%{isMarket && <i className="font-normal not-italic opacity-70"> est.</i>}
+    <div className={cn(
+      'flex items-center gap-2 rounded-xl px-3 py-2 w-fit border',
+      cfg.badge,
+    )}>
+      {/* Stoplight dot */}
+      <span className={cn('w-2 h-2 rounded-full flex-shrink-0', cfg.dot)} />
+
+      {/* Action label */}
+      <span className="text-xs font-bold tracking-wide">{label}</span>
+
+      {/* Direction */}
+      <span className="flex items-center gap-0.5 text-xs font-semibold opacity-80">
+        <Icon className="w-3 h-3" />
+        {dirLabel}
+      </span>
+
+      {/* Edge */}
+      {!compact && !isTrap && (
+        <span className={cn(
+          'text-[11px] font-bold ml-0.5',
+          edgePP >= 8 ? 'opacity-100' : 'opacity-75'
+        )}>
+          {edgeStr}{!hasRealOdds && <span className="font-normal opacity-60"> est.</span>}
         </span>
       )}
     </div>

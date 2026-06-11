@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import logging
+import math
 import os
 import secrets
 import time
@@ -180,8 +181,29 @@ ODDS_MARKET_TO_PROP = {
 
 # ── TTL cache ─────────────────────────────────────────────────────────────────
 _cache: dict = {}
+_redis_client = None
+
+try:
+    import redis
+    REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+    # 2.0s socket timeout keeps it from hanging when Redis is absent
+    _redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True, socket_timeout=2.0)
+    _redis_client.ping()
+    logging.info("Redis cache connected successfully.")
+except Exception as e:
+    logging.warning(f"Redis connection failed, falling back to in-memory caching: {e}")
+    _redis_client = None
 
 def cache_get(key: str, ttl: int = 3600):
+    if _redis_client:
+        try:
+            val = _redis_client.get(key)
+            if val is not None:
+                return json.loads(val)
+        except Exception as e:
+            logging.warning(f"Redis cache_get error for key {key}: {e}")
+    
+    # Local fallback
     if key in _cache:
         data, ts = _cache[key]
         if datetime.now() - ts < timedelta(seconds=ttl):
@@ -189,6 +211,14 @@ def cache_get(key: str, ttl: int = 3600):
     return None
 
 def cache_set(key: str, data):
+    if _redis_client:
+        try:
+            # TTL in seconds
+            _redis_client.setex(key, 3600, json.dumps(data))
+            return
+        except Exception as e:
+            logging.warning(f"Redis cache_set error for key {key}: {e}")
+            
     _cache[key] = (data, datetime.now())
 
 
@@ -287,6 +317,21 @@ def parse_matchup(matchup: str):
         return False, matchup.split(" @ ")[1].strip()
     return False, matchup
 
+def poisson_over_prob(lambda_val: float, line: float) -> float:
+    """P(X > line) for Poisson(lambda_val). Uses floor(line) since count data is discrete."""
+    if lambda_val <= 0 or line < 0:
+        return 0.5
+    k = int(math.floor(line))
+    # CDF = P(X <= k) = sum_{i=0}^{k} e^{-λ} λ^i / i!
+    log_lambda = math.log(lambda_val)
+    log_term = -lambda_val  # log(e^{-λ} λ^0 / 0!) = -λ
+    cdf = math.exp(log_term)
+    for i in range(1, k + 1):
+        log_term += log_lambda - math.log(i)
+        cdf += math.exp(log_term)
+    return round(max(0.0, min(1.0, 1.0 - cdf)), 4)
+
+
 def calculate_analytics(logs: list, prop_type: str, line: float) -> dict:
     # logs comes from NBA API in reverse-chronological order (most recent first)
     values = [stat_value(g, prop_type) for g in logs]
@@ -327,6 +372,7 @@ def calculate_analytics(logs: list, prop_type: str, line: float) -> dict:
         "season_avg": season_avg,
         "season_games": season_games,
         "season_hit_rate": season_hit_rate,
+        "poisson_hit_prob": poisson_over_prob(projection, line),
         "streak_info": (f"{streak_count} game {direction} streak" if streak_count >= 2 else None),
         "last_10_games": list(reversed(values[:10])),
         "last_5_games":  list(reversed(values[:5])),
@@ -565,33 +611,107 @@ def _scoreboard_event_ids_recent(days: int = 40) -> list:
     return event_ids  # newest-first: days_ago=0 (today) appended first
 
 
+def fetch_game_logs_from_nba_api(player_name: str) -> list:
+    player = find_player(player_name)
+    if not player:
+        logging.warning(f"Player '{player_name}' not found in static player registry.")
+        return []
+    
+    player_id = player["id"]
+    season = current_season()
+    logging.info(f"Fetching game logs from stats.nba.com for {player_name} (ID: {player_id}, Season: {season})")
+    
+    # Try Regular Season logs
+    regular_logs = []
+    try:
+        data = nba_stats_get("playergamelog", {
+            "PlayerID": player_id,
+            "LeagueID": "00",
+            "Season": season,
+            "SeasonType": "Regular Season",
+            "DateFrom": "",
+            "DateTo": ""
+        })
+        regular_logs = parse_result_set(data, "PlayerGameLog")
+    except Exception as e:
+        logging.error(f"Failed to fetch Regular Season logs for {player_name}: {e}")
+        
+    # Try Playoff logs
+    playoff_logs = []
+    try:
+        data = nba_stats_get("playergamelog", {
+            "PlayerID": player_id,
+            "LeagueID": "00",
+            "Season": season,
+            "SeasonType": "Playoffs",
+            "DateFrom": "",
+            "DateTo": ""
+        })
+        playoff_logs = parse_result_set(data, "PlayerGameLog")
+    except Exception:
+        pass
+        
+    all_logs = regular_logs + playoff_logs
+    if not all_logs:
+        return []
+        
+    mapped_logs = []
+    for g in all_logs:
+        # Matchup can be "LAL vs. BOS" or "LAL @ BOS"
+        matchup = g.get("MATCHUP", "")
+        min_val = g.get("MIN", "0")
+        
+        mapped_logs.append({
+            "GAME_DATE": g.get("GAME_DATE"), # e.g. "FEB 15, 2025"
+            "MATCHUP": matchup,
+            "MIN": str(min_val),
+            "PTS": float(g.get("PTS") or 0),
+            "REB": float(g.get("REB") or 0),
+            "AST": float(g.get("AST") or 0),
+            "STL": float(g.get("STL") or 0),
+            "BLK": float(g.get("BLK") or 0),
+            "FG3M": float(g.get("FG3M") or 0),
+        })
+        
+    # Sort descending by game date
+    mapped_logs.sort(key=lambda x: _parse_game_date(x.get("GAME_DATE")), reverse=True)
+    return mapped_logs
+
+
 def fetch_game_logs(player_name: str) -> list:
     """
-    Fetch the last 15 played games for a player by scanning recent ESPN boxscores.
-
-    Approach: iterate the last 40 days of actual NBA games (newest first), load
-    each boxscore, look for the player by displayName.  No eventlog, no player-ID
-    lookup — those were both unreliable sources of old October data.
-
-    The 40-day window covers the regular-season tail AND the first two rounds of
-    playoffs, so it always returns current-season games regardless of season type.
+    Fetch the last 15 played games for a player.
+    Tries the official stats.nba.com API first. If it fails, falls back to scanning recent ESPN boxscores.
     """
     if not player_name:
         return []
 
-    cache_key = f"espn_gamelogs_v4_{player_name}_{datetime.now().strftime('%Y%m%d')}"
+    cache_key = f"gamelogs_v9_{player_name}_{datetime.now().strftime('%Y%m%d')}"
     cached = cache_get(cache_key, ttl=3600)
     if cached is not None:
         return cached
 
+    # Try stats.nba.com first
+    try:
+        logs = fetch_game_logs_from_nba_api(player_name)
+        if logs:
+            capped_logs = logs[:15]
+            cache_set(cache_key, capped_logs)
+            logging.info(f"fetch_game_logs '{player_name}': successfully retrieved {len(capped_logs)} games from stats.nba.com")
+            return capped_logs
+    except Exception as e:
+        logging.warning(f"Failed to fetch game logs from stats.nba.com for {player_name}: {e}. Falling back to ESPN scanner.")
+
+    # Fallback to ESPN boxscore crawler
+    logging.info(f"ESPN scoreboard fallback initiated for '{player_name}'")
     event_ids = _scoreboard_event_ids_recent(days=40)
     if not event_ids:
-        logging.warning(f"fetch_game_logs: scoreboard returned no events")
+        logging.warning(f"fetch_game_logs fallback: scoreboard returned no events")
         return []
 
     from concurrent.futures import ThreadPoolExecutor
 
-    logs: list = []
+    logs = []
     BATCH = 10  # fetch 10 boxscores in parallel at a time
     for i in range(0, len(event_ids), BATCH):
         batch = event_ids[i : i + BATCH]
@@ -605,11 +725,12 @@ def fetch_game_logs(player_name: str) -> list:
             break
 
     logs.sort(key=lambda g: g.get("GAME_DATE", ""), reverse=True)
-    logging.info(f"fetch_game_logs '{player_name}': {len(logs)} games | {[g.get('GAME_DATE') for g in logs[:5]]}")
+    logging.info(f"fetch_game_logs fallback '{player_name}': {len(logs)} games | {[g.get('GAME_DATE') for g in logs[:5]]}")
 
     if logs:
         cache_set(cache_key, logs)
     return logs
+
 
 @app.post("/api/player-stats")
 async def get_player_stats(req: StatsRequest):

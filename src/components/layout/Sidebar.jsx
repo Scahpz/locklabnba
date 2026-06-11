@@ -1,11 +1,12 @@
-import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { TrendingUp, Zap, Layers, Bell, User, GitCompare, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TrendingUp, Zap, Layers, Bell, User, GitCompare, Activity, ChevronLeft, ChevronRight, Sparkles, Search } from 'lucide-react';
 import logo from '@/assets/logo.png';
 
 const navItems = [
   { path: '/', label: 'Props', icon: Zap },
+  { path: '/ai-picks', label: 'AI Picks', icon: Sparkles },
   { path: '/trends', label: 'Streaks & Trends', icon: TrendingUp },
   { path: '/compare', label: 'Compare', icon: GitCompare },
   { path: '/odds', label: 'Live Odds', icon: Activity },
@@ -16,6 +17,16 @@ const navItems = [
 
 export default function Sidebar({ collapsed, setCollapsed }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const [search, setSearch] = useState('');
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    const q = search.trim();
+    if (!q) return;
+    navigate(`/trends?player=${encodeURIComponent(q)}`);
+    setSearch('');
+  };
 
   return (
     <aside className={cn(
@@ -36,6 +47,22 @@ export default function Sidebar({ collapsed, setCollapsed }) {
           </div>
         )}
       </div>
+
+      {/* Search */}
+      {!collapsed && (
+        <form onSubmit={handleSearch} className="px-3 py-2 border-b border-white/5">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search player…"
+              className="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 transition-all"
+            />
+          </div>
+        </form>
+      )}
 
       {/* Nav */}
       <nav className="flex-1 p-2.5 space-y-0.5 overflow-y-auto">

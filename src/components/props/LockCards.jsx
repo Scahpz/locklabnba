@@ -5,6 +5,7 @@ import TeamLogo from '@/components/common/TeamLogo';
 import { useParlay } from '@/lib/ParlayContext';
 import VerdictBadge from '@/components/props/VerdictBadge';
 import { gradeProp } from '@/lib/grading';
+import { calcEVVerdict } from '@/lib/verdict';
 
 function fmtOdds(n) {
   if (n == null) return '—';
@@ -24,6 +25,7 @@ function LockCard({ prop, aiVerdict, aiLoading }) {
     return { ...prop, hit_rate_last_10: dynamicHitRate, edge: dynamicEdge };
   })();
   const grade = gradeProp(gradedProp);
+  const evVerdict = calcEVVerdict(gradedProp, grade);
 
   return (
     <div className="relative rounded-2xl border border-primary/20 bg-[hsl(222,47%,9%)] overflow-hidden glow-green">
@@ -55,12 +57,7 @@ function LockCard({ prop, aiVerdict, aiLoading }) {
           </div>
         </div>
 
-        <VerdictBadge
-          verdict={grade.verdict}
-          ai_confidence={grade.confidence}
-          loading={aiLoading && !aiVerdict}
-          isPickOfDay={true}
-        />
+        <VerdictBadge evVerdict={evVerdict} loading={aiLoading && !aiVerdict} />
         {aiVerdict?.reason && (
           <p className="text-[11px] text-muted-foreground/70 mt-2 leading-snug">{aiVerdict.reason}</p>
         )}
@@ -69,11 +66,11 @@ function LockCard({ prop, aiVerdict, aiLoading }) {
         <div className="flex items-center justify-between bg-white/4 border border-white/6 rounded-xl p-3 mt-3">
           <div>
             <p className="text-[10px] text-muted-foreground/60 font-semibold uppercase tracking-wider">{prop.prop_type}</p>
-            <p className="text-2xl font-bold text-foreground mt-0.5 leading-none">{grade.lean === 'OVER' ? 'Over' : 'Under'} {prop.line}</p>
+            <p className="text-2xl font-bold text-foreground mt-0.5 leading-none">{evVerdict.direction === 'OVER' ? 'Over' : 'Under'} {prop.line}</p>
           </div>
           <div className="text-right">
-            <p className="text-sm font-bold text-primary">{grade.lean === 'OVER' ? fmtOdds(prop.over_odds) : fmtOdds(prop.under_odds)}</p>
-            <p className="text-[10px] text-muted-foreground/60 mt-0.5">{grade.lean === 'OVER' ? gradedProp.hit_rate_last_10 : 100 - (gradedProp.hit_rate_last_10 ?? 50)}% hit rate</p>
+            <p className="text-sm font-bold text-primary">{evVerdict.direction === 'OVER' ? fmtOdds(prop.over_odds) : fmtOdds(prop.under_odds)}</p>
+            <p className="text-[10px] text-muted-foreground/60 mt-0.5">{evVerdict.direction === 'OVER' ? gradedProp.hit_rate_last_10 : 100 - (gradedProp.hit_rate_last_10 ?? 50)}% hit rate</p>
           </div>
         </div>
 
@@ -101,11 +98,11 @@ function LockCard({ prop, aiVerdict, aiLoading }) {
         )}
 
         <button
-          onClick={() => addLeg(prop, grade.lean === 'OVER' ? 'over' : 'under')}
+          onClick={() => addLeg(prop, evVerdict.direction === 'OVER' ? 'over' : 'under')}
           className="w-full mt-3 py-2.5 rounded-xl bg-primary/10 hover:bg-primary/15 active:scale-[0.98] border border-primary/25 text-primary text-xs font-bold transition-all flex items-center justify-center gap-1.5"
         >
           <TrendingUp className="w-3.5 h-3.5" />
-          Add {grade.lean === 'OVER' ? 'Over' : 'Under'} to Parlay
+          Add {evVerdict.direction === 'OVER' ? 'Over' : 'Under'} to Parlay
         </button>
       </div>
     </div>

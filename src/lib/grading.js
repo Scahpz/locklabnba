@@ -223,17 +223,19 @@ function gradeWithContext(prop) {
     category:        'form',
   });
 
+  const poissonProb = prop.poisson_hit_prob ?? null;
+  const hitScore = poissonProb != null ? poissonProb : (hit != null ? hit / 100 : null);
   criteria.push({
     label: hit != null
-      ? `Hit Rate: ${hit}% (need ≥ 60%)`
+      ? `Hit Rate: ${hit}%${poissonProb != null ? ` · Poisson P(over): ${Math.round(poissonProb * 100)}%` : ''} (need ≥ 60%)`
       : pendingLabel('Hit Rate — loading…', 'Hit Rate — not available'),
     detail: hit != null
       ? hit >= 60
-        ? `Cleared this line ${hit}% of last 10 games — highly consistent`
-        : `Only ${hit}% hit rate over last 10 — inconsistent`
+        ? `Cleared this line ${hit}% of last 10 games — highly consistent${poissonProb != null ? `. Statistical model gives ${Math.round(poissonProb * 100)}% probability of going over` : ''}`
+        : `Only ${hit}% hit rate over last 10 — inconsistent${poissonProb != null ? `. Statistical model gives ${Math.round(poissonProb * 100)}% probability of going over` : ''}`
       : pendingDetail('Game log data loading in background', 'Player not found in NBA stats — using market odds only'),
     pass:            hit != null && hit >= 60,
-    continuousScore: hit != null ? hit / 100 : null,
+    continuousScore: hitScore,
     weight:          13,
     available:       hit != null,
     pending:         hit == null && !noData,
