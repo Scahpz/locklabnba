@@ -893,6 +893,7 @@ export default function Props() {
                     rank={i + 1}
                     aiVerdict={verdicts[key]}
                     aiLoading={aiLoading}
+                    activeSource={selectedSources.length === 1 ? selectedSources[0] : null}
                     onOpenDetail={() => setDetailKey({ player_name: prop.player_name, prop_type: prop.prop_type })}
                   />
                 );

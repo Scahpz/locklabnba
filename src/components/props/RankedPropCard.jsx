@@ -35,20 +35,32 @@ function getTier(grade) {
   return 'C';
 }
 
-export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, onOpenDetail }) {
+export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, activeSource, onOpenDetail }) {
   const { addLeg, isSelected } = useParlay();
   const [showBooks, setShowBooks] = useState(false);
   const [selectedBook, setSelectedBook] = useState(null);
 
+  // When a single platform is filtered, use that book's specific line for grading.
+  // This means the same player prop can grade differently on FanDuel vs PrizePicks
+  // because each platform sets its own line.
+  const platformBook = React.useMemo(() => {
+    if (!activeSource) return null;
+    const books = /** @type {{key:string,line:number|null,over_odds:number|null,under_odds:number|null,title:string}[]} */ (prop.all_books || []);
+    return books.find((b) => b.key === activeSource) ?? null;
+  }, [activeSource, prop.all_books]);
+
   const gradedProp = React.useMemo(() => {
-    const logs = prop.last_10_games || [];
-    if (logs.length === 0) return prop;
-    const hitCount = logs.filter(v => v > prop.line).length;
-    const dynamicHitRate = Math.round(hitCount / logs.length * 100);
+    // Use platform-specific line when a single source is selected; otherwise consensus line
+    const line = platformBook?.line ?? prop.line;
+    const overOdds  = platformBook?.over_odds  ?? prop.over_odds;
+    const underOdds = platformBook?.under_odds ?? prop.under_odds;
     const base = prop.projection ?? prop.avg_last_10 ?? null;
-    const dynamicEdge = base != null ? Math.round((base - prop.line) * 100) / 100 : prop.edge;
-    return { ...prop, hit_rate_last_10: dynamicHitRate, edge: dynamicEdge };
-  }, [prop]);
+    const logs = prop.last_10_games || [];
+    const hitCount = logs.filter(v => v > line).length;
+    const dynamicHitRate = logs.length > 0 ? Math.round(hitCount / logs.length * 100) : prop.hit_rate_last_10;
+    const dynamicEdge = base != null ? Math.round((base - line) * 100) / 100 : prop.edge;
+    return { ...prop, line, over_odds: overOdds, under_odds: underOdds, hit_rate_last_10: dynamicHitRate, edge: dynamicEdge };
+  }, [prop, platformBook]);
 
   const grade = gradeProp(gradedProp);
   const evVerdict = calcEVVerdict(gradedProp, grade);
@@ -56,10 +68,10 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, onOpe
   const isOverFavorable = evVerdict.direction === 'OVER';
   const hasBooks = prop.all_books?.length > 1;
 
-  const activeBook = selectedBook ? prop.all_books?.find(b => b.key === selectedBook) : null;
-  const displayOverOdds = activeBook?.over_odds ?? prop.over_odds;
-  const displayUnderOdds = activeBook?.under_odds ?? prop.under_odds;
-  const displayLine = activeBook?.line ?? prop.line;
+  const activeBook = selectedBook ? prop.all_books?.find(b => b.key === selectedBook) : platformBook;
+  const displayOverOdds = activeBook?.over_odds ?? gradedProp.over_odds;
+  const displayUnderOdds = activeBook?.under_odds ?? gradedProp.under_odds;
+  const displayLine = activeBook?.line ?? gradedProp.line;
 
   const overOddsValues = (prop.all_books || []).map(b => b.over_odds).filter(v => v != null);
   const underOddsValues = (prop.all_books || []).map(b => b.under_odds).filter(v => v != null);
