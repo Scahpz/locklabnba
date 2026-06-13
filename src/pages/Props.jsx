@@ -12,12 +12,12 @@ import { TEAM_STATS } from '@/lib/teamStats';
 import PropDetailModal from '@/components/props/PropDetailModal';
 
 // ── Game-log localStorage cache ───────────────────────────────────────────────
-const GL_CACHE_PREFIX = 'locklab_gl_v8_';
+const GL_CACHE_PREFIX = 'locklab_gl_v9_';
 const GL_TTL_MS = 2 * 60 * 60 * 1000; // 2-hour TTL per entry
 // Wipe all older cache versions on load
 for (let i = localStorage.length - 1; i >= 0; i--) {
   const k = localStorage.key(i);
-  if (k && k.startsWith('locklab_gl_') && !k.startsWith('locklab_gl_v8_')) {
+  if (k && k.startsWith('locklab_gl_') && !k.startsWith('locklab_gl_v9_')) {
     localStorage.removeItem(k);
   }
 }

@@ -312,11 +312,16 @@ def to_line(avg: float) -> float:
     return max(0.5, round(avg * 2) / 2)
 
 def parse_matchup(matchup: str):
-    if " vs. " in matchup:
-        return True, matchup.split(" vs. ")[1].strip()
-    if " @ " in matchup:
-        return False, matchup.split(" @ ")[1].strip()
-    return False, matchup
+    m = (matchup or "").strip()
+    if " vs. " in m:          # NBA API home: "LAL vs. BOS"
+        return True, m.split(" vs. ")[1].strip()
+    if m.lower().startswith("vs."):  # ESPN home: "vs. BOS"
+        return True, m[3:].strip()
+    if " @ " in m:             # NBA API away: "LAL @ BOS"
+        return False, m.split(" @ ")[1].strip()
+    if m.startswith("@ "):     # ESPN away: "@ LAL"
+        return False, m[2:].strip()
+    return False, m
 
 def poisson_over_prob(lambda_val: float, line: float) -> float:
     """P(X > line) for Poisson(lambda_val). Uses floor(line) since count data is discrete."""

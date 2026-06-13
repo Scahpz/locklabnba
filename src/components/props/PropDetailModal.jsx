@@ -333,6 +333,16 @@ export default function PropDetailModal({ prop, onClose }) {
             {(gameLogs.length > 0 || prop.game_logs_last_20?.length > 0) && (() => {
               const allDetailLogs = prop.game_logs_last_20 || prop.game_logs_last_10 || [];
 
+              // Derive home/away from matchup string — handles both NBA API ("LAL vs. BOS")
+              // and ESPN fallback ("vs. BOS" / "@ LAL") formats
+              const isHomeGame = (g) => {
+                const m = (g.matchup || '').trim().toLowerCase();
+                if (m.startsWith('vs.')) return true;
+                if (m.includes(' vs. ')) return true;
+                if (m.startsWith('@') || m.includes(' @ ')) return false;
+                return g.isHome ?? false;
+              };
+
               // Step 1: pick the time window
               const windowLogs = chartWindow === 'l5'
                 ? allDetailLogs.slice(-5)
@@ -342,9 +352,9 @@ export default function PropDetailModal({ prop, onClose }) {
 
               // Step 2: apply location filter on top of the window
               const activeDetail = locationFilter === 'home'
-                ? windowLogs.filter(g => g.isHome)
+                ? windowLogs.filter(g => isHomeGame(g))
                 : locationFilter === 'away'
-                ? windowLogs.filter(g => !g.isHome)
+                ? windowLogs.filter(g => !isHomeGame(g))
                 : windowLogs;
 
               const chartValues = activeDetail.map(g => g.value);
@@ -443,7 +453,7 @@ export default function PropDetailModal({ prop, onClose }) {
                       {[...activeDetail].reverse().map((g, i) => (
                         <div key={i} className={cn('grid grid-cols-4 text-xs px-4 py-2.5 items-center', i % 2 === 1 ? 'bg-secondary/20' : '')}>
                           <span className="text-muted-foreground text-[10px]">{g.date ? g.date.replace(/^\d{4}-/, '') : '—'}</span>
-                          <span className="text-foreground text-[10px]">{g.isHome ? 'vs' : '@'} {g.opp}</span>
+                          <span className="text-foreground text-[10px]">{isHomeGame(g) ? 'vs' : '@'} {g.opp}</span>
                           <span className={cn('text-center font-bold text-sm', g.value > adjustedLine ? 'text-primary' : 'text-destructive')}>
                             {g.value}
                           </span>
