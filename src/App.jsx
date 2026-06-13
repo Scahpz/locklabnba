@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
@@ -49,6 +49,8 @@ const AuthenticatedApp = () => {
         <Route path="/compare" element={<Compare />} />
         <Route path="/odds" element={<LiveOdds />} />
         <Route path="/ai-picks" element={<AIPicks />} />
+        <Route path="/live-odds" element={<Navigate to="/odds" replace />} />
+        <Route path="/streaks" element={<Navigate to="/trends" replace />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

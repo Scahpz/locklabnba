@@ -221,25 +221,37 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, activ
       </div>
 
       {/* Stats row — uses gradedProp so numbers match the active line */}
-      <div className="px-4 pb-3 grid grid-cols-3 gap-2">
-        <div className="bg-white/3 rounded-xl p-2.5 text-center">
-          <p className="text-[9px] text-muted-foreground/60 uppercase font-semibold tracking-wider">Projection</p>
-          <p className="text-sm font-bold text-foreground mt-0.5">{gradedProp.projection ?? '—'}</p>
-        </div>
-        <div className="bg-white/3 rounded-xl p-2.5 text-center">
-          <p className="text-[9px] text-muted-foreground/60 uppercase font-semibold tracking-wider">Edge</p>
-          <p className={cn("text-sm font-bold flex items-center justify-center gap-0.5 mt-0.5", isOverFavorable ? 'text-primary' : 'text-destructive')}>
-            {isOverFavorable ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            {gradedProp.edge != null ? `${gradedProp.edge > 0 ? '+' : ''}${gradedProp.edge}` : '—'}
-          </p>
-        </div>
-        <div className="bg-white/3 rounded-xl p-2.5 text-center">
-          <p className="text-[9px] text-muted-foreground/60 uppercase font-semibold tracking-wider">Hit Rate</p>
-          <p className="text-sm font-bold text-foreground mt-0.5">
-            {gradedProp.hit_rate_last_10 != null ? `${gradedProp.hit_rate_last_10}%` : '—'}
-          </p>
-        </div>
-      </div>
+      {(() => {
+        const stillLoading = !gradedProp.has_analytics && !gradedProp.data_unavailable;
+        const Skeleton = () => <span className="inline-block w-10 h-3.5 rounded bg-white/10 animate-pulse mt-0.5" />;
+        return (
+          <div className="px-4 pb-3 grid grid-cols-3 gap-2">
+            <div className="bg-white/3 rounded-xl p-2.5 text-center">
+              <p className="text-[9px] text-muted-foreground/60 uppercase font-semibold tracking-wider">Projection</p>
+              <p className="text-sm font-bold text-foreground mt-0.5">
+                {stillLoading ? <Skeleton /> : (gradedProp.projection ?? '—')}
+              </p>
+            </div>
+            <div className="bg-white/3 rounded-xl p-2.5 text-center">
+              <p className="text-[9px] text-muted-foreground/60 uppercase font-semibold tracking-wider">Edge</p>
+              <p className={cn("text-sm font-bold flex items-center justify-center gap-0.5 mt-0.5", isOverFavorable ? 'text-primary' : 'text-destructive')}>
+                {stillLoading ? <Skeleton /> : (
+                  <>
+                    {isOverFavorable ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                    {gradedProp.edge != null ? `${gradedProp.edge > 0 ? '+' : ''}${gradedProp.edge}` : '—'}
+                  </>
+                )}
+              </p>
+            </div>
+            <div className="bg-white/3 rounded-xl p-2.5 text-center">
+              <p className="text-[9px] text-muted-foreground/60 uppercase font-semibold tracking-wider">Hit Rate</p>
+              <p className="text-sm font-bold text-foreground mt-0.5">
+                {stillLoading ? <Skeleton /> : (gradedProp.hit_rate_last_10 != null ? `${gradedProp.hit_rate_last_10}%` : '—')}
+              </p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Platform badges */}
       {baseProp.sources?.length > 0 && (

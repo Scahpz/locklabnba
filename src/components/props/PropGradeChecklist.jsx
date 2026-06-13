@@ -3,13 +3,24 @@ import { Check, X, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { gradeProp } from '@/lib/grading';
 
+function toLetterGrade(pass, available) {
+  if (available === 0) return '?';
+  const r = pass / available;
+  if (r >= 0.75) return 'A';
+  if (r >= 0.55) return 'B';
+  if (r >= 0.35) return 'C';
+  if (r >= 0.2)  return 'D';
+  return 'F';
+}
+
 export default function PropGradeChecklist({ prop }) {
   const [open, setOpen] = useState(false);
   const { criteria, passCount, totalCriteria, dataQuality } = gradeProp(prop);
   const availableCount = criteria.filter(c => c.available).length;
+  const letterGrade = toLetterGrade(passCount, availableCount);
 
-  const scoreColor = passCount >= 4 ? 'text-primary bg-primary/15 ring-primary/20'
-    : passCount >= 2 ? 'text-chart-4 bg-chart-4/15 ring-chart-4/20'
+  const scoreColor = ['A', 'B'].includes(letterGrade) ? 'text-primary bg-primary/15 ring-primary/20'
+    : letterGrade === 'C' ? 'text-chart-4 bg-chart-4/15 ring-chart-4/20'
     : 'text-destructive bg-destructive/15 ring-destructive/20';
 
   return (
@@ -23,10 +34,10 @@ export default function PropGradeChecklist({ prop }) {
             Grade Breakdown
           </span>
           <span className={cn(
-            "text-[10px] font-bold px-1.5 py-0.5 rounded-lg ring-1",
+            "text-[11px] font-bold px-2 py-0.5 rounded-lg ring-1",
             scoreColor
           )}>
-            {passCount}/{availableCount}
+            {letterGrade}
           </span>
           {dataQuality === 'market' && (
             <span className="text-[9px] text-muted-foreground/60 italic">market only</span>
