@@ -815,9 +815,10 @@ async def get_player_gamelogs_bulk(req: BulkGamelogsRequest):
     names = list(dict.fromkeys(req.playerNames))[:50]  # dedupe, cap at 50
 
     # Warm the scoreboard cache once so all workers share it immediately
-    _scoreboard_event_ids_recent(days=40)
+    # 15 days covers current games + recent history; 40 days was too slow on cold start
+    _scoreboard_event_ids_recent(days=15)
 
-    with ThreadPoolExecutor(max_workers=8) as pool:
+    with ThreadPoolExecutor(max_workers=min(15, len(names))) as pool:
         results_list = list(pool.map(_analytics_for_player, names))
 
     analytics = {name: data for name, data in zip(names, results_list)}

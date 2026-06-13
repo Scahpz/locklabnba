@@ -34,7 +34,8 @@ function glCacheSet(name, data) {
 }
 async function fetchBulkGameLogs(names) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 30000); // 30s — if Railway takes longer, show cards without analytics
+  // 50s per chunk — Railway cold-starts + ESPN scoreboard pre-warm can take 30-40s
+  const timer = setTimeout(() => ctrl.abort(), 50000);
   try {
     const res = await fetch(`${NBA_API}/api/player-gamelogs-bulk`, {
       method: 'POST',
@@ -196,26 +197,32 @@ export default function Props() {
     if (!needsFetch.length) return;
     needsFetch.forEach(n => fetchedPlayers.current.add(n));
 
-    // One bulk request for all uncached players
-    fetchBulkGameLogs(needsFetch).then(data => {
-      const updates = {};
-      if (data?.analytics) {
-        Object.entries(data.analytics).forEach(([name, analytics]) => {
-          if (analytics && Object.keys(analytics).length > 0) {
-            updates[name] = analytics;
-            glCacheSet(name, { analytics });
-          }
-        });
-      }
-      // Mark every requested player as attempted (null = no data found).
-      // Without this, players with no NBA API match stay stuck on "loading".
-      needsFetch.forEach(n => { if (!(n in updates)) updates[n] = null; });
-      setPlayerAnalytics(prev => ({ ...prev, ...updates }));
-    }).catch(() => {
-      // On network failure, mark all as null so the UI clears the spinner
-      const updates = {};
-      needsFetch.forEach(n => { updates[n] = null; });
-      setPlayerAnalytics(prev => ({ ...prev, ...updates }));
+    // Split into chunks of 15 and fire simultaneously — each chunk updates the UI
+    // as it resolves so analytics appear progressively instead of all-or-nothing.
+    const CHUNK = 15;
+    const chunks = [];
+    for (let i = 0; i < needsFetch.length; i += CHUNK) chunks.push(needsFetch.slice(i, i + CHUNK));
+
+    chunks.forEach(chunk => {
+      fetchBulkGameLogs(chunk).then(data => {
+        const updates = {};
+        if (data?.analytics) {
+          Object.entries(data.analytics).forEach(([name, analytics]) => {
+            if (analytics && Object.keys(analytics).length > 0) {
+              updates[name] = analytics;
+              glCacheSet(name, { analytics });
+            }
+          });
+        }
+        // Players not returned by the backend → mark null so criteria show "not available"
+        // rather than staying on "loading" forever.
+        chunk.forEach(n => { if (!(n in updates)) updates[n] = null; });
+        setPlayerAnalytics(prev => ({ ...prev, ...updates }));
+      }).catch(() => {
+        const updates = {};
+        chunk.forEach(n => { updates[n] = null; });
+        setPlayerAnalytics(prev => ({ ...prev, ...updates }));
+      });
     });
   }, [rawProps]);
 
