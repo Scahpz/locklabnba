@@ -22,66 +22,79 @@ const propTypeLabels = {
   'P+R': 'P+R', 'P+A': 'P+A', 'A+R': 'A+R',
 };
 
-// Tier is derived from grade confidence — nothing to do with the backend confidence_tier field
-// A = strong (≥75% conf, not UNSAFE)  B = moderate (≥60%)  C = weak/no clear edge
-const tierConfig = {
-  A: { label: 'Tier A', title: 'Strong signal',   className: 'bg-primary/10 text-primary border-primary/20' },
-  B: { label: 'Tier B', title: 'Moderate signal', className: 'bg-chart-4/10 text-chart-4 border-chart-4/20' },
-  C: { label: 'Tier C', title: 'Weak signal',     className: 'bg-white/5 text-muted-foreground border-white/8' },
-};
-function getTier(grade) {
-  if (grade.verdict !== 'UNSAFE' && grade.confidence >= 75) return 'A';
-  if (grade.verdict !== 'UNSAFE' && grade.confidence >= 60) return 'B';
-  return 'C';
+// Recalculate streak from the actual game log values so it always matches
+// the active line (platform-specific or consensus) and the most recent data.
+// last_10_games from backend is oldest-first; we work newest-first.
+function calcStreakFromLogs(last10games, line) {
+  if (!last10games || last10games.length === 0) return null;
+  const recent = [...last10games].reverse(); // newest first
+  const dir = recent[0] > line ? 'over' : 'under';
+  let count = 0;
+  for (const v of recent) {
+    if ((dir === 'over' && v > line) || (dir === 'under' && v <= line)) count++;
+    else break;
+  }
+  return count >= 2 ? `${count} game ${dir} streak` : null;
 }
 
-export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, activeSource, onOpenDetail }) {
+export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, activeSource, playerProps, onOpenDetail }) {
   const { addLeg, isSelected } = useParlay();
   const [showBooks, setShowBooks] = useState(false);
   const [selectedBook, setSelectedBook] = useState(null);
+  // Which prop type is active on this card (null = base prop passed in)
+  const [selectedType, setSelectedType] = useState(null);
 
-  // When a single platform is filtered, use that book's specific line for grading.
-  // This means the same player prop can grade differently on FanDuel vs PrizePicks
-  // because each platform sets its own line.
+  // The "base" prop — either the user-switched sibling or the original prop
+  const baseProp = React.useMemo(() => {
+    if (!selectedType || !playerProps) return prop;
+    return playerProps.find(p => p.prop_type === selectedType) ?? prop;
+  }, [selectedType, playerProps, prop]);
+
+  // When a single platform is filtered, use that book's specific line
   const platformBook = React.useMemo(() => {
     if (!activeSource) return null;
-    const books = /** @type {{key:string,line:number|null,over_odds:number|null,under_odds:number|null,title:string}[]} */ (prop.all_books || []);
+    const books = /** @type {{key:string,line:number|null,over_odds:number|null,under_odds:number|null,title:string}[]} */ (baseProp.all_books || []);
     return books.find((b) => b.key === activeSource) ?? null;
-  }, [activeSource, prop.all_books]);
+  }, [activeSource, baseProp.all_books]);
 
+  // gradedProp: applies platform-specific line (if active) + recalculates hit rate / edge
   const gradedProp = React.useMemo(() => {
-    // Use platform-specific line when a single source is selected; otherwise consensus line
-    const line = platformBook?.line ?? prop.line;
-    const overOdds  = platformBook?.over_odds  ?? prop.over_odds;
-    const underOdds = platformBook?.under_odds ?? prop.under_odds;
-    const base = prop.projection ?? prop.avg_last_10 ?? null;
-    const logs = prop.last_10_games || [];
-    const hitCount = logs.filter(v => v > line).length;
-    const dynamicHitRate = logs.length > 0 ? Math.round(hitCount / logs.length * 100) : prop.hit_rate_last_10;
-    const dynamicEdge = base != null ? Math.round((base - line) * 100) / 100 : prop.edge;
-    return { ...prop, line, over_odds: overOdds, under_odds: underOdds, hit_rate_last_10: dynamicHitRate, edge: dynamicEdge };
-  }, [prop, platformBook]);
+    const line       = platformBook?.line      ?? baseProp.line;
+    const overOdds   = platformBook?.over_odds  ?? baseProp.over_odds;
+    const underOdds  = platformBook?.under_odds ?? baseProp.under_odds;
+    const base       = baseProp.projection ?? baseProp.avg_last_10 ?? null;
+    const logs       = baseProp.last_10_games || [];
+    const hitCount   = logs.filter(v => v > line).length;
+    const dynamicHitRate = logs.length > 0 ? Math.round(hitCount / logs.length * 100) : baseProp.hit_rate_last_10;
+    const dynamicEdge    = base != null ? Math.round((base - line) * 100) / 100 : baseProp.edge;
+    return { ...baseProp, line, over_odds: overOdds, under_odds: underOdds, hit_rate_last_10: dynamicHitRate, edge: dynamicEdge };
+  }, [baseProp, platformBook]);
 
-  const grade = gradeProp(gradedProp);
-  const evVerdict = calcEVVerdict(gradedProp, grade);
-  const tier = tierConfig[getTier(grade)];
+  // Streak recalculated from live log data + active line (never stale)
+  const streakInfo = React.useMemo(
+    () => calcStreakFromLogs(gradedProp.last_10_games, gradedProp.line),
+    [gradedProp.last_10_games, gradedProp.line]
+  );
+
+  const grade          = gradeProp(gradedProp);
+  const evVerdict      = calcEVVerdict(gradedProp, grade);
   const isOverFavorable = evVerdict.direction === 'OVER';
-  const hasBooks = prop.all_books?.length > 1;
+  const hasBooks       = (baseProp.all_books?.length ?? 0) > 1;
 
-  const activeBook = selectedBook ? prop.all_books?.find(b => b.key === selectedBook) : platformBook;
-  const displayOverOdds = activeBook?.over_odds ?? gradedProp.over_odds;
+  const activeBook      = selectedBook ? baseProp.all_books?.find(b => b.key === selectedBook) : platformBook;
+  const displayOverOdds  = activeBook?.over_odds  ?? gradedProp.over_odds;
   const displayUnderOdds = activeBook?.under_odds ?? gradedProp.under_odds;
-  const displayLine = activeBook?.line ?? gradedProp.line;
+  const displayLine      = activeBook?.line       ?? gradedProp.line;
 
-  const overOddsValues = (prop.all_books || []).map(b => b.over_odds).filter(v => v != null);
-  const underOddsValues = (prop.all_books || []).map(b => b.under_odds).filter(v => v != null);
-  const bestOverOdds = overOddsValues.length ? Math.max(...overOddsValues) : null;
-  const worstOverOdds = overOddsValues.length ? Math.min(...overOddsValues) : null;
-  const bestUnderOdds = underOddsValues.length ? Math.max(...underOddsValues) : null;
-  const worstUnderOdds = underOddsValues.length ? Math.min(...underOddsValues) : null;
+  const overOddsValues  = (baseProp.all_books || []).map(b => b.over_odds).filter(v => v != null);
+  const underOddsValues = (baseProp.all_books || []).map(b => b.under_odds).filter(v => v != null);
+  const bestOverOdds    = overOddsValues.length  ? Math.max(...overOddsValues)  : null;
+  const worstOverOdds   = overOddsValues.length  ? Math.min(...overOddsValues)  : null;
+  const bestUnderOdds   = underOddsValues.length ? Math.max(...underOddsValues) : null;
+  const worstUnderOdds  = underOddsValues.length ? Math.min(...underOddsValues) : null;
 
   const handlePick = (pick) => {
-    addLeg({ ...prop, over_odds: displayOverOdds, under_odds: displayUnderOdds, line: displayLine, bookmaker: activeBook?.title ?? prop.bookmaker }, pick);
+    addLeg({ ...gradedProp, over_odds: displayOverOdds, under_odds: displayUnderOdds, line: displayLine, bookmaker: activeBook?.title ?? baseProp.bookmaker }, pick);
   };
 
   const rankStyle = rank <= 3
@@ -90,38 +103,47 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, activ
     ? 'text-primary bg-primary/10 border-primary/15'
     : 'text-muted-foreground bg-white/5 border-white/8';
 
-  const overSelected = isSelected(prop.player_name, prop.prop_type, 'over');
-  const underSelected = isSelected(prop.player_name, prop.prop_type, 'under');
+  const overSelected  = isSelected(baseProp.player_name, baseProp.prop_type, 'over');
+  const underSelected = isSelected(baseProp.player_name, baseProp.prop_type, 'under');
+
+  // Sibling prop types for the switcher (exclude current)
+  const siblingTypes = React.useMemo(() => {
+    if (!playerProps || playerProps.length <= 1) return [];
+    return playerProps
+      .map(p => p.prop_type)
+      .filter((t, i, arr) => arr.indexOf(t) === i); // dedupe
+  }, [playerProps]);
+
+  const activePropType = selectedType ?? prop.prop_type;
 
   return (
     <div className={cn(
       "rounded-2xl border bg-[hsl(222,47%,9%)] transition-all duration-200 overflow-hidden",
       "hover:border-white/12 hover:shadow-[0_4px_24px_rgba(0,0,0,0.3)]",
-      prop.is_lock ? "border-primary/20 shadow-[0_0_20px_hsl(142,71%,45%,0.06)]" : "border-white/6"
+      baseProp.is_lock ? "border-primary/20 shadow-[0_0_20px_hsl(142,71%,45%,0.06)]" : "border-white/6"
     )}>
-      {/* Top accent bar for locks */}
-      {prop.is_lock && <div className="h-0.5 w-full bg-gradient-to-r from-primary/0 via-primary to-primary/0" />}
+      {baseProp.is_lock && <div className="h-0.5 w-full bg-gradient-to-r from-primary/0 via-primary to-primary/0" />}
 
       {/* Header */}
       <div className="p-4 pb-3">
-        <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2.5">
             <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold border flex-shrink-0", rankStyle)}>
               {rank}
             </div>
-            <TeamLogo team={prop.team} className="w-9 h-9" />
+            <TeamLogo team={baseProp.team} className="w-9 h-9" />
             <div>
-              <Link to={`/trends?player=${encodeURIComponent(prop.player_name)}`}
+              <Link to={`/trends?player=${encodeURIComponent(baseProp.player_name)}`}
                 className="font-semibold text-sm text-foreground hover:text-primary transition-colors">
-                {prop.player_name}
+                {baseProp.player_name}
               </Link>
-              <p className="text-[11px] text-muted-foreground/70 mt-0.5">{prop.team} vs {prop.opponent} · {prop.position}</p>
+              <p className="text-[11px] text-muted-foreground/70 mt-0.5">{baseProp.team} vs {baseProp.opponent} · {baseProp.position}</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            {prop.is_lock && <Lock className="w-3.5 h-3.5 text-primary" />}
-            {prop.trap_warning && <AlertTriangle className="w-3.5 h-3.5 text-destructive" />}
-            {prop.best_value && <Award className="w-3.5 h-3.5 text-chart-4" />}
+            {baseProp.is_lock     && <Lock          className="w-3.5 h-3.5 text-primary"     />}
+            {baseProp.trap_warning && <AlertTriangle className="w-3.5 h-3.5 text-destructive" />}
+            {baseProp.best_value  && <Award         className="w-3.5 h-3.5 text-chart-4"     />}
             <span
               title={`${evVerdict.label} · ${evVerdict.direction} · ${evVerdict.edgePP > 0 ? '+' : ''}${evVerdict.edgePP}% edge`}
               className={cn(
@@ -135,6 +157,26 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, activ
           </div>
         </div>
 
+        {/* Prop type switcher — shown when player has multiple prop types loaded */}
+        {siblingTypes.length > 1 && (
+          <div className="flex gap-1 overflow-x-auto pb-1 mb-2 scrollbar-none -mx-1 px-1">
+            {siblingTypes.map(t => (
+              <button
+                key={t}
+                onClick={() => { setSelectedType(t); setSelectedBook(null); }}
+                className={cn(
+                  "text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all flex-shrink-0",
+                  activePropType === t
+                    ? "bg-primary/20 border-primary/40 text-primary"
+                    : "bg-white/5 border-white/8 text-muted-foreground/70 hover:text-foreground hover:border-white/15"
+                )}
+              >
+                {propTypeLabels[t] || t}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Verdict */}
         <div className="mb-3">
           <VerdictBadge evVerdict={evVerdict} loading={false} />
@@ -147,7 +189,7 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, activ
         <div className="flex items-center justify-between bg-white/4 rounded-xl p-3 border border-white/5">
           <div>
             <p className="text-[10px] text-muted-foreground/60 font-semibold uppercase tracking-wider">
-              {propTypeLabels[prop.prop_type] || prop.prop_type}
+              {propTypeLabels[gradedProp.prop_type] || gradedProp.prop_type}
             </p>
             <p className="text-2xl font-bold text-foreground mt-0.5 leading-none">{displayLine}</p>
           </div>
@@ -178,29 +220,31 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, activ
         </div>
       </div>
 
-      {/* Stats row */}
+      {/* Stats row — uses gradedProp so numbers match the active line */}
       <div className="px-4 pb-3 grid grid-cols-3 gap-2">
         <div className="bg-white/3 rounded-xl p-2.5 text-center">
           <p className="text-[9px] text-muted-foreground/60 uppercase font-semibold tracking-wider">Projection</p>
-          <p className="text-sm font-bold text-foreground mt-0.5">{prop.projection ?? '—'}</p>
+          <p className="text-sm font-bold text-foreground mt-0.5">{gradedProp.projection ?? '—'}</p>
         </div>
         <div className="bg-white/3 rounded-xl p-2.5 text-center">
           <p className="text-[9px] text-muted-foreground/60 uppercase font-semibold tracking-wider">Edge</p>
           <p className={cn("text-sm font-bold flex items-center justify-center gap-0.5 mt-0.5", isOverFavorable ? 'text-primary' : 'text-destructive')}>
             {isOverFavorable ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            {prop.edge != null ? `${prop.edge > 0 ? '+' : ''}${prop.edge}%` : '—'}
+            {gradedProp.edge != null ? `${gradedProp.edge > 0 ? '+' : ''}${gradedProp.edge}` : '—'}
           </p>
         </div>
         <div className="bg-white/3 rounded-xl p-2.5 text-center">
           <p className="text-[9px] text-muted-foreground/60 uppercase font-semibold tracking-wider">Hit Rate</p>
-          <p className="text-sm font-bold text-foreground mt-0.5">{prop.hit_rate_last_10 != null ? `${prop.hit_rate_last_10}%` : '—'}</p>
+          <p className="text-sm font-bold text-foreground mt-0.5">
+            {gradedProp.hit_rate_last_10 != null ? `${gradedProp.hit_rate_last_10}%` : '—'}
+          </p>
         </div>
       </div>
 
-      {/* Platform availability */}
-      {prop.sources?.length > 0 && (
+      {/* Platform badges */}
+      {baseProp.sources?.length > 0 && (
         <div className="px-4 pb-2 flex items-center gap-1.5 flex-wrap">
-          {/** @type {string[]} */ (prop.sources).map(src => {
+          {/** @type {string[]} */ (baseProp.sources).map(src => {
             const m = SOURCE_META[src];
             if (!m) return null;
             return (
@@ -212,18 +256,18 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, activ
         </div>
       )}
 
-      {/* Streak */}
-      {prop.streak_info && (
+      {/* Streak — recalculated from live logs against active line */}
+      {streakInfo && (
         <div className="px-4 pb-3">
           <div className="flex items-center gap-1.5 bg-chart-4/8 border border-chart-4/15 rounded-xl px-3 py-1.5">
             <Zap className="w-3 h-3 text-chart-4 flex-shrink-0" />
-            <p className="text-[11px] text-chart-4 font-medium">{prop.streak_info}</p>
+            <p className="text-[11px] text-chart-4 font-medium">{streakInfo}</p>
           </div>
         </div>
       )}
 
-      {/* Grade Checklist */}
-      <PropGradeChecklist prop={prop} />
+      {/* Grade Checklist — uses gradedProp so all values match active line */}
+      <PropGradeChecklist prop={gradedProp} />
 
       {/* Deep Dive */}
       <div className="px-4 pb-4">
@@ -239,7 +283,7 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, activ
           <button onClick={() => setShowBooks(s => !s)}
             className="w-full flex items-center justify-center gap-1.5 py-2.5 text-[11px] text-muted-foreground/60 hover:text-muted-foreground transition-colors">
             {showBooks ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-            {showBooks ? 'Hide' : 'Compare'} {prop.all_books.length} books
+            {showBooks ? 'Hide' : 'Compare'} {baseProp.all_books.length} books
           </button>
           {showBooks && (
             <div className="px-4 pb-4 space-y-1.5">
@@ -249,8 +293,8 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, activ
                 <span className="text-center">Over</span>
                 <span className="text-center">Under</span>
               </div>
-              {prop.all_books.map(b => {
-                const isActive = selectedBook === b.key || (!selectedBook && b.key === prop.all_books[0]?.key);
+              {baseProp.all_books.map(b => {
+                const isActive = selectedBook === b.key || (!selectedBook && b.key === baseProp.all_books[0]?.key);
                 return (
                   <button key={b.key} onClick={() => setSelectedBook(selectedBook === b.key ? null : b.key)}
                     className={cn(

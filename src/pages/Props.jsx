@@ -34,7 +34,7 @@ function glCacheSet(name, data) {
 }
 async function fetchBulkGameLogs(names) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 90000); // 90s — bulk can be slow on first load
+  const timer = setTimeout(() => ctrl.abort(), 30000); // 30s — if Railway takes longer, show cards without analytics
   try {
     const res = await fetch(`${NBA_API}/api/player-gamelogs-bulk`, {
       method: 'POST',
@@ -506,6 +506,17 @@ export default function Props() {
     return candidates[0] || null;
   }, [enrichedProps, todayTeams]);
 
+  // All prop types per player (from the full unfiltered set) — passed to each card
+  // so it can show a prop-type switcher without having to know about filtered siblings
+  const propsByPlayer = useMemo(() => {
+    const map = {};
+    enrichedProps.forEach(p => {
+      if (!map[p.player_name]) map[p.player_name] = [];
+      map[p.player_name].push(p);
+    });
+    return map;
+  }, [enrichedProps]);
+
   // Unique betting platforms present in the current prop set, in display order
   const availableSources = useMemo(() => {
     const seen = new Set();
@@ -894,6 +905,7 @@ export default function Props() {
                     aiVerdict={verdicts[key]}
                     aiLoading={aiLoading}
                     activeSource={selectedSources.length === 1 ? selectedSources[0] : null}
+                    playerProps={propsByPlayer[prop.player_name]}
                     onOpenDetail={() => setDetailKey({ player_name: prop.player_name, prop_type: prop.prop_type })}
                   />
                 );

@@ -193,11 +193,13 @@ let _fetchPromise = null;
 async function _doFetch() {
   const defaultBookmakers = 'draftkings,fanduel,betmgm,caesars,pointsbetus';
 
-  // Fetch settings + all free sources in parallel
+  // Fetch settings + all free sources in parallel.
+  // Underdog tends to respond in 3-6s; PrizePicks can take 8-12s.
+  // We cap both at 9s so a slow scrape never blocks showing props.
   const [settingsResult, ppResult, udResult] = await Promise.allSettled([
     fetchWithTimeout(`${NBA_API}/api/settings`, {}, 5000).then(r => r.json()).catch(() => ({})),
-    fetchWithTimeout(`${NBA_API}/api/prizepicks/props`, {}, 14000).then(r => r.ok ? r.json() : null).catch(() => null),
-    fetchWithTimeout(`${NBA_API}/api/underdog/props`, {}, 14000).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetchWithTimeout(`${NBA_API}/api/prizepicks/props`, {}, 9000).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetchWithTimeout(`${NBA_API}/api/underdog/props`, {}, 9000).then(r => r.ok ? r.json() : null).catch(() => null),
   ]);
 
   const settings    = settingsResult.status === 'fulfilled' ? settingsResult.value : {};
