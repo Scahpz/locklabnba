@@ -6,10 +6,18 @@ import { gradeProp } from '@/lib/grading';
 function toLetterGrade(pass, available) {
   if (available === 0) return '?';
   const r = pass / available;
-  if (r >= 0.75) return 'A';
-  if (r >= 0.55) return 'B';
-  if (r >= 0.35) return 'C';
-  if (r >= 0.2)  return 'D';
+  if (r >= 0.92) return 'A+';
+  if (r >= 0.83) return 'A';
+  if (r >= 0.75) return 'A-';
+  if (r >= 0.68) return 'B+';
+  if (r >= 0.60) return 'B';
+  if (r >= 0.55) return 'B-';
+  if (r >= 0.48) return 'C+';
+  if (r >= 0.42) return 'C';
+  if (r >= 0.35) return 'C-';
+  if (r >= 0.30) return 'D+';
+  if (r >= 0.25) return 'D';
+  if (r >= 0.20) return 'D-';
   return 'F';
 }
 
@@ -19,8 +27,10 @@ export default function PropGradeChecklist({ prop }) {
   const availableCount = criteria.filter(c => c.available).length;
   const letterGrade = toLetterGrade(passCount, availableCount);
 
-  const scoreColor = ['A', 'B'].includes(letterGrade) ? 'text-primary bg-primary/15 ring-primary/20'
-    : letterGrade === 'C' ? 'text-chart-4 bg-chart-4/15 ring-chart-4/20'
+  const scoreColor = letterGrade[0] === 'A' || letterGrade === 'B+' || letterGrade === 'B'
+    ? 'text-primary bg-primary/15 ring-primary/20'
+    : letterGrade[0] === 'C' || letterGrade === 'B-'
+    ? 'text-chart-4 bg-chart-4/15 ring-chart-4/20'
     : 'text-destructive bg-destructive/15 ring-destructive/20';
 
   return (

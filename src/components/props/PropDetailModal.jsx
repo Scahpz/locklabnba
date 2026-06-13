@@ -18,6 +18,24 @@ function fmtOdds(n) {
   return n > 0 ? `+${n}` : `${n}`;
 }
 
+function toLetterGrade(pass, available) {
+  if (available === 0) return '?';
+  const r = pass / available;
+  if (r >= 0.92) return 'A+';
+  if (r >= 0.83) return 'A';
+  if (r >= 0.75) return 'A-';
+  if (r >= 0.68) return 'B+';
+  if (r >= 0.60) return 'B';
+  if (r >= 0.55) return 'B-';
+  if (r >= 0.48) return 'C+';
+  if (r >= 0.42) return 'C';
+  if (r >= 0.35) return 'C-';
+  if (r >= 0.30) return 'D+';
+  if (r >= 0.25) return 'D';
+  if (r >= 0.20) return 'D-';
+  return 'F';
+}
+
 /** Convert American odds → implied probability (includes vig) */
 function oddsToProb(odds) {
   if (odds == null) return null;
@@ -412,14 +430,20 @@ export default function PropDetailModal({ prop, onClose }) {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Grade Breakdown</p>
-                <span className={cn(
-                  'text-xs font-bold px-2 py-0.5 rounded-full',
-                  grade.passCount >= 4 ? 'bg-primary/20 text-primary' :
-                  grade.passCount >= 2 ? 'bg-chart-4/20 text-chart-4' :
-                  'bg-destructive/20 text-destructive'
-                )}>
-                  {grade.passCount}/{grade.criteria.filter(c => c.available).length} pass
-                </span>
+                {(() => {
+                  const avail = grade.criteria.filter(c => c.available).length;
+                  const lg = toLetterGrade(grade.passCount, avail);
+                  return (
+                    <span className={cn(
+                      'text-xs font-bold px-2 py-0.5 rounded-full',
+                      lg[0] === 'A' || lg === 'B+' || lg === 'B' ? 'bg-primary/20 text-primary' :
+                      lg[0] === 'C' || lg === 'B-' ? 'bg-chart-4/20 text-chart-4' :
+                      'bg-destructive/20 text-destructive'
+                    )}>
+                      {lg}
+                    </span>
+                  );
+                })()}
               </div>
               <div className="bg-secondary/30 rounded-xl border border-border/40 p-4 space-y-4">
                 {grade.criteria.map((c, i) => (
