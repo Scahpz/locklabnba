@@ -85,6 +85,8 @@ export default function Props() {
   const [loading, setLoading] = useState(() => !getCachedProps()); // skip spinner if stale cache exists
   const [slowLoad, setSlowLoad] = useState(false); // true after 10s — shows "warming up" message
   const [refreshing, setRefreshing] = useState(false); // subtle background refresh indicator
+  const [retryIn, setRetryIn] = useState(null); // countdown seconds until auto-retry, null = not retrying
+  const retryTimerRef = useRef(null);
   const [isLive, setIsLive] = useState(false);
   // Restore filter state from sessionStorage so navigating away and back preserves selections
   const savedFilters = (() => { try { return JSON.parse(sessionStorage.getItem('props_filters') || '{}'); } catch { return {}; } })();
@@ -127,7 +129,29 @@ export default function Props() {
     return true;
   };
 
+  const startRetryCountdown = (seconds = 25) => {
+    if (retryTimerRef.current) clearInterval(retryTimerRef.current);
+    setRetryIn(seconds);
+    let remaining = seconds;
+    retryTimerRef.current = setInterval(() => {
+      remaining -= 1;
+      setRetryIn(remaining);
+      if (remaining <= 0) {
+        clearInterval(retryTimerRef.current);
+        retryTimerRef.current = null;
+        setRetryIn(null);
+        loadData(true);
+      }
+    }, 1000);
+  };
+
+  const cancelRetry = () => {
+    if (retryTimerRef.current) { clearInterval(retryTimerRef.current); retryTimerRef.current = null; }
+    setRetryIn(null);
+  };
+
   const loadData = async (forceRefresh = false) => {
+    cancelRetry();
     if (forceRefresh) {
       clearLiveCache();
       setPlayerAnalytics({});
@@ -147,12 +171,12 @@ export default function Props() {
       setSlowLoad(false);
     }
 
-    // After 10s with no data, show "warming up" message so users know what's happening
     const slowTimer = setTimeout(() => setSlowLoad(true), 10000);
 
+    let gotData = false;
     try {
       const data = await fetchLiveProps();
-      applyData(data);
+      gotData = applyData(data);
     } catch {
       if (!stale) setRawProps([]);
     } finally {
@@ -160,6 +184,12 @@ export default function Props() {
       setLoading(false);
       setSlowLoad(false);
       setRefreshing(false);
+    }
+
+    // If fetch returned empty and there's no stale cache to fall back on,
+    // schedule an auto-retry — covers cold-start races and momentary scraper failures
+    if (!gotData && !getCachedProps()) {
+      startRetryCountdown(25);
     }
   };
 
@@ -342,7 +372,10 @@ export default function Props() {
     });
   }, [rawProps, playerAnalytics, teamContext]);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+    return () => { if (retryTimerRef.current) clearInterval(retryTimerRef.current); };
+  }, []);
 
   const toggleGame = (g) => {
     const key = `${(g.away || '').toUpperCase()}@${(g.home || '').toUpperCase()}`;
@@ -785,10 +818,40 @@ export default function Props() {
 
       {/* Empty state */}
       {enrichedProps.length === 0 && (
-        <div className="text-center py-20 text-muted-foreground">
-          <Zap className="w-12 h-12 mx-auto mb-3 opacity-20" />
-          <p className="text-lg font-medium">No props available today</p>
-          <p className="text-sm mt-1">Check back closer to game time once props are posted.</p>
+        <div className="text-center py-20 text-muted-foreground space-y-3">
+          <Zap className="w-12 h-12 mx-auto opacity-20" />
+          {retryIn != null ? (
+            <>
+              <p className="text-base font-medium text-foreground">Couldn't load props</p>
+              <p className="text-sm">The server may still be warming up. Retrying in <span className="text-primary font-bold">{retryIn}s</span>…</p>
+              <div className="flex items-center justify-center gap-3 mt-2">
+                <button
+                  onClick={() => { cancelRetry(); loadData(true); }}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-primary/15 border border-primary/30 text-primary hover:bg-primary/25 transition-all font-medium"
+                >
+                  Retry Now
+                </button>
+                <button
+                  onClick={cancelRetry}
+                  className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-base font-medium">No props available today</p>
+              <p className="text-sm">Check back closer to game time once props are posted.</p>
+              <button
+                onClick={() => loadData(true)}
+                className="mt-1 text-xs px-3 py-1.5 rounded-lg bg-secondary border border-border text-muted-foreground hover:text-foreground transition-all"
+              >
+                <RefreshCw className="w-3 h-3 inline mr-1.5" />
+                Try again
+              </button>
+            </>
+          )}
         </div>
       )}
 
