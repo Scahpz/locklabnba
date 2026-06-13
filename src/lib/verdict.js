@@ -1,17 +1,12 @@
 /**
  * EV-based verdict engine.
  *
- * Combines:
- *   - Model probability (Poisson from backend, or grading confidence)
- *   - Market implied probability (de-vigged from real sportsbook odds)
- *
- * Returns a stoplight tier + edge %, giving users a single clear signal.
- *
  * Tiers:
- *   GREEN  "BET IT"  — model beats market by ≥ 8pp  (strong +EV)
- *   YELLOW "LEAN"    — model beats market by 3–8pp   (marginal edge)
- *   RED    "SKIP"    — edge < 3pp                    (no clear edge)
- *   RED    "TRAP"    — grade is UNSAFE / bad matchup (avoid regardless of odds)
+ *   GREEN  "BET IT OVER/UNDER" — model beats market by ≥ 8pp
+ *   YELLOW "LEAN OVER/UNDER"   — model beats market by 3–8pp
+ *   RED    "SKIP"              — edge < 3pp, no clear value
+ *   TRAP   "TRAP"              — line is artificially juiced (overround > 10%)
+ *                                or grading says UNSAFE — avoid both sides
  */
 
 function impliedProb(odds) {
@@ -38,9 +33,13 @@ export function calcEVVerdict(prop, grade) {
   const overOdds  = prop.over_odds  ?? -110;
   const underOdds = prop.under_odds ?? -110;
 
-  // Model probability of going OVER the line.
-  // Prefer the Poisson probability from the backend (statistically grounded).
-  // Fall back to grading confidence mapped to a directional probability.
+  // Detect artificially juiced lines: standard vig is ~4-5%, >10% means books are
+  // extracting extra margin — the line looks appealing but value is squeezed out both ways
+  const rawOver    = impliedProb(overOdds);
+  const rawUnder   = impliedProb(underOdds);
+  const overround  = rawOver + rawUnder;
+  const isJuiced   = overround > 1.10;
+
   let modelOverProb;
   if (prop.poisson_hit_prob != null) {
     modelOverProb = prop.poisson_hit_prob;
@@ -49,34 +48,28 @@ export function calcEVVerdict(prop, grade) {
       ? grade.confidence / 100
       : 1 - grade.confidence / 100;
   } else {
-    // Market-only data — no real model edge, use market as baseline
     modelOverProb = devig(overOdds, underOdds);
   }
 
-  // Market true probability of OVER (de-vigged)
   const marketOverProb = devig(overOdds, underOdds);
-
-  // Direction: whichever side the model favors
-  const direction   = modelOverProb >= 0.5 ? 'OVER' : 'UNDER';
-  const modelProb   = direction === 'OVER' ? modelOverProb  : 1 - modelOverProb;
-  const marketProb  = direction === 'OVER' ? marketOverProb : 1 - marketOverProb;
-  const edgePP      = Math.round((modelProb - marketProb) * 1000) / 10; // 1 decimal place
-
-  // Real sportsbook odds or just -110 defaults?
+  const direction  = modelOverProb >= 0.5 ? 'OVER' : 'UNDER';
+  const modelProb  = direction === 'OVER' ? modelOverProb  : 1 - modelOverProb;
+  const marketProb = direction === 'OVER' ? marketOverProb : 1 - marketOverProb;
+  const edgePP     = Math.round((modelProb - marketProb) * 1000) / 10;
   const hasRealOdds = overOdds !== -110 || underOdds !== -110;
 
-  // TRAP: grading says UNSAFE — don't bet regardless of edge
-  if (grade.verdict === 'UNSAFE' && grade.dataQuality === 'full') {
-    return { tier: 'RED', label: 'TRAP', direction, edgePP, modelProb, marketProb, hasRealOdds };
+  // TRAP: grading says UNSAFE with full data, OR the book has inflated the vig
+  if ((grade.verdict === 'UNSAFE' && grade.dataQuality === 'full') || isJuiced) {
+    return { tier: 'TRAP', label: 'TRAP', direction, edgePP, modelProb, marketProb, hasRealOdds };
   }
 
   let tier, label;
   if (edgePP >= 8) {
     tier  = 'GREEN';
-    label = 'BET IT';
+    label = `BET IT ${direction}`;
   } else if (edgePP >= 3) {
     tier  = 'YELLOW';
-    label = 'LEAN';
+    label = `LEAN ${direction}`;
   } else {
     tier  = 'RED';
     label = 'SKIP';
@@ -87,18 +80,23 @@ export function calcEVVerdict(prop, grade) {
 
 export const TIER_CONFIG = {
   GREEN: {
-    dot:       'bg-emerald-400',
-    badge:     'bg-emerald-500/15 border-emerald-500/35 text-emerald-400',
-    label:     'BET IT',
+    dot:   'bg-emerald-400',
+    badge: 'bg-emerald-500/15 border-emerald-500/35 text-emerald-400',
+    label: 'BET IT',
   },
   YELLOW: {
-    dot:       'bg-amber-400',
-    badge:     'bg-amber-500/15 border-amber-500/35 text-amber-400',
-    label:     'LEAN',
+    dot:   'bg-amber-400',
+    badge: 'bg-amber-500/15 border-amber-500/35 text-amber-400',
+    label: 'LEAN',
   },
   RED: {
-    dot:       'bg-rose-500',
-    badge:     'bg-rose-500/12 border-rose-500/30 text-rose-400',
-    label:     'SKIP',
+    dot:   'bg-rose-500',
+    badge: 'bg-rose-500/12 border-rose-500/30 text-rose-400',
+    label: 'SKIP',
+  },
+  TRAP: {
+    dot:   'bg-orange-500',
+    badge: 'bg-orange-500/15 border-orange-500/40 text-orange-400',
+    label: 'TRAP',
   },
 };

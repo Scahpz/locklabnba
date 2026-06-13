@@ -179,13 +179,21 @@ export default function PropHistory() {
 
   const overallHitRate = settled.length > 0 ? Math.round((hits.length / settled.length) * 100) : null;
 
-  // Accuracy by grade tier
+  // Accuracy by grade tier — match on tier field (GREEN/YELLOW/RED/TRAP) or
+  // fall back to grade_label prefix for backwards-compat with old entries
   const byTier = useMemo(() => {
-    const tiers = ['BET IT', 'LEAN', 'SKIP'];
-    return tiers.map(tier => {
-      const tierEntries = settled.filter(e => e.grade_label === tier);
-      const tierHits    = tierEntries.filter(e => e.result === 'hit');
-      return { label: tier, hit: tierHits.length, total: tierEntries.length };
+    const TIERS = [
+      { tier: 'GREEN', label: 'BET IT' },
+      { tier: 'YELLOW', label: 'LEAN' },
+      { tier: 'RED', label: 'SKIP' },
+      { tier: 'TRAP', label: 'TRAP' },
+    ];
+    return TIERS.map(({ tier, label }) => {
+      const tierEntries = settled.filter(e =>
+        e.tier === tier || (e.grade_label || '').startsWith(label)
+      );
+      const tierHits = tierEntries.filter(e => e.result === 'hit');
+      return { label, hit: tierHits.length, total: tierEntries.length };
     }).filter(t => t.total > 0);
   }, [settled]);
 
@@ -269,7 +277,7 @@ export default function PropHistory() {
                         label={t.label}
                         hit={t.hit}
                         total={t.total}
-                        color={t.label === 'BET IT' ? 'text-primary' : t.label === 'LEAN' ? 'text-chart-4' : 'text-destructive'}
+                        color={t.label === 'BET IT' ? 'text-primary' : t.label === 'LEAN' ? 'text-chart-4' : t.label === 'TRAP' ? 'text-orange-400' : 'text-destructive'}
                       />
                     ))}
                   </div>
