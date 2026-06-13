@@ -1,9 +1,9 @@
-const CACHE_KEY = 'locklab_live_props_v35';
-const CACHE_TS_KEY = 'locklab_live_props_ts_v35';
+const CACHE_KEY = 'locklab_live_props_v36';
+const CACHE_TS_KEY = 'locklab_live_props_ts_v36';
 const FRESH_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 (function purgeOldCaches() {
-  for (let i = 1; i <= 34; i++) {
+  for (let i = 1; i <= 35; i++) {
     localStorage.removeItem(`locklab_live_props_v${i}`);
     localStorage.removeItem(`locklab_live_props_date_v${i}`);
     localStorage.removeItem(`locklab_live_props_ts_v${i}`);
@@ -198,8 +198,8 @@ async function _doFetch() {
   // We cap both at 9s so a slow scrape never blocks showing props.
   const [settingsResult, ppResult, udResult] = await Promise.allSettled([
     fetchWithTimeout(`${NBA_API}/api/settings`, {}, 5000).then(r => r.json()).catch(() => ({})),
-    fetchWithTimeout(`${NBA_API}/api/prizepicks/props`, {}, 9000).then(r => r.ok ? r.json() : null).catch(() => null),
-    fetchWithTimeout(`${NBA_API}/api/underdog/props`, {}, 9000).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetchWithTimeout(`${NBA_API}/api/prizepicks/props`, {}, 22000).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetchWithTimeout(`${NBA_API}/api/underdog/props`, {}, 22000).then(r => r.ok ? r.json() : null).catch(() => null),
   ]);
 
   const settings    = settingsResult.status === 'fulfilled' ? settingsResult.value : {};

@@ -769,7 +769,49 @@ export default function Props() {
 
           {/* Filters */}
           <div className="flex flex-col gap-2" ref={searchRef}>
-            {/* Row 1: prop type pills */}
+            {/* Platform switcher — single-select, shown whenever any source is available */}
+            {availableSources.length > 0 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 pb-1 scrollbar-none">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 flex-shrink-0 self-center mr-0.5">
+                  Platform
+                </span>
+                {/* "All" — deselects platform filter */}
+                <button
+                  onClick={() => setSelectedSources([])}
+                  className={cn(
+                    "text-xs px-3 py-1.5 rounded-lg border transition-all flex-shrink-0 whitespace-nowrap font-medium",
+                    selectedSources.length === 0
+                      ? "bg-white/12 border-white/30 text-foreground"
+                      : "bg-secondary/40 border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
+                  )}
+                >
+                  All
+                </button>
+                {availableSources.map(src => {
+                  const meta = SOURCE_META[src] || { label: src, cls: 'text-muted-foreground bg-white/5 border-white/10' };
+                  const active = selectedSources[0] === src;
+                  return (
+                    <button
+                      key={src}
+                      onClick={() => setSelectedSources(active ? [] : [src])}
+                      className={cn(
+                        "text-xs px-3 py-1.5 rounded-lg border transition-all flex-shrink-0 whitespace-nowrap font-medium",
+                        active ? meta.cls : "bg-secondary/40 border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
+                      )}
+                    >
+                      {meta.label}
+                    </button>
+                  );
+                })}
+                {selectedSources.length === 1 && (
+                  <span className="text-[10px] text-muted-foreground/50 flex-shrink-0 self-center ml-1">
+                    · grading against {SOURCE_META[selectedSources[0]]?.label ?? selectedSources[0]} lines
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Prop type pills */}
             <div className="flex gap-1.5 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap pb-1 scrollbar-none">
               <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 self-center" />
               {PROP_TYPES.map(t => (
@@ -787,42 +829,6 @@ export default function Props() {
                 </button>
               ))}
             </div>
-
-            {/* Row 1b: platform / source filter — only shown when data has multiple sources */}
-            {availableSources.length > 1 && (
-              <div className="flex items-center gap-1.5 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 pb-1 scrollbar-none">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 flex-shrink-0 mr-0.5">App</span>
-                <button
-                  onClick={() => setSelectedSources([])}
-                  className={cn(
-                    "text-xs px-3 py-1.5 rounded-lg border transition-all flex-shrink-0 whitespace-nowrap",
-                    selectedSources.length === 0
-                      ? "bg-white/10 border-white/25 text-foreground font-medium"
-                      : "bg-secondary/40 border-border/50 text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  All
-                </button>
-                {availableSources.map(src => {
-                  const meta = SOURCE_META[src] || { label: src, cls: 'text-muted-foreground bg-white/5 border-white/10' };
-                  const active = selectedSources.includes(src);
-                  return (
-                    <button
-                      key={src}
-                      onClick={() => setSelectedSources(prev =>
-                        active ? prev.filter(s => s !== src) : [...prev, src]
-                      )}
-                      className={cn(
-                        "text-xs px-3 py-1.5 rounded-lg border transition-all flex-shrink-0 whitespace-nowrap font-medium",
-                        active ? meta.cls : "bg-secondary/40 border-border/50 text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      {meta.label}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
 
 
             {/* Row 2: player search + sort */}
