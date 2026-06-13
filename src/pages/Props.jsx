@@ -816,11 +816,11 @@ export default function Props() {
                   {/* Sportsbook unlock hint — only when no sportsbook data loaded */}
                   {hasOnlyFreeSources && (
                     <p className="text-[10px] text-muted-foreground/40 pl-1">
-                      FanDuel · DraftKings · Bet365 · BetMGM · Caesars + more available with an{' '}
+                      FanDuel · Bet365 · BetMGM · Caesars + more available with an{' '}
                       <a href="https://the-odds-api.com" target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-muted-foreground/70 transition-colors">
                         Odds API key
                       </a>
-                      {' '}configured in Settings.
+                      {' '}in Settings.
                     </p>
                   )}
                 </div>

@@ -1,9 +1,9 @@
-const CACHE_KEY = 'locklab_live_props_v36';
-const CACHE_TS_KEY = 'locklab_live_props_ts_v36';
+const CACHE_KEY = 'locklab_live_props_v37';
+const CACHE_TS_KEY = 'locklab_live_props_ts_v37';
 const FRESH_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 (function purgeOldCaches() {
-  for (let i = 1; i <= 35; i++) {
+  for (let i = 1; i <= 36; i++) {
     localStorage.removeItem(`locklab_live_props_v${i}`);
     localStorage.removeItem(`locklab_live_props_date_v${i}`);
     localStorage.removeItem(`locklab_live_props_ts_v${i}`);
@@ -32,12 +32,12 @@ export function setStoredApiKey() {}
 // Human-readable display info keyed by the book/source key the backend uses.
 // Keys match what the Odds API returns (or our own keys for PP/UD).
 export const SOURCE_META = {
-  // ── DFS / contest apps (free data, no API key needed) ───────────────────────
+  // ── Free sources (no API key needed) ─────────────────────────────────────────
   prizepicks:    { label: 'PrizePicks', cls: 'text-purple-400  bg-purple-500/15  border-purple-500/30',  free: true  },
   underdog:      { label: 'Underdog',   cls: 'text-rose-400    bg-rose-500/15    border-rose-500/30',    free: true  },
+  draftkings:    { label: 'DraftKings', cls: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30', free: true  },
   // ── Sportsbooks (require Odds API key) ─────────────────────────────────────
   fanduel:       { label: 'FanDuel',    cls: 'text-sky-400     bg-sky-500/15     border-sky-500/30'     },
-  draftkings:    { label: 'DraftKings', cls: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30' },
   betmgm:        { label: 'BetMGM',    cls: 'text-orange-400  bg-orange-500/15  border-orange-500/30'  },
   caesars:       { label: 'Caesars',    cls: 'text-yellow-400  bg-yellow-500/15  border-yellow-500/30'  },
   bet365:        { label: 'Bet365',     cls: 'text-lime-400    bg-lime-500/15    border-lime-500/30'    },
@@ -120,7 +120,7 @@ export function savePrevLines(props) {
 //   line      — median across all books (consensus)
 //   over_odds / under_odds — best (highest) across all books
 
-function mergeSources(oddsData, ppData, udData) {
+function mergeSources(oddsData, ppData, udData, dkData) {
   // key = "PlayerName__prop_type"
   const map = {};
 
@@ -130,13 +130,18 @@ function mergeSources(oddsData, ppData, udData) {
       map[key] = { ...prop, sources: new Set(), all_books: [] };
     }
     const m = map[key];
+    // Fill in team/game info when an earlier source left it blank (e.g. DraftKings)
+    if (!m.player_team && prop.player_team) m.player_team = prop.player_team;
+    if (!m.home && prop.home) m.home = prop.home;
+    if (!m.away && prop.away) m.away = prop.away;
+    if (!m.position && prop.position) m.position = prop.position;
     if (!m.sources.has(bookKey)) {
       m.sources.add(bookKey);
       m.all_books.push({
-        key:       bookKey,
-        title:     bookTitle,
-        line:      prop.line,
-        over_odds: prop.over_odds,
+        key:        bookKey,
+        title:      bookTitle,
+        line:       prop.line,
+        over_odds:  prop.over_odds,
         under_odds: prop.under_odds,
       });
     }
@@ -147,11 +152,9 @@ function mergeSources(oddsData, ppData, udData) {
     for (const prop of oddsData.rawProps) {
       const books = prop.bookmakers || [];
       if (books.length === 0) {
-        // No individual book data — treat as generic "odds" source
         upsert(prop, 'odds', 'Sportsbook');
       } else {
         for (const b of books) {
-          // Build a per-book prop so upsert adds it cleanly
           upsert(
             { ...prop, line: b.line ?? prop.line, over_odds: b.over_odds ?? prop.over_odds, under_odds: b.under_odds ?? prop.under_odds },
             b.key,
@@ -159,6 +162,13 @@ function mergeSources(oddsData, ppData, udData) {
           );
         }
       }
+    }
+  }
+
+  // DraftKings (free, scraped directly)
+  if (dkData?.rawProps?.length) {
+    for (const prop of dkData.rawProps) {
+      upsert(prop, 'draftkings', 'DraftKings');
     }
   }
 
@@ -202,12 +212,12 @@ async function _doFetch() {
   const defaultBookmakers = 'draftkings,fanduel,betmgm,caesars,pointsbetus';
 
   // Fetch settings + all free sources in parallel.
-  // Underdog tends to respond in 3-6s; PrizePicks can take 8-12s.
-  // We cap both at 9s so a slow scrape never blocks showing props.
-  const [settingsResult, ppResult, udResult] = await Promise.allSettled([
+  // DK subcategory discovery + parallel fetches typically take 8-18s.
+  const [settingsResult, ppResult, udResult, dkResult] = await Promise.allSettled([
     fetchWithTimeout(`${NBA_API}/api/settings`, {}, 5000).then(r => r.json()).catch(() => ({})),
     fetchWithTimeout(`${NBA_API}/api/prizepicks/props`, {}, 22000).then(r => r.ok ? r.json() : null).catch(() => null),
     fetchWithTimeout(`${NBA_API}/api/underdog/props`, {}, 22000).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetchWithTimeout(`${NBA_API}/api/draftkings/props`, {}, 25000).then(r => r.ok ? r.json() : null).catch(() => null),
   ]);
 
   const settings    = settingsResult.status === 'fulfilled' ? settingsResult.value : {};
@@ -215,6 +225,7 @@ async function _doFetch() {
   const bookmakers  = settings?.bookmakers || defaultBookmakers;
   const ppData      = ppResult.status === 'fulfilled' ? ppResult.value : null;
   const udData      = udResult.status === 'fulfilled' ? udResult.value : null;
+  const dkData      = dkResult.status === 'fulfilled' ? dkResult.value : null;
 
   let oddsData = null;
   if (hasOddsKey) {
@@ -224,7 +235,7 @@ async function _doFetch() {
   }
 
   // Merge all sources
-  let rawProps = mergeSources(oddsData, ppData, udData);
+  let rawProps = mergeSources(oddsData, ppData, udData, dkData);
 
   // Last-resort fallback
   if (!rawProps.length) {
@@ -239,9 +250,9 @@ async function _doFetch() {
     return { game_date: new Date().toLocaleDateString(), games_summary: [], props: [] };
   }
 
-  const gameDate     = oddsData?.game_date || ppData?.game_date || udData?.game_date
+  const gameDate     = oddsData?.game_date || ppData?.game_date || udData?.game_date || dkData?.game_date
     || new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  const gamesSummary = oddsData?.games_summary || ppData?.games_summary || udData?.games_summary || [];
+  const gamesSummary = oddsData?.games_summary || ppData?.games_summary || udData?.games_summary || dkData?.games_summary || [];
 
   const props = rawProps.map((prop, i) => enrichProp(prop, i));
   const payload = { game_date: gameDate, games_summary: gamesSummary, props };

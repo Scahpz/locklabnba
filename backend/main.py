@@ -1425,6 +1425,168 @@ async def get_underdog_props():
     return result
 
 
+# ── /api/draftkings/props  (free, no key required) ───────────────────────────
+DK_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Origin": "https://sportsbook.draftkings.com",
+    "Referer": "https://sportsbook.draftkings.com/",
+}
+DK_NBA_GROUP = 42648      # NBA event group at DraftKings
+DK_PROPS_CAT  = 583       # "Player Props" offer category
+
+DK_STAT_MAP = {
+    "Points":           "points",
+    "Rebounds":         "rebounds",
+    "Assists":          "assists",
+    "3-Pointers Made":  "3PM",
+    "Pts + Rebs + Asts":"PRA",
+    "Pts + Reb":        "P+R",
+    "Pts + Ast":        "P+A",
+    "Ast + Reb":        "A+R",
+    "Steals":           "steals",
+    "Blocked Shots":    "blocks",
+}
+
+def _dk_get(path: str, timeout: int = 12) -> dict:
+    url = f"https://sportsbook.draftkings.com/sites/US-SB/api/v5{path}"
+    r = requests.get(url, params={"format": "json"}, headers=DK_HEADERS, timeout=timeout)
+    r.raise_for_status()
+    return r.json()
+
+@app.get("/api/draftkings/props")
+async def get_dk_props():
+    cached = cache_get("dk_props", ttl=900)
+    if cached:
+        return cached
+
+    # Step 1: discover which subcategory IDs cover our target stat types
+    try:
+        top = _dk_get(f"/eventgroups/{DK_NBA_GROUP}/categories/{DK_PROPS_CAT}")
+    except Exception as e:
+        raise HTTPException(502, f"DraftKings unavailable: {e}")
+
+    eg = top.get("eventGroup", {})
+    subcat_ids: list[tuple[int, str]] = []   # (subcategoryId, prop_type)
+    for ocat in eg.get("offerCategories", []):
+        for desc in ocat.get("offerSubcategoryDescriptors", []):
+            name = desc.get("name", "")
+            pt   = DK_STAT_MAP.get(name)
+            if pt:
+                subcat_ids.append((desc["subcategoryId"], pt))
+
+    if not subcat_ids:
+        logging.warning("DraftKings: no matching subcategories found")
+        return {"rawProps": [], "source": "draftkings", "game_date": datetime.now().strftime("%A, %B %d"), "games_summary": []}
+
+    # Step 2: fetch each subcategory in parallel
+    def _fetch_subcat(args):
+        subcat_id, prop_type = args
+        try:
+            return prop_type, _dk_get(f"/eventgroups/{DK_NBA_GROUP}/categories/{DK_PROPS_CAT}/subcategories/{subcat_id}")
+        except Exception as e:
+            logging.warning(f"DraftKings subcat {subcat_id} ({prop_type}): {e}")
+            return prop_type, None
+
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=min(6, len(subcat_ids))) as pool:
+        results = list(pool.map(_fetch_subcat, subcat_ids))
+
+    # Step 3: parse offers
+    raw_props: list = []
+    games_summary: list = []
+    seen: set = set()
+    seen_games: set = set()
+
+    for prop_type, data in results:
+        if not data:
+            continue
+        eg2 = data.get("eventGroup", {})
+
+        # Build event → team map
+        events_by_id: dict = {}
+        for evt in eg2.get("events", []):
+            eid = evt.get("eventId")
+            events_by_id[eid] = {
+                "home": evt.get("homeTeamAbbreviation", ""),
+                "away": evt.get("awayTeamAbbreviation", ""),
+                "scheduled_at": evt.get("startDate", ""),
+            }
+
+        for ocat in eg2.get("offerCategories", []):
+            for desc in ocat.get("offerSubcategoryDescriptors", []):
+                sub = desc.get("offerSubcategory") or {}
+                for offer_list in sub.get("offers", []):
+                    # Each offer_list = [over_outcome, under_outcome] for one player
+                    player_name = None
+                    line = None
+                    over_odds = -110
+                    under_odds = -110
+                    event_id = None
+
+                    for outcome in offer_list:
+                        if player_name is None:
+                            player_name = outcome.get("participant") or outcome.get("label")
+                        if line is None:
+                            line = outcome.get("line")
+                        if event_id is None:
+                            event_id = outcome.get("eventId")
+                        raw_label = (outcome.get("label") or "").lower()
+                        try:
+                            odds = int(str(outcome.get("oddsAmerican", "-110")).replace("+", ""))
+                        except (ValueError, TypeError):
+                            odds = -110
+                        if "over" in raw_label:
+                            over_odds = odds
+                        elif "under" in raw_label:
+                            under_odds = odds
+
+                    if not player_name or line is None:
+                        continue
+
+                    key = (player_name, prop_type)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+
+                    game = events_by_id.get(event_id, {})
+                    home = game.get("home", "")
+                    away = game.get("away", "")
+                    gkey = f"{away}@{home}"
+                    if gkey not in seen_games and home and away:
+                        seen_games.add(gkey)
+                        games_summary.append({"home": home, "away": away, "scheduled_at": game.get("scheduled_at", "")})
+
+                    raw_props.append({
+                        "player_name": player_name,
+                        "prop_type":   prop_type,
+                        "line":        float(line),
+                        "home":        home,
+                        "away":        away,
+                        "player_team": "",   # filled in by mergeSources from PP/UD
+                        "position":    "G",
+                        "over_odds":   over_odds,
+                        "under_odds":  under_odds,
+                        "bookmakers": [{"title": "DraftKings", "key": "draftkings",
+                                        "line": float(line), "over_odds": over_odds, "under_odds": under_odds}],
+                        "avg_last_10": None, "avg_last_5": None,
+                        "hit_rate_last_10": None, "projection": None,
+                        "edge": None, "confidence_score": 5,
+                        "streak_info": None, "last_10_games": None, "game_logs_last_10": None,
+                    })
+
+    result = {
+        "game_date":     datetime.now().strftime("%A, %B %d"),
+        "games_summary": games_summary,
+        "rawProps":      raw_props,
+        "source":        "draftkings",
+    }
+    cache_set("dk_props", result)
+    logging.info(f"DraftKings: scraped {len(raw_props)} props")
+    return result
+
+
 # ── /api/free-props  (PrizePicks + Underdog merged, deduped, best line) ────────
 @app.get("/api/free-props")
 async def get_free_props():
