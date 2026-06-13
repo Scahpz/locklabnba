@@ -9,6 +9,7 @@ import VerdictBadge from '@/components/props/VerdictBadge';
 import PropGradeChecklist from '@/components/props/PropGradeChecklist';
 import { gradeProp } from '@/lib/grading';
 import { calcEVVerdict, TIER_CONFIG } from '@/lib/verdict';
+import { SOURCE_META } from '@/lib/liveData';
 
 function fmtOdds(n) {
   if (n == null) return '—';
@@ -183,6 +184,21 @@ export default function RankedPropCard({ prop, rank, aiVerdict, aiLoading, onOpe
           <p className="text-sm font-bold text-foreground mt-0.5">{prop.hit_rate_last_10 != null ? `${prop.hit_rate_last_10}%` : '—'}</p>
         </div>
       </div>
+
+      {/* Platform availability */}
+      {prop.sources?.length > 0 && (
+        <div className="px-4 pb-2 flex items-center gap-1.5 flex-wrap">
+          {/** @type {string[]} */ (prop.sources).map(src => {
+            const m = SOURCE_META[src];
+            if (!m) return null;
+            return (
+              <span key={src} className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-md border', m.cls)}>
+                {m.label}
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {/* Streak */}
       {prop.streak_info && (

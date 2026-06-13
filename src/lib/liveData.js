@@ -1,9 +1,9 @@
-const CACHE_KEY = 'locklab_live_props_v34';
-const CACHE_TS_KEY = 'locklab_live_props_ts_v34';
-const FRESH_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours — stays valid across typical use gaps
+const CACHE_KEY = 'locklab_live_props_v35';
+const CACHE_TS_KEY = 'locklab_live_props_ts_v35';
+const FRESH_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 (function purgeOldCaches() {
-  for (let i = 1; i <= 33; i++) {
+  for (let i = 1; i <= 34; i++) {
     localStorage.removeItem(`locklab_live_props_v${i}`);
     localStorage.removeItem(`locklab_live_props_date_v${i}`);
     localStorage.removeItem(`locklab_live_props_ts_v${i}`);
@@ -28,6 +28,17 @@ export function clearLiveCache() {
 
 export function getStoredApiKey() { return null; }
 export function setStoredApiKey() {}
+
+// Human-readable display info keyed by the book/source key the backend uses
+export const SOURCE_META = {
+  fanduel:     { label: 'FanDuel',    cls: 'text-sky-400     bg-sky-500/15     border-sky-500/30'     },
+  draftkings:  { label: 'DraftKings', cls: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30' },
+  betmgm:      { label: 'BetMGM',    cls: 'text-orange-400  bg-orange-500/15  border-orange-500/30'  },
+  caesars:     { label: 'Caesars',    cls: 'text-yellow-400  bg-yellow-500/15  border-yellow-500/30'  },
+  pointsbetus: { label: 'PointsBet', cls: 'text-indigo-400  bg-indigo-500/15  border-indigo-500/30'  },
+  prizepicks:  { label: 'PrizePicks', cls: 'text-purple-400  bg-purple-500/15  border-purple-500/30'  },
+  underdog:    { label: 'Underdog',   cls: 'text-rose-400    bg-rose-500/15    border-rose-500/30'    },
+};
 
 function fetchWithTimeout(url, opts, ms) {
   const ctrl = new AbortController();
@@ -71,6 +82,9 @@ function enrichProp(prop, index) {
     confidence_tier: hasRealAnalytics
       ? (confidence_score >= 8 ? 'A' : confidence_score >= 6 ? 'B' : 'C')
       : 'C',
+    // all_books preserved from merge step; sources array drives platform filter
+    all_books: prop.all_books || [],
+    sources:   prop.sources   || [],
   };
 }
 
@@ -90,56 +104,137 @@ export function savePrevLines(props) {
   try { sessionStorage.setItem(LINE_PREV_KEY, JSON.stringify(map)); } catch {}
 }
 
+// ── Multi-source merge ────────────────────────────────────────────────────────
+// Fetches all available sources in parallel and merges into one deduplicated list.
+// Each merged prop carries:
+//   sources   — string[] of platform keys (e.g. ['fanduel', 'draftkings', 'prizepicks'])
+//   all_books — book objects from every source that carries this prop
+//   line      — median across all books (consensus)
+//   over_odds / under_odds — best (highest) across all books
+
+function mergeSources(oddsData, ppData, udData) {
+  // key = "PlayerName__prop_type"
+  const map = {};
+
+  function upsert(prop, bookKey, bookTitle) {
+    const key = `${prop.player_name}__${prop.prop_type}`;
+    if (!map[key]) {
+      map[key] = { ...prop, sources: new Set(), all_books: [] };
+    }
+    const m = map[key];
+    if (!m.sources.has(bookKey)) {
+      m.sources.add(bookKey);
+      m.all_books.push({
+        key:       bookKey,
+        title:     bookTitle,
+        line:      prop.line,
+        over_odds: prop.over_odds,
+        under_odds: prop.under_odds,
+      });
+    }
+  }
+
+  // Odds API props — each prop has its own bookmakers array
+  if (oddsData?.rawProps?.length) {
+    for (const prop of oddsData.rawProps) {
+      const books = prop.bookmakers || [];
+      if (books.length === 0) {
+        // No individual book data — treat as generic "odds" source
+        upsert(prop, 'odds', 'Sportsbook');
+      } else {
+        for (const b of books) {
+          // Build a per-book prop so upsert adds it cleanly
+          upsert(
+            { ...prop, line: b.line ?? prop.line, over_odds: b.over_odds ?? prop.over_odds, under_odds: b.under_odds ?? prop.under_odds },
+            b.key,
+            b.title,
+          );
+        }
+      }
+    }
+  }
+
+  // PrizePicks
+  if (ppData?.rawProps?.length) {
+    for (const prop of ppData.rawProps) {
+      upsert(prop, 'prizepicks', 'PrizePicks');
+    }
+  }
+
+  // Underdog
+  if (udData?.rawProps?.length) {
+    for (const prop of udData.rawProps) {
+      upsert(prop, 'underdog', 'Underdog');
+    }
+  }
+
+  return Object.values(map).map(m => {
+    const books = m.all_books;
+    // Consensus line: median
+    const lines = books.map(b => b.line).filter(l => l != null).sort((a, b) => a - b);
+    const line = lines.length ? lines[Math.floor(lines.length / 2)] : m.line;
+    // Best odds: highest value across books
+    const overOdds  = books.reduce((best, b) => b.over_odds  != null && b.over_odds  > best ? b.over_odds  : best, m.over_odds  ?? -110);
+    const underOdds = books.reduce((best, b) => b.under_odds != null && b.under_odds > best ? b.under_odds : best, m.under_odds ?? -110);
+
+    return {
+      ...m,
+      line,
+      over_odds:  overOdds,
+      under_odds: underOdds,
+      sources:    Array.from(m.sources),
+    };
+  });
+}
+
 // ── In-flight promise deduplication ──────────────────────────────────────────
-// Shared across all callers so a prefetch and Props.jsx share one network request.
 let _fetchPromise = null;
 
 async function _doFetch() {
   const defaultBookmakers = 'draftkings,fanduel,betmgm,caesars,pointsbetus';
 
-  // Settings + underdog in parallel — underdog is the fastest reliable source
-  const [settingsResult, underdogResult] = await Promise.allSettled([
+  // Fetch settings + all free sources in parallel
+  const [settingsResult, ppResult, udResult] = await Promise.allSettled([
     fetchWithTimeout(`${NBA_API}/api/settings`, {}, 5000).then(r => r.json()).catch(() => ({})),
-    fetchWithTimeout(`${NBA_API}/api/underdog/props`, {}, 12000).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetchWithTimeout(`${NBA_API}/api/prizepicks/props`, {}, 14000).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetchWithTimeout(`${NBA_API}/api/underdog/props`, {}, 14000).then(r => r.ok ? r.json() : null).catch(() => null),
   ]);
 
-  const settings = settingsResult.status === 'fulfilled' ? settingsResult.value : {};
-  const hasOddsKey = !!settings?.odds_api_key;
-  const bookmakers = settings?.bookmakers || defaultBookmakers;
+  const settings    = settingsResult.status === 'fulfilled' ? settingsResult.value : {};
+  const hasOddsKey  = !!settings?.odds_api_key;
+  const bookmakers  = settings?.bookmakers || defaultBookmakers;
+  const ppData      = ppResult.status === 'fulfilled' ? ppResult.value : null;
+  const udData      = udResult.status === 'fulfilled' ? udResult.value : null;
 
   let oddsData = null;
-
   if (hasOddsKey) {
     oddsData = await fetchWithTimeout(
       `${NBA_API}/api/odds/props?bookmakers=${encodeURIComponent(bookmakers)}`, {}, 10000
     ).then(r => r.ok ? r.json() : null).catch(() => null);
   }
 
-  if (!oddsData?.rawProps?.length) {
-    const ud = underdogResult.status === 'fulfilled' ? underdogResult.value : null;
-    if (ud?.rawProps?.length) oddsData = ud;
-  }
+  // Merge all sources
+  let rawProps = mergeSources(oddsData, ppData, udData);
 
-  if (!oddsData?.rawProps?.length) {
-    oddsData = await fetchWithTimeout(`${NBA_API}/api/prizepicks/props`, {}, 12000)
+  // Last-resort fallback
+  if (!rawProps.length) {
+    const fallback = await fetchWithTimeout(`${NBA_API}/api/live-props`, {}, 12000)
       .then(r => r.ok ? r.json() : null).catch(() => null);
+    if (fallback?.rawProps?.length) {
+      rawProps = fallback.rawProps.map(p => ({ ...p, sources: [], all_books: [] }));
+    }
   }
 
-  if (!oddsData?.rawProps?.length) {
-    oddsData = await fetchWithTimeout(`${NBA_API}/api/live-props`, {}, 12000)
-      .then(r => r.ok ? r.json() : null).catch(() => null);
-  }
-
-  if (!oddsData?.rawProps?.length) {
+  if (!rawProps.length) {
     return { game_date: new Date().toLocaleDateString(), games_summary: [], props: [] };
   }
 
-  const props = oddsData.rawProps.map((prop, i) => enrichProp(prop, i));
-  const payload = {
-    game_date: oddsData.game_date || new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
-    games_summary: oddsData.games_summary || [],
-    props,
-  };
+  const gameDate     = oddsData?.game_date || ppData?.game_date || udData?.game_date
+    || new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const gamesSummary = oddsData?.games_summary || ppData?.games_summary || udData?.games_summary || [];
+
+  const props = rawProps.map((prop, i) => enrichProp(prop, i));
+  const payload = { game_date: gameDate, games_summary: gamesSummary, props };
 
   localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
   localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
@@ -148,15 +243,12 @@ async function _doFetch() {
 
 export async function fetchLiveProps() {
   if (isCacheValid()) return getCachedProps();
-  // Reuse an already-running fetch — avoids duplicate network requests
   if (_fetchPromise) return _fetchPromise;
   _fetchPromise = _doFetch().finally(() => { _fetchPromise = null; });
   return _fetchPromise;
 }
 
 // ── Eager prefetch ────────────────────────────────────────────────────────────
-// Kick off the network request the moment this module is imported —
-// before any React component mounts — so Props.jsx "joins" an already-running fetch.
 if (!isCacheValid()) {
   fetchLiveProps().catch(() => {});
 }

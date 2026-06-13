@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { fetchLiveProps, getCachedProps, isCacheValid, clearLiveCache } from '@/lib/liveData';
+import { fetchLiveProps, getCachedProps, isCacheValid, clearLiveCache, SOURCE_META } from '@/lib/liveData';
 import { getAIVerdicts } from '@/lib/aiVerdicts';
 import LockCards from '@/components/props/LockCards';
 import RankedPropCard from '@/components/props/RankedPropCard';
@@ -95,6 +95,7 @@ export default function Props() {
   const [playerSearch, setPlayerSearch] = useState('');
   const [showPlayerDrop, setShowPlayerDrop] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState(savedFilters.selectedPlayers ?? []);
+  const [selectedSources, setSelectedSources] = useState(savedFilters.selectedSources ?? []);
   const [detailKey, setDetailKey] = useState(null); // { player_name, prop_type }
   const [detailDemon, setDetailDemon] = useState(false);
   const searchRef = useRef(null);
@@ -104,8 +105,8 @@ export default function Props() {
 
   // Persist filter state to sessionStorage so it survives navigation
   useEffect(() => {
-    sessionStorage.setItem('props_filters', JSON.stringify({ selectedGames, selectedType, sortBy, selectedPlayers }));
-  }, [selectedGames, selectedType, sortBy, selectedPlayers]);
+    sessionStorage.setItem('props_filters', JSON.stringify({ selectedGames, selectedType, sortBy, selectedPlayers, selectedSources }));
+  }, [selectedGames, selectedType, sortBy, selectedPlayers, selectedSources]);
 
   const applyData = (data, skipAI = false) => {
     if (!data?.props?.length) return false;
@@ -505,6 +506,15 @@ export default function Props() {
     return candidates[0] || null;
   }, [enrichedProps, todayTeams]);
 
+  // Unique betting platforms present in the current prop set, in display order
+  const availableSources = useMemo(() => {
+    const seen = new Set();
+    enrichedProps.forEach(p => (p.sources || []).forEach(s => seen.add(s)));
+    // Order: sportsbooks first, then DFS/contest sites
+    const ORDER = ['fanduel', 'draftkings', 'betmgm', 'caesars', 'pointsbetus', 'prizepicks', 'underdog'];
+    return ORDER.filter(s => seen.has(s));
+  }, [enrichedProps]);
+
   // Unique player names for search suggestions
   const allPlayerNames = useMemo(() => {
     const seen = new Set();
@@ -536,6 +546,12 @@ export default function Props() {
       result = result.filter(p => selectedPlayers.includes(p.player_name));
     }
 
+    if (selectedSources.length > 0) {
+      result = result.filter(p =>
+        (p.sources || []).some(s => selectedSources.includes(s))
+      );
+    }
+
     if (selectedGames.length > 0) {
       result = result.filter(p => {
         const pTeam = (p.team || '').toUpperCase();
@@ -561,7 +577,7 @@ export default function Props() {
 
     // Diversity cap: max 3 props per team so a single favorable matchup can't
     // flood the top of the list. Only applies to AI Rank sort with no active filters.
-    const isUnfiltered = selectedGames.length === 0 && selectedPlayers.length === 0 && selectedType === 'all';
+    const isUnfiltered = selectedGames.length === 0 && selectedPlayers.length === 0 && selectedType === 'all' && selectedSources.length === 0;
     if (sortBy === 'ai_rank' && isUnfiltered) {
       const teamCount = {};
       const capped = [];
@@ -577,7 +593,7 @@ export default function Props() {
     }
 
     return result;
-  }, [enrichedProps, selectedGames, selectedType, sortBy, selectedPlayers]);
+  }, [enrichedProps, selectedGames, selectedType, sortBy, selectedPlayers, selectedSources]);
 
   if (loading) {
     return (
@@ -749,6 +765,43 @@ export default function Props() {
                 </button>
               ))}
             </div>
+
+            {/* Row 1b: platform / source filter — only shown when data has multiple sources */}
+            {availableSources.length > 1 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 pb-1 scrollbar-none">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 flex-shrink-0 mr-0.5">App</span>
+                <button
+                  onClick={() => setSelectedSources([])}
+                  className={cn(
+                    "text-xs px-3 py-1.5 rounded-lg border transition-all flex-shrink-0 whitespace-nowrap",
+                    selectedSources.length === 0
+                      ? "bg-white/10 border-white/25 text-foreground font-medium"
+                      : "bg-secondary/40 border-border/50 text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  All
+                </button>
+                {availableSources.map(src => {
+                  const meta = SOURCE_META[src] || { label: src, cls: 'text-muted-foreground bg-white/5 border-white/10' };
+                  const active = selectedSources.includes(src);
+                  return (
+                    <button
+                      key={src}
+                      onClick={() => setSelectedSources(prev =>
+                        active ? prev.filter(s => s !== src) : [...prev, src]
+                      )}
+                      className={cn(
+                        "text-xs px-3 py-1.5 rounded-lg border transition-all flex-shrink-0 whitespace-nowrap font-medium",
+                        active ? meta.cls : "bg-secondary/40 border-border/50 text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {meta.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
 
             {/* Row 2: player search + sort */}
             <div className="flex items-center gap-2 flex-wrap">
