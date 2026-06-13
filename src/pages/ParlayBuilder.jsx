@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { fetchLiveProps } from '@/lib/liveData';
-import { Layers, X, TrendingUp, CheckCircle2, Trophy, Loader2 } from 'lucide-react';
+import { Layers, X, TrendingUp, CheckCircle2, Trophy, Loader2, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import TeamLogo from '@/components/common/TeamLogo';
 import { useParlay } from '@/lib/ParlayContext';
 import { base44 } from '@/api/base44Client';
+import ParlayHistoryTab from '@/components/props/ParlayHistoryTab';
 
 function calculateCombinedOdds(legs) {
   if (legs.length === 0) return '0';
@@ -42,6 +43,8 @@ export default function ParlayBuilder() {
   const [loadingProps, setLoadingProps] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [parlayName, setParlayName] = useState('');
+  const [activeTab, setActiveTab] = useState('builder');
+  const [historyKey, setHistoryKey] = useState(0);
 
   useEffect(() => {
     async function load() {
@@ -104,9 +107,11 @@ export default function ParlayBuilder() {
         game_date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
         status: 'pending',
       });
-      toast.success('Parlay submitted! Track it in your Profile.');
+      toast.success('Parlay saved! Switching to History…');
       clearLegs();
       setParlayName('');
+      setHistoryKey(k => k + 1);
+      setActiveTab('history');
     } catch (e) {
       toast.error('Failed to submit parlay');
     } finally {
@@ -121,10 +126,47 @@ export default function ParlayBuilder() {
           <Layers className="w-7 h-7 text-accent" />
           Parlay Builder
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">Build from today's live props and submit to track results</p>
+        <p className="text-sm text-muted-foreground mt-1">Build from today's live props and track your results</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Tab switcher */}
+      <div className="flex gap-1.5">
+        <button
+          onClick={() => setActiveTab('builder')}
+          className={cn(
+            "flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg border transition-all",
+            activeTab === 'builder'
+              ? "bg-primary/20 border-primary/40 text-primary"
+              : "bg-secondary/40 border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
+          )}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          Builder
+          {legs.length > 0 && (
+            <span className="text-[10px] font-bold bg-primary text-primary-foreground rounded-full w-4 h-4 flex items-center justify-center">
+              {legs.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('history')}
+          className={cn(
+            "flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg border transition-all",
+            activeTab === 'history'
+              ? "bg-white/12 border-white/25 text-foreground"
+              : "bg-secondary/40 border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
+          )}
+        >
+          <History className="w-3.5 h-3.5" />
+          History
+        </button>
+      </div>
+
+      {/* History tab */}
+      {activeTab === 'history' && <ParlayHistoryTab refreshKey={historyKey} />}
+
+      {/* Builder tab */}
+      {activeTab === 'builder' && <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Parlay Slip */}
         <div className="lg:col-span-1">
           <div className="rounded-xl border border-border bg-card p-4 sticky top-4">
@@ -291,7 +333,7 @@ export default function ParlayBuilder() {
             </div>
           )}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
