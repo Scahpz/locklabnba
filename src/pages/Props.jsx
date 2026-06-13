@@ -769,47 +769,63 @@ export default function Props() {
 
           {/* Filters */}
           <div className="flex flex-col gap-2" ref={searchRef}>
-            {/* Platform switcher — single-select, shown whenever any source is available */}
-            {availableSources.length > 0 && (
-              <div className="flex items-center gap-1.5 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 pb-1 scrollbar-none">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 flex-shrink-0 self-center mr-0.5">
-                  Platform
-                </span>
-                {/* "All" — deselects platform filter */}
-                <button
-                  onClick={() => setSelectedSources([])}
-                  className={cn(
-                    "text-xs px-3 py-1.5 rounded-lg border transition-all flex-shrink-0 whitespace-nowrap font-medium",
-                    selectedSources.length === 0
-                      ? "bg-white/12 border-white/30 text-foreground"
-                      : "bg-secondary/40 border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
-                  )}
-                >
-                  All
-                </button>
-                {availableSources.map(src => {
-                  const meta = SOURCE_META[src] || { label: src, cls: 'text-muted-foreground bg-white/5 border-white/10' };
-                  const active = selectedSources[0] === src;
-                  return (
+            {/* Platform switcher */}
+            {availableSources.length > 0 && (() => {
+              const hasOnlyFreeSources = availableSources.every(s => SOURCE_META[s]?.free);
+              const activeMeta = selectedSources[0] ? (SOURCE_META[selectedSources[0]] || { label: selectedSources[0] }) : null;
+              return (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 pb-1 scrollbar-none">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 flex-shrink-0 self-center mr-0.5">
+                      Platform
+                    </span>
+                    {/* All — clears platform filter */}
                     <button
-                      key={src}
-                      onClick={() => setSelectedSources(active ? [] : [src])}
+                      onClick={() => setSelectedSources([])}
                       className={cn(
                         "text-xs px-3 py-1.5 rounded-lg border transition-all flex-shrink-0 whitespace-nowrap font-medium",
-                        active ? meta.cls : "bg-secondary/40 border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
+                        selectedSources.length === 0
+                          ? "bg-white/12 border-white/30 text-foreground"
+                          : "bg-secondary/40 border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
                       )}
                     >
-                      {meta.label}
+                      All
                     </button>
-                  );
-                })}
-                {selectedSources.length === 1 && (
-                  <span className="text-[10px] text-muted-foreground/50 flex-shrink-0 self-center ml-1">
-                    · grading against {SOURCE_META[selectedSources[0]]?.label ?? selectedSources[0]} lines
-                  </span>
-                )}
-              </div>
-            )}
+                    {availableSources.map(src => {
+                      const meta = SOURCE_META[src] || { label: src, cls: 'text-muted-foreground bg-white/5 border-white/10' };
+                      const active = selectedSources[0] === src;
+                      return (
+                        <button
+                          key={src}
+                          onClick={() => setSelectedSources(active ? [] : [src])}
+                          className={cn(
+                            "text-xs px-3 py-1.5 rounded-lg border transition-all flex-shrink-0 whitespace-nowrap font-medium",
+                            active ? meta.cls : "bg-secondary/40 border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
+                          )}
+                        >
+                          {meta.label}
+                        </button>
+                      );
+                    })}
+                    {activeMeta && (
+                      <span className="text-[10px] text-muted-foreground/50 flex-shrink-0 self-center ml-1 whitespace-nowrap">
+                        · grading against {activeMeta.label} lines
+                      </span>
+                    )}
+                  </div>
+                  {/* Sportsbook unlock hint — only when no sportsbook data loaded */}
+                  {hasOnlyFreeSources && (
+                    <p className="text-[10px] text-muted-foreground/40 pl-1">
+                      FanDuel · DraftKings · Bet365 · BetMGM · Caesars + more available with an{' '}
+                      <a href="https://the-odds-api.com" target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-muted-foreground/70 transition-colors">
+                        Odds API key
+                      </a>
+                      {' '}configured in Settings.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Prop type pills */}
             <div className="flex gap-1.5 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap pb-1 scrollbar-none">

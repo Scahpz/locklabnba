@@ -29,15 +29,23 @@ export function clearLiveCache() {
 export function getStoredApiKey() { return null; }
 export function setStoredApiKey() {}
 
-// Human-readable display info keyed by the book/source key the backend uses
+// Human-readable display info keyed by the book/source key the backend uses.
+// Keys match what the Odds API returns (or our own keys for PP/UD).
 export const SOURCE_META = {
-  fanduel:     { label: 'FanDuel',    cls: 'text-sky-400     bg-sky-500/15     border-sky-500/30'     },
-  draftkings:  { label: 'DraftKings', cls: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30' },
-  betmgm:      { label: 'BetMGM',    cls: 'text-orange-400  bg-orange-500/15  border-orange-500/30'  },
-  caesars:     { label: 'Caesars',    cls: 'text-yellow-400  bg-yellow-500/15  border-yellow-500/30'  },
-  pointsbetus: { label: 'PointsBet', cls: 'text-indigo-400  bg-indigo-500/15  border-indigo-500/30'  },
-  prizepicks:  { label: 'PrizePicks', cls: 'text-purple-400  bg-purple-500/15  border-purple-500/30'  },
-  underdog:    { label: 'Underdog',   cls: 'text-rose-400    bg-rose-500/15    border-rose-500/30'    },
+  // ── DFS / contest apps (free data, no API key needed) ───────────────────────
+  prizepicks:    { label: 'PrizePicks', cls: 'text-purple-400  bg-purple-500/15  border-purple-500/30',  free: true  },
+  underdog:      { label: 'Underdog',   cls: 'text-rose-400    bg-rose-500/15    border-rose-500/30',    free: true  },
+  // ── Sportsbooks (require Odds API key) ─────────────────────────────────────
+  fanduel:       { label: 'FanDuel',    cls: 'text-sky-400     bg-sky-500/15     border-sky-500/30'     },
+  draftkings:    { label: 'DraftKings', cls: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30' },
+  betmgm:        { label: 'BetMGM',    cls: 'text-orange-400  bg-orange-500/15  border-orange-500/30'  },
+  caesars:       { label: 'Caesars',    cls: 'text-yellow-400  bg-yellow-500/15  border-yellow-500/30'  },
+  bet365:        { label: 'Bet365',     cls: 'text-lime-400    bg-lime-500/15    border-lime-500/30'    },
+  pointsbetus:   { label: 'PointsBet',  cls: 'text-indigo-400  bg-indigo-500/15  border-indigo-500/30'  },
+  betonlineag:   { label: 'BetOnline',  cls: 'text-cyan-400    bg-cyan-500/15    border-cyan-500/30'    },
+  mybookieag:    { label: 'MyBookie',   cls: 'text-teal-400    bg-teal-500/15    border-teal-500/30'    },
+  bovada:        { label: 'Bovada',     cls: 'text-amber-400   bg-amber-500/15   border-amber-500/30'   },
+  williamhill_us:{ label: 'WilliamHill',cls: 'text-blue-400    bg-blue-500/15    border-blue-500/30'    },
 };
 
 function fetchWithTimeout(url, opts, ms) {

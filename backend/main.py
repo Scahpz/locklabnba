@@ -398,21 +398,35 @@ class StatsRequest(BaseModel):
     propType: str
     line: float
 
+def _to_ascii(s: str) -> str:
+    """Convert accented / non-ASCII chars to their closest ASCII equivalent.
+    ş→s, ü→u, Jokić→Jokic, curly apostrophes→straight, etc."""
+    import unicodedata
+    s = s.replace('’', "'").replace('‘', "'")  # curly apostrophes
+    return unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('ascii')
+
 def find_player(name: str):
     from nba_api.stats.static import players as ps
-    # Exact match first
-    matches = ps.find_players_by_full_name(name)
+    import re
+
+    # Normalise unicode so "Şengün" matches "Sengun", "Jokić" matches "Jokic"
+    clean = _to_ascii(name)
+
+    # Exact match first (with ASCII-cleaned name)
+    matches = ps.find_players_by_full_name(clean)
     active = [p for p in matches if p.get("is_active")]
     if active:
         return active[0]
     if matches:
         return matches[0]
-    # Fuzzy fallback: normalize (remove periods, Jr/Sr/III, extra spaces)
-    import re
+
+    # Fuzzy fallback: remove Jr/Sr/suffixes and all non-alpha chars
     def normalize(n):
-        n = re.sub(r'\b(jr|sr|ii|iii|iv)\b\.?', '', n.lower())
+        n = _to_ascii(n).lower()
+        n = re.sub(r'\b(jr|sr|ii|iii|iv)\b\.?', '', n)
         n = re.sub(r'[^a-z\s]', '', n)
         return ' '.join(n.split())
+
     target = normalize(name)
     all_players = ps.get_players()
     for p in all_players:
@@ -719,8 +733,8 @@ def fetch_game_logs(player_name: str) -> list:
     from concurrent.futures import ThreadPoolExecutor
 
     def _norm_espn(n: str) -> str:
-        """Normalize for loose matching: lowercase, drop all non-alpha chars."""
-        return ' '.join(_re.sub(r'[^a-z ]', '', n.lower()).split())
+        """Normalize for loose matching: ASCII-fold accents, lowercase, strip punctuation."""
+        return ' '.join(_re.sub(r'[^a-z ]', '', _to_ascii(n).lower()).split())
 
     player_norm = _norm_espn(player_name)
 
@@ -837,7 +851,8 @@ async def get_player_gamelogs_bulk(req: BulkGamelogsRequest):
     # 15 days covers current games + recent history; 40 days was too slow on cold start
     _scoreboard_event_ids_recent(days=15)
 
-    with ThreadPoolExecutor(max_workers=min(15, len(names))) as pool:
+    # 8 workers = enough parallelism while avoiding stats.nba.com rate-limit bans
+    with ThreadPoolExecutor(max_workers=min(8, len(names))) as pool:
         results_list = list(pool.map(_analytics_for_player, names))
 
     analytics = {name: data for name, data in zip(names, results_list)}
