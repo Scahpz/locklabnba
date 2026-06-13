@@ -2,9 +2,9 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { fetchLiveProps, getCachedProps, isCacheValid, clearLiveCache, SOURCE_META } from '@/lib/liveData';
 import { getAIVerdicts } from '@/lib/aiVerdicts';
 import LockCards from '@/components/props/LockCards';
-import RankedPropCard from '@/components/props/RankedPropCard';
 import DemonPickCard from '@/components/props/DemonPickCard';
 import { RefreshCw, Wifi, WifiOff, Zap, SlidersHorizontal, Search, X } from 'lucide-react';
+import PlayerRow from '@/components/props/PlayerRow';
 import { cn } from '@/lib/utils';
 import { rankScore, gradeProp } from '@/lib/grading';
 import { NBA_API } from '@/lib/config';
@@ -617,6 +617,21 @@ export default function Props() {
     return result;
   }, [enrichedProps, selectedGames, selectedType, sortBy, selectedPlayers, selectedSources]);
 
+  // Group ranked props by player, preserving the rank of their best prop
+  const playerGroups = useMemo(() => {
+    const seen = new Map();
+    const groups = [];
+    filteredAndRanked.forEach((prop, i) => {
+      const name = prop.player_name;
+      if (!seen.has(name)) {
+        seen.set(name, groups.length);
+        groups.push({ playerName: name, rank: i + 1, props: [] });
+      }
+      groups[seen.get(name)].props.push(prop);
+    });
+    return groups;
+  }, [filteredAndRanked]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -922,27 +937,27 @@ export default function Props() {
             </div>
           </div>
 
-          {/* Ranked props list */}
+          {/* Ranked props list — collapsed by player */}
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <p className="text-xs text-muted-foreground">{filteredAndRanked.length} props · ranked by {SORT_OPTIONS.find(o => o.value === sortBy)?.label}</p>
+              <p className="text-xs text-muted-foreground">
+                {playerGroups.length} players · {filteredAndRanked.length} props · ranked by {SORT_OPTIONS.find(o => o.value === sortBy)?.label}
+              </p>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredAndRanked.map((prop, i) => {
-                const key = `${prop.player_name}__${prop.prop_type}__${prop.line}`;
-                return (
-                  <RankedPropCard
-                    key={key}
-                    prop={prop}
-                    rank={i + 1}
-                    aiVerdict={verdicts[key]}
-                    aiLoading={aiLoading}
-                    activeSource={selectedSources.length === 1 ? selectedSources[0] : null}
-                    playerProps={propsByPlayer[prop.player_name]}
-                    onOpenDetail={() => setDetailKey({ player_name: prop.player_name, prop_type: prop.prop_type })}
-                  />
-                );
-              })}
+            <div className="space-y-2">
+              {playerGroups.map(({ playerName, rank, props }) => (
+                <PlayerRow
+                  key={playerName}
+                  playerName={playerName}
+                  props={props}
+                  allPlayerProps={propsByPlayer[playerName] ?? props}
+                  rank={rank}
+                  verdicts={verdicts}
+                  aiLoading={aiLoading}
+                  activeSource={selectedSources.length === 1 ? selectedSources[0] : null}
+                  onOpenDetail={(pName, pType) => setDetailKey({ player_name: pName, prop_type: pType })}
+                />
+              ))}
             </div>
           </div>
         </>
