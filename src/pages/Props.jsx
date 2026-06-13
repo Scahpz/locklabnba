@@ -83,6 +83,7 @@ export default function Props() {
   const [gameDate, setGameDate] = useState(null);
   const [gamesSummary, setGamesSummary] = useState([]);
   const [loading, setLoading] = useState(() => !getCachedProps()); // skip spinner if stale cache exists
+  const [slowLoad, setSlowLoad] = useState(false); // true after 10s — shows "warming up" message
   const [refreshing, setRefreshing] = useState(false); // subtle background refresh indicator
   const [isLive, setIsLive] = useState(false);
   // Restore filter state from sessionStorage so navigating away and back preserves selections
@@ -128,23 +129,26 @@ export default function Props() {
 
   const loadData = async (forceRefresh = false) => {
     if (forceRefresh) {
-      clearLiveCache(); // bust cache so fetchLiveProps goes to network
+      clearLiveCache();
       setPlayerAnalytics({});
       setTeamContext({ teams: TEAM_STATS, injuries: {}, back_to_back: [], game_spreads: {} });
       fetchedPlayers.current = new Set();
     }
 
-    // Show stale cache instantly — no spinner
     const stale = getCachedProps();
     const cacheIsFresh = !forceRefresh && isCacheValid();
     if (stale && !forceRefresh) {
       applyData(stale, /* skipAI= */ !cacheIsFresh);
       setLoading(false);
-      if (cacheIsFresh) return; // fresh — nothing more to do
-      setRefreshing(true); // stale — fetch fresh in background
+      if (cacheIsFresh) return;
+      setRefreshing(true);
     } else {
       setLoading(true);
+      setSlowLoad(false);
     }
+
+    // After 10s with no data, show "warming up" message so users know what's happening
+    const slowTimer = setTimeout(() => setSlowLoad(true), 10000);
 
     try {
       const data = await fetchLiveProps();
@@ -152,7 +156,9 @@ export default function Props() {
     } catch {
       if (!stale) setRawProps([]);
     } finally {
+      clearTimeout(slowTimer);
       setLoading(false);
+      setSlowLoad(false);
       setRefreshing(false);
     }
   };
@@ -644,9 +650,16 @@ export default function Props() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
+      <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
         <RefreshCw className="w-6 h-6 animate-spin text-primary" />
-        <span className="ml-2 text-sm text-muted-foreground">Fetching today's props…</span>
+        <span className="text-sm text-muted-foreground">
+          {slowLoad ? 'Server warming up after inactivity…' : 'Fetching today\'s props…'}
+        </span>
+        {slowLoad && (
+          <span className="text-xs text-muted-foreground/50 max-w-xs">
+            This happens once after the server goes idle. Usually takes 30–45s — hang tight.
+          </span>
+        )}
       </div>
     );
   }

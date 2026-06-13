@@ -211,13 +211,14 @@ let _fetchPromise = null;
 async function _doFetch() {
   const defaultBookmakers = 'draftkings,fanduel,betmgm,caesars,pointsbetus';
 
-  // Fetch settings + all free sources in parallel.
-  // DK subcategory discovery + parallel fetches typically take 8-18s.
+  // Timeouts are set to 55s so Railway cold-starts (30-45s boot time) are survived.
+  // Railway holds incoming requests while the container boots, so the same request
+  // that triggered the wake-up gets served once the server is ready.
   const [settingsResult, ppResult, udResult, dkResult] = await Promise.allSettled([
-    fetchWithTimeout(`${NBA_API}/api/settings`, {}, 5000).then(r => r.json()).catch(() => ({})),
-    fetchWithTimeout(`${NBA_API}/api/prizepicks/props`, {}, 22000).then(r => r.ok ? r.json() : null).catch(() => null),
-    fetchWithTimeout(`${NBA_API}/api/underdog/props`, {}, 22000).then(r => r.ok ? r.json() : null).catch(() => null),
-    fetchWithTimeout(`${NBA_API}/api/draftkings/props`, {}, 25000).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetchWithTimeout(`${NBA_API}/api/settings`, {}, 55000).then(r => r.json()).catch(() => ({})),
+    fetchWithTimeout(`${NBA_API}/api/prizepicks/props`, {}, 55000).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetchWithTimeout(`${NBA_API}/api/underdog/props`, {}, 55000).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetchWithTimeout(`${NBA_API}/api/draftkings/props`, {}, 55000).then(r => r.ok ? r.json() : null).catch(() => null),
   ]);
 
   const settings    = settingsResult.status === 'fulfilled' ? settingsResult.value : {};
@@ -239,7 +240,7 @@ async function _doFetch() {
 
   // Last-resort fallback
   if (!rawProps.length) {
-    const fallback = await fetchWithTimeout(`${NBA_API}/api/live-props`, {}, 12000)
+    const fallback = await fetchWithTimeout(`${NBA_API}/api/live-props`, {}, 55000)
       .then(r => r.ok ? r.json() : null).catch(() => null);
     if (fallback?.rawProps?.length) {
       rawProps = fallback.rawProps.map(p => ({ ...p, sources: [], all_books: [] }));
