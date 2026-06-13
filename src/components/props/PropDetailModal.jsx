@@ -96,7 +96,8 @@ export default function PropDetailModal({ prop, onClose }) {
   const sliderMax = Math.round((originalLine + 6) * 2) / 2;
 
   const [adjustedLine, setAdjustedLine] = useState(originalLine);
-  const [chartTab, setChartTab] = useState('l10'); // 'l5' | 'l10' | 'l20' | 'home' | 'away'
+  const [chartWindow, setChartWindow] = useState('l10'); // 'l5' | 'l10' | 'l20'
+  const [locationFilter, setLocationFilter] = useState('all'); // 'all' | 'home' | 'away'
 
   // Close on Escape
   useEffect(() => {
@@ -328,34 +329,30 @@ export default function PropDetailModal({ prop, onClose }) {
               />
             </div>
 
-            {/* Chart tabs */}
+            {/* Chart: window + location filters */}
             {(gameLogs.length > 0 || prop.game_logs_last_20?.length > 0) && (() => {
               const allDetailLogs = prop.game_logs_last_20 || prop.game_logs_last_10 || [];
-              const homeLogs = allDetailLogs.filter(g => g.isHome);
-              const awayLogs = allDetailLogs.filter(g => !g.isHome);
-              const l10Detail = allDetailLogs.slice(allDetailLogs.length - 10 < 0 ? 0 : allDetailLogs.length - 10).slice(-10);
-              const l5Detail  = allDetailLogs.slice(-5);
-              const l20Detail = allDetailLogs;
 
-              // Which logs to display in chart + table
-              const tabLogs = {
-                l5:   l5Detail,
-                l10:  (prop.game_logs_last_10 || l10Detail),
-                l20:  l20Detail,
-                home: homeLogs,
-                away: awayLogs,
-              };
-              const activeDetail = tabLogs[chartTab] || tabLogs.l10;
-              const chartValues  = activeDetail.map(g => g.value);
+              // Step 1: pick the time window
+              const windowLogs = chartWindow === 'l5'
+                ? allDetailLogs.slice(-5)
+                : chartWindow === 'l20'
+                ? allDetailLogs
+                : (prop.game_logs_last_10 || allDetailLogs.slice(-10));
+
+              // Step 2: apply location filter on top of the window
+              const activeDetail = locationFilter === 'home'
+                ? windowLogs.filter(g => g.isHome)
+                : locationFilter === 'away'
+                ? windowLogs.filter(g => !g.isHome)
+                : windowLogs;
+
+              const chartValues = activeDetail.map(g => g.value);
               const activeChartMeta = activeDetail.map(g => ({ isHome: g.isHome, opp: g.opp, date: g.date }));
 
-              const TABS = [
-                { key: 'l5',   label: 'L5' },
-                { key: 'l10',  label: 'L10' },
-                ...(l20Detail.length > 10 ? [{ key: 'l20', label: 'L20' }] : []),
-                ...(homeLogs.length > 0   ? [{ key: 'home', label: '🏠 Home' }] : []),
-                ...(awayLogs.length > 0   ? [{ key: 'away', label: '✈ Away' }] : []),
-              ];
+              const hasL20 = allDetailLogs.length > 10;
+              const hasHome = windowLogs.some(g => g.isHome);
+              const hasAway = windowLogs.some(g => !g.isHome);
 
               const tabHR = chartValues.length > 0
                 ? Math.round(chartValues.filter(v => v > adjustedLine).length / chartValues.length * 100)
@@ -366,15 +363,19 @@ export default function PropDetailModal({ prop, onClose }) {
 
               return (
                 <div>
-                  {/* Tab bar */}
-                  <div className="flex items-center gap-1.5 mb-3 overflow-x-auto scrollbar-none">
-                    {TABS.map(t => (
+                  {/* Row 1: window selector */}
+                  <div className="flex items-center gap-1.5 mb-2">
+                    {[
+                      { key: 'l5',  label: 'L5' },
+                      { key: 'l10', label: 'L10' },
+                      ...(hasL20 ? [{ key: 'l20', label: 'L20' }] : []),
+                    ].map(t => (
                       <button
                         key={t.key}
-                        onClick={() => setChartTab(t.key)}
+                        onClick={() => { setChartWindow(t.key); setLocationFilter('all'); }}
                         className={cn(
-                          "text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all flex-shrink-0",
-                          chartTab === t.key
+                          "text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all",
+                          chartWindow === t.key
                             ? "bg-primary/20 border-primary/40 text-primary"
                             : "bg-secondary/40 border-border/50 text-muted-foreground hover:text-foreground"
                         )}
@@ -382,12 +383,43 @@ export default function PropDetailModal({ prop, onClose }) {
                         {t.label}
                       </button>
                     ))}
+
+                    {/* Divider */}
+                    <span className="w-px h-4 bg-white/10 mx-0.5" />
+
+                    {/* Row 2 inline: location filter */}
+                    {[
+                      { key: 'all',  label: 'All' },
+                      ...(hasHome ? [{ key: 'home', label: '🏠 Home' }] : []),
+                      ...(hasAway ? [{ key: 'away', label: '✈ Away' }] : []),
+                    ].map(f => (
+                      <button
+                        key={f.key}
+                        onClick={() => setLocationFilter(f.key)}
+                        className={cn(
+                          "text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all",
+                          locationFilter === f.key
+                            ? "bg-chart-4/20 border-chart-4/40 text-chart-4"
+                            : "bg-secondary/40 border-border/50 text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+
                     {tabAvg != null && (
                       <span className="text-[10px] text-muted-foreground/60 ml-auto flex-shrink-0">
                         avg {tabAvg} · {tabHR}% hit
                       </span>
                     )}
                   </div>
+
+                  {/* No games for this filter */}
+                  {activeDetail.length === 0 && (
+                    <div className="text-center py-6 text-[11px] text-muted-foreground/50">
+                      No {locationFilter === 'home' ? 'home' : 'away'} games in this window
+                    </div>
+                  )}
 
                   {/* Chart */}
                   {chartValues.length > 0 && (
