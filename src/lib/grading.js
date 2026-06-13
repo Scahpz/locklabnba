@@ -196,7 +196,7 @@ function gradeWithContext(prop) {
       ? l10 > line
         ? `Averaging ${l10} over last 10 games — beats the line by +${(l10 - line).toFixed(1)}`
         : `Averaging ${l10} over last 10 — below line by ${(line - l10).toFixed(1)}`
-      : pendingDetail('Game log data loading in background', 'Player not found in NBA stats — using market odds only'),
+      : pendingDetail('Game log data loading in background', 'Game log stats unavailable — using market odds only'),
     pass:            l10 != null && l10 > line,
     continuousScore: formScore(l10, line),
     weight:          25,
@@ -214,7 +214,7 @@ function gradeWithContext(prop) {
       ? l5 > line
         ? `Recent form is hot — L5 avg ${l5} beats the line${injNote ? `. Recent games may reflect expanded role with ${injNote}` : ''}`
         : `Recent cold streak — L5 avg ${l5} below line${injNote ? `. Consider that recent games may reflect expanded role with ${injNote}` : ''}`
-      : pendingDetail('Game log data loading in background', 'Player not found in NBA stats — using market odds only'),
+      : pendingDetail('Game log data loading in background', 'Game log stats unavailable — using market odds only'),
     pass:            l5 != null && l5 > line,
     continuousScore: formScore(l5, line),
     weight:          15,
@@ -233,7 +233,7 @@ function gradeWithContext(prop) {
       ? hit >= 60
         ? `Cleared this line ${hit}% of last 10 games — highly consistent${poissonProb != null ? `. Statistical model gives ${Math.round(poissonProb * 100)}% probability of going over` : ''}`
         : `Only ${hit}% hit rate over last 10 — inconsistent${poissonProb != null ? `. Statistical model gives ${Math.round(poissonProb * 100)}% probability of going over` : ''}`
-      : pendingDetail('Game log data loading in background', 'Player not found in NBA stats — using market odds only'),
+      : pendingDetail('Game log data loading in background', 'Game log stats unavailable — using market odds only'),
     pass:            hit != null && hit >= 60,
     continuousScore: hitScore,
     weight:          13,
@@ -255,7 +255,7 @@ function gradeWithContext(prop) {
       ? seasonAvg > line
         ? `Season average ${seasonAvg} over ${seasonGames} games clears the line — ${seasonHitRate}% season hit rate`
         : `Season average ${seasonAvg} over ${seasonGames} games is below the line — ${seasonHitRate}% season hit rate`
-      : pendingDetail('Season average loading', 'Player not found in NBA stats — using market odds only'),
+      : pendingDetail('Season average loading', 'Season stats unavailable — using market odds only'),
     pass:            seasonAvg != null && seasonAvg > line,
     continuousScore: formScore(seasonAvg, line),
     weight:          8,

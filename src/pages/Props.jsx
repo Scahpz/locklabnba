@@ -241,7 +241,11 @@ export default function Props() {
       // playerAnalytics[name] is an object   → fetched, has data
       const analyticsEntry = playerAnalytics[prop.player_name];
       const analytics = (analyticsEntry != null) ? analyticsEntry?.[prop.prop_type] : undefined;
-      const dataUnavailable = analyticsEntry === null; // tried but no match in NBA API
+      // dataUnavailable when: (1) player fetch returned null (not found in NBA API), or
+      //                       (2) player was found but no stats computed for this specific prop type
+      //                           (avg below threshold) — prevents "loading" state forever
+      const dataUnavailable = analyticsEntry === null
+        || (analyticsEntry !== undefined && analyticsEntry !== null && analytics === undefined);
       const cs = analytics?.confidence_score || prop.confidence_score || 5;
       const base = analytics ? {
         ...prop,

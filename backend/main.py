@@ -421,14 +421,20 @@ def find_player(name: str):
     for p in all_players:
         if normalize(p["full_name"]) == target:
             return p
-    # Partial match on last name
+    # Partial match: require both first AND last name to avoid wrong-player returns
     parts = target.split()
-    if parts:
-        last = parts[-1]
-        candidates = [p for p in all_players if last in normalize(p["full_name"]).split()]
+    if len(parts) >= 2:
+        first, last = parts[0], parts[-1]
+        candidates = [
+            p for p in all_players
+            if last in normalize(p["full_name"]).split()
+            and first in normalize(p["full_name"]).split()
+        ]
         active_c = [p for p in candidates if p.get("is_active")]
         if active_c:
             return active_c[0]
+        if candidates:
+            return candidates[0]
     return None
 
 def _parse_game_date(s: str):
@@ -709,7 +715,14 @@ def fetch_game_logs(player_name: str) -> list:
         logging.warning(f"fetch_game_logs fallback: scoreboard returned no events")
         return []
 
+    import re as _re
     from concurrent.futures import ThreadPoolExecutor
+
+    def _norm_espn(n: str) -> str:
+        """Normalize for loose matching: lowercase, drop all non-alpha chars."""
+        return ' '.join(_re.sub(r'[^a-z ]', '', n.lower()).split())
+
+    player_norm = _norm_espn(player_name)
 
     logs = []
     BATCH = 10  # fetch 10 boxscores in parallel at a time
@@ -718,7 +731,13 @@ def fetch_game_logs(player_name: str) -> list:
         with ThreadPoolExecutor(max_workers=BATCH) as pool:
             boxes = list(pool.map(_espn_boxscore_index, batch))
         for box_index in boxes:
-            entry = box_index.get(player_name)
+            entry = box_index.get(player_name)  # exact match first (fastest)
+            if not entry:
+                # Normalized fallback — handles apostrophe/hyphen/accent variants
+                for espn_name, espn_data in box_index.items():
+                    if _norm_espn(espn_name) == player_norm:
+                        entry = espn_data
+                        break
             if entry and entry.get("PTS") is not None:
                 logs.append(entry)
         if len(logs) >= 15:
