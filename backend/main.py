@@ -36,6 +36,7 @@ _data_dir.mkdir(parents=True, exist_ok=True)
 PARLAYS_FILE = _data_dir / "parlays.json"
 SETTINGS_FILE = _data_dir / "settings.json"
 USERS_FILE    = _data_dir / "users.json"
+PROP_HISTORY_FILE = _data_dir / "prop_history.json"
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "locklab-dev-secret-key-2025-nba")
 
@@ -362,6 +363,22 @@ def calculate_analytics(logs: list, prop_type: str, line: float) -> dict:
     display_logs_10 = list(reversed(logs[:10]))
     display_logs_5  = list(reversed(logs[:5]))
 
+    # L20 stats (use all logs up to 20)
+    last_20 = values[:20]
+    avg_last_20 = round(sum(last_20) / len(last_20), 1) if last_20 else line
+    hit_rate_last_20 = round(sum(1 for v in last_20 if v > line) / len(last_20) * 100, 1) if last_20 else 50.0
+    display_logs_20 = list(reversed(logs[:20]))
+
+    # Home/Away splits (parse_matchup already exists and returns (isHome, opp))
+    home_logs = [(g, stat_value(g, prop_type)) for g in logs if parse_matchup(g.get("MATCHUP", ""))[0]]
+    away_logs = [(g, stat_value(g, prop_type)) for g in logs if not parse_matchup(g.get("MATCHUP", ""))[0]]
+    home_vals = [v for _, v in home_logs[:15]]
+    away_vals = [v for _, v in away_logs[:15]]
+    home_avg = round(sum(home_vals) / len(home_vals), 1) if home_vals else None
+    away_avg = round(sum(away_vals) / len(away_vals), 1) if away_vals else None
+    home_hit_rate = round(sum(1 for v in home_vals if v > line) / len(home_vals) * 100, 1) if home_vals else None
+    away_hit_rate = round(sum(1 for v in away_vals if v > line) / len(away_vals) * 100, 1) if away_vals else None
+
     return {
         "avg_last_5": avg_last_5,
         "avg_last_10": avg_last_10,
@@ -377,6 +394,26 @@ def calculate_analytics(logs: list, prop_type: str, line: float) -> dict:
         "last_10_games": list(reversed(values[:10])),
         "last_5_games":  list(reversed(values[:5])),
         "minutes_last_5": [float(g.get("MIN") or 0) for g in display_logs_5],
+        "avg_last_20": avg_last_20,
+        "hit_rate_last_20": hit_rate_last_20,
+        "last_20_games": list(reversed(values[:20])),
+        "home_avg": home_avg,
+        "away_avg": away_avg,
+        "home_hit_rate": home_hit_rate,
+        "away_hit_rate": away_hit_rate,
+        "home_games_count": len(home_vals),
+        "away_games_count": len(away_vals),
+        "game_logs_last_20": [
+            {
+                "date": g.get("GAME_DATE"),
+                "matchup": g.get("MATCHUP"),
+                "value": stat_value(g, prop_type),
+                "minutes": g.get("MIN"),
+                "isHome": parse_matchup(g.get("MATCHUP", ""))[0],
+                "opp": parse_matchup(g.get("MATCHUP", ""))[1],
+            }
+            for g in display_logs_20
+        ],
         "game_logs_last_10": [
             {
                 "date": g.get("GAME_DATE"),
@@ -2096,6 +2133,112 @@ async def auth_update_me(request: Request, body: UpdateProfileRequest):
     users[user_id] = user
     save_users(users)
     return _user_public(user)
+
+
+# ── /api/prop-history CRUD ────────────────────────────────────────────────────
+def load_prop_history() -> list:
+    if PROP_HISTORY_FILE.exists():
+        try:
+            return json.loads(PROP_HISTORY_FILE.read_text())
+        except Exception:
+            return []
+    return []
+
+def save_prop_history(entries: list):
+    PROP_HISTORY_FILE.write_text(json.dumps(entries, indent=2))
+
+@app.get("/api/prop-history")
+async def list_prop_history(request: Request):
+    user_id = get_token_user_id(request)
+    entries = [x for x in load_prop_history() if x.get("user_id") == user_id]
+    entries.sort(key=lambda x: x.get("created_date", ""), reverse=True)
+    return entries
+
+@app.post("/api/prop-history")
+async def create_prop_history_entry(request: Request, entry: dict):
+    user_id = get_token_user_id(request)
+    entries = load_prop_history()
+    game_date = entry.get("game_date", datetime.now().strftime("%Y-%m-%d"))
+    # Dedup: same user + player + prop_type + date
+    existing = next((e for e in entries
+                     if e.get("user_id") == user_id
+                     and e.get("player_name") == entry.get("player_name")
+                     and e.get("prop_type") == entry.get("prop_type")
+                     and e.get("game_date") == game_date), None)
+    if existing:
+        return existing
+    entry["id"] = str(uuid.uuid4())
+    entry["user_id"] = user_id
+    entry["game_date"] = game_date
+    entry["created_date"] = datetime.now().isoformat()
+    entry["result"] = "pending"
+    entries.append(entry)
+    save_prop_history(entries)
+    return entry
+
+@app.put("/api/prop-history/{entry_id}")
+async def update_prop_history_entry(request: Request, entry_id: str, data: dict):
+    user_id = get_token_user_id(request)
+    entries = load_prop_history()
+    for i, e in enumerate(entries):
+        if e["id"] == entry_id and e.get("user_id") == user_id:
+            entries[i] = {**e, **data}
+            save_prop_history(entries)
+            return entries[i]
+    raise HTTPException(404, "Entry not found")
+
+@app.delete("/api/prop-history/{entry_id}")
+async def delete_prop_history_entry(request: Request, entry_id: str):
+    user_id = get_token_user_id(request)
+    save_prop_history([e for e in load_prop_history()
+                       if not (e["id"] == entry_id and e.get("user_id") == user_id)])
+    return {"ok": True}
+
+@app.post("/api/prop-history/settle")
+async def settle_prop_history(request: Request):
+    """Auto-settle pending prop history entries using stored game logs."""
+    from concurrent.futures import ThreadPoolExecutor
+    user_id = get_token_user_id(request)
+    entries = load_prop_history()
+    today = datetime.now().strftime("%Y-%m-%d")
+    pending = [e for e in entries
+               if e.get("user_id") == user_id
+               and e.get("result") == "pending"
+               and e.get("game_date", "9999") < today]
+    if not pending:
+        return {"settled": 0, "message": "No pending entries to settle"}
+
+    players = list({e["player_name"] for e in pending})
+    def get_logs(name):
+        try:
+            return name, fetch_game_logs(name) or []
+        except Exception:
+            return name, []
+
+    player_logs = {}
+    with ThreadPoolExecutor(max_workers=min(5, len(players))) as pool:
+        for name, logs in pool.map(get_logs, players):
+            player_logs[name] = logs
+
+    pending_ids = {e["id"] for e in pending}
+    settled_count = 0
+    for i, entry in enumerate(entries):
+        if entry.get("id") not in pending_ids:
+            continue
+        logs = player_logs.get(entry["player_name"], [])
+        game_date = entry.get("game_date", "")
+        prop_type = entry.get("prop_type", "")
+        line = float(entry.get("line", 0))
+        direction = entry.get("direction", "OVER")
+        matching = next((g for g in logs if game_date in (g.get("GAME_DATE") or "")), None)
+        if matching:
+            actual = stat_value(matching, prop_type)
+            result = "hit" if (direction == "OVER" and actual > line) or (direction == "UNDER" and actual <= line) else "miss"
+            entries[i] = {**entry, "result": result, "actual_value": actual}
+            settled_count += 1
+
+    save_prop_history(entries)
+    return {"settled": settled_count, "total_pending": len(pending)}
 
 
 @app.get("/health")

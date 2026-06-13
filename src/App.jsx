@@ -16,6 +16,7 @@ import Profile from '@/pages/Profile.jsx';
 import Compare from '@/pages/Compare';
 import LiveOdds from '@/pages/LiveOdds';
 import AIPicks from '@/pages/AIPicks.jsx';
+import PropHistory from '@/pages/PropHistory.jsx';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -49,6 +50,7 @@ const AuthenticatedApp = () => {
         <Route path="/compare" element={<Compare />} />
         <Route path="/odds" element={<LiveOdds />} />
         <Route path="/ai-picks" element={<AIPicks />} />
+        <Route path="/history" element={<PropHistory />} />
         <Route path="/live-odds" element={<Navigate to="/odds" replace />} />
         <Route path="/streaks" element={<Navigate to="/trends" replace />} />
       </Route>

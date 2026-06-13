@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, Check, Clock, Zap } from 'lucide-react';
+import { X, Check, Clock, Zap, Home, Plane } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { gradeProp } from '@/lib/grading';
 import TeamLogo from '@/components/common/TeamLogo';
@@ -78,6 +78,7 @@ export default function PropDetailModal({ prop, onClose }) {
   const sliderMax = Math.round((originalLine + 6) * 2) / 2;
 
   const [adjustedLine, setAdjustedLine] = useState(originalLine);
+  const [chartTab, setChartTab] = useState('l10'); // 'l5' | 'l10' | 'l20' | 'home' | 'away'
 
   // Close on Escape
   useEffect(() => {
@@ -309,48 +310,103 @@ export default function PropDetailModal({ prop, onClose }) {
               />
             </div>
 
-            {/* Chart */}
-            {gameLogs.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Last 10 Games</p>
-                <PlayerTrendChart
-                  games={gameLogs}
-                  line={adjustedLine}
-                  propType={prop.prop_type}
-                  gameLogs={chartGameLogs}
-                />
-              </div>
-            )}
+            {/* Chart tabs */}
+            {(gameLogs.length > 0 || prop.game_logs_last_20?.length > 0) && (() => {
+              const allDetailLogs = prop.game_logs_last_20 || prop.game_logs_last_10 || [];
+              const homeLogs = allDetailLogs.filter(g => g.isHome);
+              const awayLogs = allDetailLogs.filter(g => !g.isHome);
+              const l10Detail = allDetailLogs.slice(allDetailLogs.length - 10 < 0 ? 0 : allDetailLogs.length - 10).slice(-10);
+              const l5Detail  = allDetailLogs.slice(-5);
+              const l20Detail = allDetailLogs;
 
-            {/* Game log table — newest first */}
-            {prop.game_logs_last_10?.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Game Log</p>
-                <div className="bg-secondary/30 rounded-xl overflow-hidden border border-border/40">
-                  <div className="grid grid-cols-4 text-[9px] text-muted-foreground uppercase px-4 py-2 border-b border-border/40 bg-secondary/40">
-                    <span>Date</span>
-                    <span>Matchup</span>
-                    <span className="text-center">{propTypeLabels[prop.prop_type] || prop.prop_type}</span>
-                    <span className="text-right">Result</span>
+              // Which logs to display in chart + table
+              const tabLogs = {
+                l5:   l5Detail,
+                l10:  (prop.game_logs_last_10 || l10Detail),
+                l20:  l20Detail,
+                home: homeLogs,
+                away: awayLogs,
+              };
+              const activeDetail = tabLogs[chartTab] || tabLogs.l10;
+              const chartValues  = activeDetail.map(g => g.value);
+              const activeChartMeta = activeDetail.map(g => ({ isHome: g.isHome, opp: g.opp, date: g.date }));
+
+              const TABS = [
+                { key: 'l5',   label: 'L5' },
+                { key: 'l10',  label: 'L10' },
+                ...(l20Detail.length > 10 ? [{ key: 'l20', label: 'L20' }] : []),
+                ...(homeLogs.length > 0   ? [{ key: 'home', label: '🏠 Home' }] : []),
+                ...(awayLogs.length > 0   ? [{ key: 'away', label: '✈ Away' }] : []),
+              ];
+
+              const tabHR = chartValues.length > 0
+                ? Math.round(chartValues.filter(v => v > adjustedLine).length / chartValues.length * 100)
+                : null;
+              const tabAvg = chartValues.length > 0
+                ? Math.round(chartValues.reduce((s, v) => s + v, 0) / chartValues.length * 10) / 10
+                : null;
+
+              return (
+                <div>
+                  {/* Tab bar */}
+                  <div className="flex items-center gap-1.5 mb-3 overflow-x-auto scrollbar-none">
+                    {TABS.map(t => (
+                      <button
+                        key={t.key}
+                        onClick={() => setChartTab(t.key)}
+                        className={cn(
+                          "text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all flex-shrink-0",
+                          chartTab === t.key
+                            ? "bg-primary/20 border-primary/40 text-primary"
+                            : "bg-secondary/40 border-border/50 text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                    {tabAvg != null && (
+                      <span className="text-[10px] text-muted-foreground/60 ml-auto flex-shrink-0">
+                        avg {tabAvg} · {tabHR}% hit
+                      </span>
+                    )}
                   </div>
-                  {[...prop.game_logs_last_10].reverse().map((g, i) => (
-                    <div
-                      key={i}
-                      className={cn('grid grid-cols-4 text-xs px-4 py-2.5 items-center', i % 2 === 1 ? 'bg-secondary/20' : '')}
-                    >
-                      <span className="text-muted-foreground text-[10px]">{g.date ? g.date.replace(/^\d{4}-/, '') : '—'}</span>
-                      <span className="text-foreground text-[10px]">{g.isHome ? 'vs' : '@'} {g.opp}</span>
-                      <span className={cn('text-center font-bold text-sm', g.value > adjustedLine ? 'text-primary' : 'text-destructive')}>
-                        {g.value}
-                      </span>
-                      <span className={cn('text-right text-[10px] font-semibold', g.value > adjustedLine ? 'text-primary' : 'text-destructive')}>
-                        {g.value > adjustedLine ? '✓ HIT' : '✗ MISS'}
-                      </span>
+
+                  {/* Chart */}
+                  {chartValues.length > 0 && (
+                    <PlayerTrendChart
+                      games={chartValues}
+                      line={adjustedLine}
+                      propType={prop.prop_type}
+                      gameLogs={activeChartMeta}
+                    />
+                  )}
+
+                  {/* Game log table */}
+                  {activeDetail.length > 0 && (
+                    <div className="mt-3 bg-secondary/30 rounded-xl overflow-hidden border border-border/40">
+                      <div className="grid grid-cols-4 text-[9px] text-muted-foreground uppercase px-4 py-2 border-b border-border/40 bg-secondary/40">
+                        <span>Date</span>
+                        <span>Matchup</span>
+                        <span className="text-center">{propTypeLabels[prop.prop_type] || prop.prop_type}</span>
+                        <span className="text-right">Result</span>
+                      </div>
+                      {[...activeDetail].reverse().map((g, i) => (
+                        <div key={i} className={cn('grid grid-cols-4 text-xs px-4 py-2.5 items-center', i % 2 === 1 ? 'bg-secondary/20' : '')}>
+                          <span className="text-muted-foreground text-[10px]">{g.date ? g.date.replace(/^\d{4}-/, '') : '—'}</span>
+                          <span className="text-foreground text-[10px]">{g.isHome ? 'vs' : '@'} {g.opp}</span>
+                          <span className={cn('text-center font-bold text-sm', g.value > adjustedLine ? 'text-primary' : 'text-destructive')}>
+                            {g.value}
+                          </span>
+                          <span className={cn('text-right text-[10px] font-semibold', g.value > adjustedLine ? 'text-primary' : 'text-destructive')}>
+                            {g.value > adjustedLine ? '✓ HIT' : '✗ MISS'}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Grade breakdown — fully expanded */}
             <div>

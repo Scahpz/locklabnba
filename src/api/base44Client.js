@@ -111,21 +111,16 @@ export const base44 = {
   entities: {
     SavedParlay: {
       list: async () => apiRequest('/api/parlays'),
-
-      create: async (data) =>
-        apiRequest('/api/parlays', {
-          method: 'POST',
-          body: JSON.stringify(data),
-        }),
-
-      update: async (id, data) =>
-        apiRequest(`/api/parlays/${id}`, {
-          method: 'PUT',
-          body: JSON.stringify(data),
-        }),
-
-      delete: async (id) =>
-        apiRequest(`/api/parlays/${id}`, { method: 'DELETE' }),
+      create: async (data) => apiRequest('/api/parlays', { method: 'POST', body: JSON.stringify(data) }),
+      update: async (id, data) => apiRequest(`/api/parlays/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+      delete: async (id) => apiRequest(`/api/parlays/${id}`, { method: 'DELETE' }),
+    },
+    PropHistory: {
+      list: async () => apiRequest('/api/prop-history'),
+      create: async (data) => apiRequest('/api/prop-history', { method: 'POST', body: JSON.stringify(data) }),
+      update: async (id, data) => apiRequest(`/api/prop-history/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+      delete: async (id) => apiRequest(`/api/prop-history/${id}`, { method: 'DELETE' }),
+      settle: async () => apiRequest('/api/prop-history/settle', { method: 'POST', body: JSON.stringify({}) }),
     },
   },
 };

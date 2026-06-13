@@ -1,3 +1,5 @@
+import { getPrevLines } from '@/lib/liveData';
+
 /**
  * 4-Factor Grading Engine
  *
@@ -353,6 +355,76 @@ function gradeWithContext(prop) {
       weight:          14,
       available:       true,
       category:        'rest',
+    });
+  }
+
+  // ── 5b. HOME/AWAY SPLIT ──────────────────────────────────────────────────
+  const homeAvg = prop.home_avg;
+  const awayAvg = prop.away_avg;
+  if (homeAvg != null || awayAvg != null) {
+    const isHome      = prop.is_home ?? false;
+    const splitAvg    = isHome ? (homeAvg ?? awayAvg) : (awayAvg ?? homeAvg);
+    const splitHR     = isHome ? (prop.home_hit_rate ?? prop.away_hit_rate) : (prop.away_hit_rate ?? prop.home_hit_rate);
+    const splitGames  = isHome ? (prop.home_games_count ?? 0) : (prop.away_games_count ?? 0);
+    const locLabel    = isHome ? 'Home' : 'Away';
+    const splitPass   = splitAvg != null && splitAvg > line;
+    criteria.push({
+      label: splitAvg != null
+        ? `${locLabel} Splits: ${splitAvg} avg, ${splitHR ?? '?'}% hit rate (${splitGames}G)`
+        : `${locLabel} Splits — insufficient data`,
+      detail: splitAvg != null
+        ? splitPass
+          ? `${locLabel} avg of ${splitAvg} exceeds the line — strong ${locLabel.toLowerCase()} performer`
+          : `${locLabel} avg of ${splitAvg} is below the line — weaker ${locLabel.toLowerCase()} than season average suggests`
+        : `Not enough ${locLabel.toLowerCase()} games to compute split`,
+      pass:            splitPass,
+      continuousScore: splitAvg != null ? formScore(splitAvg, line) : null,
+      weight:          10,
+      available:       splitAvg != null,
+      pending:         false,
+      category:        'form',
+    });
+  }
+
+  // ── 5c. H2H VS TONIGHT'S OPPONENT ───────────────────────────────────────
+  const allGameLogs = prop.game_logs_last_20 || prop.game_logs_last_10 || [];
+  const opponent = prop.opponent || '';
+  const h2hGames = allGameLogs.filter(g => g.opp === opponent);
+  if (h2hGames.length >= 2) {
+    const h2hVals = h2hGames.map(g => g.value);
+    const h2hAvg  = Math.round(h2hVals.reduce((s, v) => s + v, 0) / h2hVals.length * 10) / 10;
+    const h2hHits = h2hVals.filter(v => v > line).length;
+    const h2hHR   = Math.round(h2hHits / h2hVals.length * 100);
+    criteria.push({
+      label: `H2H vs ${opponent}: ${h2hAvg} avg, ${h2hHR}% hit rate (${h2hGames.length}G)`,
+      detail: h2hAvg > line
+        ? `Averaging ${h2hAvg} in ${h2hGames.length} games vs ${opponent} this season — strong historical matchup`
+        : `Averaging only ${h2hAvg} vs ${opponent} — historically tough matchup`,
+      pass:            h2hAvg > line,
+      continuousScore: formScore(h2hAvg, line),
+      weight:          8,
+      available:       true,
+      category:        'form',
+    });
+  }
+
+  // ── 5d. LINE MOVEMENT (sharp money signal) ───────────────────────────────
+  const prevLines = getPrevLines();
+  const prevLine  = prevLines[`${prop.player_name}__${prop.prop_type}`];
+  if (prevLine != null && prevLine !== line) {
+    const diff = line - prevLine; // positive = line went UP
+    // Line UP = sharp money on OVER (books raise line to discourage more OVER action)
+    // Line DOWN = sharp money on UNDER
+    const sharpOnOver = diff > 0;
+    criteria.push({
+      label: `Line Movement: ${prevLine} → ${line} (${diff > 0 ? '+' : ''}${diff.toFixed(1)}) — sharp ${sharpOnOver ? 'OVER' : 'UNDER'}`,
+      detail: sharpOnOver
+        ? `Line rose from ${prevLine} to ${line} — books raised it to discourage OVER bets, suggesting sharp money is on the OVER`
+        : `Line fell from ${prevLine} to ${line} — sharp money appears to be on the UNDER`,
+      pass:            sharpOnOver,
+      weight:          8,
+      available:       true,
+      category:        'matchup',
     });
   }
 

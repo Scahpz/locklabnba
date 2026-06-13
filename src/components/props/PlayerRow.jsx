@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronDown, ChevronUp, TrendingUp, TrendingDown } from 'lucide-react';
+import { ChevronDown, ChevronUp, TrendingUp, TrendingDown, BookmarkPlus, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TeamLogo from '@/components/common/TeamLogo';
 import RankedPropCard from '@/components/props/RankedPropCard';
 import { gradeProp } from '@/lib/grading';
 import { calcEVVerdict, TIER_CONFIG } from '@/lib/verdict';
+import { base44 } from '@/api/base44Client';
+import { toast } from 'sonner';
 
 const propTypeLabels = {
   points: 'PTS', rebounds: 'REB', assists: 'AST', PRA: 'PRA',
@@ -15,6 +17,7 @@ const propTypeLabels = {
 export default function PlayerRow({ playerName, props, allPlayerProps, rank, verdicts, aiLoading, activeSource, onOpenDetail }) {
   const [expanded, setExpanded] = useState(false);
   const [activeType, setActiveType] = useState(() => props[0]?.prop_type);
+  const [tracked, setTracked] = useState(false);
 
   // If activeType is no longer in the filtered set, fall back gracefully
   const activeProp = useMemo(() => {
@@ -42,6 +45,28 @@ export default function PlayerRow({ playerName, props, allPlayerProps, rank, ver
   const evVerdict = calcEVVerdict(gradedProp, grade);
   const isOver    = evVerdict.direction === 'OVER';
   const stillLoading = !gradedProp.has_analytics && !gradedProp.data_unavailable;
+
+  const handleTrack = async (e) => {
+    e.stopPropagation();
+    try {
+      await base44.entities.PropHistory.create({
+        player_name:  playerName,
+        team:         gradedProp.team || gradedProp.player_team || '',
+        opponent:     gradedProp.opponent || '',
+        prop_type:    gradedProp.prop_type,
+        line:         gradedProp.line,
+        direction:    evVerdict.direction,
+        grade_label:  evVerdict.label,
+        tier:         evVerdict.tier,
+        game_date:    new Date().toLocaleDateString('en-CA'),
+        result:       'pending',
+      });
+      setTracked(true);
+      toast.success(`Tracking ${playerName} ${evVerdict.direction} ${gradedProp.line} ${gradedProp.prop_type}`);
+    } catch {
+      toast.error('Failed to track prop');
+    }
+  };
 
   const rankStyle = rank <= 3
     ? 'text-chart-4 bg-chart-4/10 border-chart-4/25'
@@ -75,6 +100,18 @@ export default function PlayerRow({ playerName, props, allPlayerProps, rank, ver
             <span className={cn('w-1.5 h-1.5 rounded-full flex-shrink-0', TIER_CONFIG[evVerdict.tier]?.dot)} />
             {evVerdict.label}
           </span>
+          <button
+            onClick={handleTrack}
+            title={tracked ? 'Tracked!' : 'Track this prop'}
+            className={cn(
+              "w-6 h-6 flex items-center justify-center rounded-lg transition-all flex-shrink-0",
+              tracked
+                ? "bg-primary/15 text-primary"
+                : "bg-white/5 text-muted-foreground hover:bg-primary/10 hover:text-primary"
+            )}
+          >
+            {tracked ? <Check className="w-3.5 h-3.5" /> : <BookmarkPlus className="w-3.5 h-3.5" />}
+          </button>
           <div className="w-6 h-6 flex items-center justify-center rounded-lg bg-white/5 text-muted-foreground flex-shrink-0">
             {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </div>
