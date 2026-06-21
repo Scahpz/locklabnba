@@ -11,6 +11,7 @@ const FRESH_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 })();
 
 import { NBA_API } from './config';
+import { isDemoMode, getMockPayload } from './mockData';
 
 export function isCacheValid() {
   const ts = Number(localStorage.getItem(CACHE_TS_KEY) || 0);
@@ -264,6 +265,7 @@ async function _doFetch() {
 }
 
 export async function fetchLiveProps() {
+  if (isDemoMode()) return getMockPayload();
   if (isCacheValid()) return getCachedProps();
   if (_fetchPromise) return _fetchPromise;
   _fetchPromise = _doFetch().finally(() => { _fetchPromise = null; });
@@ -271,6 +273,6 @@ export async function fetchLiveProps() {
 }
 
 // ── Eager prefetch ────────────────────────────────────────────────────────────
-if (!isCacheValid()) {
+if (!isDemoMode() && !isCacheValid()) {
   fetchLiveProps().catch(() => {});
 }

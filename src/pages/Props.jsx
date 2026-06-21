@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { fetchLiveProps, getCachedProps, isCacheValid, clearLiveCache, SOURCE_META } from '@/lib/liveData';
+import { isDemoMode } from '@/lib/mockData';
 import { getAIVerdicts } from '@/lib/aiVerdicts';
 import LockCards from '@/components/props/LockCards';
 import DemonPickCard from '@/components/props/DemonPickCard';
@@ -195,7 +196,7 @@ export default function Props() {
 
   // Fetch live team context (injuries, back-to-back, spreads) — merges on top of hardcoded stats
   useEffect(() => {
-    if (!rawProps.length) return;
+    if (!rawProps.length || isDemoMode()) return;
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 10000);
     fetch(`${NBA_API}/api/team-context`, { signal: ctrl.signal })
@@ -216,7 +217,7 @@ export default function Props() {
 
   // Auto-fetch game logs for all players in one bulk request
   useEffect(() => {
-    if (!rawProps.length) return;
+    if (!rawProps.length || isDemoMode()) return;
     const names = [...new Set(rawProps.map(p => p.player_name))];
     const pending = names.filter(n => !fetchedPlayers.current.has(n));
     if (!pending.length) return;
@@ -700,6 +701,13 @@ export default function Props() {
   return (
     <>
     <div className="space-y-6">
+      {/* Demo mode banner */}
+      {isDemoMode() && (
+        <div className="flex items-center gap-2 text-xs px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 font-medium">
+          <Zap className="w-3.5 h-3.5 flex-shrink-0" />
+          Demo Mode — showing example props with mock data. Remove <code className="font-mono bg-amber-500/20 px-1 rounded">?demo</code> from the URL to see live props.
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>

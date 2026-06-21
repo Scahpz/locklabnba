@@ -789,3 +789,82 @@ export function getAllProps() {
   });
   return allProps;
 }
+
+function buildGameLogs(values, oppTeam) {
+  return values.map((value, i) => {
+    const isHome = i % 2 === 0;
+    return {
+      date: `4/${values.length - i}`,
+      matchup: isHome ? `vs. ${oppTeam}` : `@ ${oppTeam}`,
+      value,
+      minutes: '32',
+      isHome,
+      opp: oppTeam,
+    };
+  });
+}
+
+function getMockGames() {
+  const seen = new Set();
+  const pairs = [];
+  mockPlayers.forEach(p => {
+    const key = [p.team, p.opponent].sort().join('_');
+    if (!seen.has(key)) {
+      seen.add(key);
+      pairs.push({
+        home: p.team,
+        away: p.opponent,
+        scheduled_at: new Date(Date.now() + pairs.length * 3600000).toISOString(),
+      });
+    }
+  });
+  return pairs.slice(0, 8);
+}
+
+export function getMockPayload() {
+  const flat = getAllProps();
+  const props = flat.map(p => {
+    const vals10 = p.last_10_games || [];
+    const vals20 = [...vals10, ...vals10].slice(0, 20);
+    const logs10 = buildGameLogs(vals10, p.opponent);
+    const logs20 = buildGameLogs(vals20, p.opponent);
+    const homeG  = logs10.filter(g => g.isHome);
+    const awayG  = logs10.filter(g => !g.isHome);
+    const avg = arr => arr.length ? parseFloat((arr.reduce((s, g) => s + g.value, 0) / arr.length).toFixed(1)) : null;
+    const hitRate = (arr, line) => arr.length ? Math.round(arr.filter(g => g.value > line).length / arr.length * 100) : null;
+
+    return {
+      ...p,
+      player_team: p.team,
+      home: p.team,
+      away: p.opponent,
+      season_avg: p.avg_last_10 ? parseFloat((p.avg_last_10 * 0.97).toFixed(1)) : null,
+      season_games: 55,
+      season_hit_rate: p.hit_rate_last_10 ? Math.round(p.hit_rate_last_10 * 0.92) : null,
+      avg_last_20: p.avg_last_10,
+      hit_rate_last_20: p.hit_rate_last_10,
+      last_20_games: vals20,
+      game_logs_last_10: logs10,
+      game_logs_last_20: logs20,
+      home_avg: avg(homeG),
+      away_avg: avg(awayG),
+      home_hit_rate: hitRate(homeG, p.line),
+      away_hit_rate: hitRate(awayG, p.line),
+      home_games_count: homeG.length,
+      away_games_count: awayG.length,
+      has_analytics: true,
+      is_home: true,
+      sources: ['draftkings'],
+      all_books: [{ key: 'draftkings', title: 'DraftKings', line: p.line, over_odds: p.over_odds, under_odds: p.under_odds }],
+    };
+  });
+
+  return {
+    game_date: 'Demo Mode · Example Props',
+    games_summary: getMockGames(),
+    props,
+  };
+}
+
+export const isDemoMode = () =>
+  typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('demo');
